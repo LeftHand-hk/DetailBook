@@ -1,0 +1,61 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#4F46E5"/>
+    </linearGradient>
+    <radialGradient id="shine" cx="30%" cy="25%" r="60%">
+      <stop offset="0%" stop-color="white" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect width="200" height="200" rx="44" fill="url(#bg)"/>
+  <!-- Shine overlay -->
+  <rect width="200" height="200" rx="44" fill="url(#shine)"/>
+  <!-- Subtle bottom shadow line -->
+  <rect x="0" y="160" width="200" height="40" rx="0" fill="black" fill-opacity="0.08"/>
+  <rect x="0" y="170" width="200" height="30" rx="0" ry="0" fill="black" fill-opacity="0.04"/>
+  <rect width="200" height="200" rx="44" fill="url(#shine)" fill-opacity="0.4"/>
+
+  <!-- D letterform (evenodd cutout) -->
+  <path fill-rule="evenodd" fill="white"
+    d="M 48 46
+       L 48 154
+       L 100 154
+       Q 158 154 158 100
+       Q 158 46 100 46
+       Z
+       M 72 70
+       L 100 70
+       Q 134 70 134 100
+       Q 134 130 100 130
+       L 72 130
+       Z"/>
+
+  <!-- Sparkle top-right — 4-point star -->
+  <g filter="url(#glow)" opacity="0.95">
+    <!-- Large sparkle -->
+    <path fill="white"
+      d="M 155 38
+         L 158 48 L 168 51 L 158 54 L 155 64
+         L 152 54 L 142 51 L 152 48 Z"/>
+    <!-- Small sparkle -->
+    <path fill="white" opacity="0.7"
+      d="M 140 22
+         L 142 28 L 148 30 L 142 32 L 140 38
+         L 138 32 L 132 30 L 138 28 Z"/>
+    <!-- Tiny dot -->
+    <circle cx="164" cy="26" r="4" fill="white" opacity="0.5"/>
+    <circle cx="172" cy="40" r="2.5" fill="white" opacity="0.4"/>
+  </g>
+
+  <!-- Shine streak across D (diagonal gloss) -->
+  <path d="M 55 62 Q 90 55 120 70" stroke="white" stroke-width="2.5"
+    stroke-linecap="round" fill="none" opacity="0.2"/>
+</svg>

@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+}
+
+model User {
+  id               String   @id @default(cuid())
+  email            String   @unique
+  password         String
+  businessName     String
+  name             String
+  phone            String   @default("")
+  city             String   @default("")
+  slug             String   @unique
+  plan             String   @default("starter")
+  trialEndsAt      String   @default("")
+  bio              String?  @db.Text
+  address          String?
+  logo             String?  @db.Text
+  coverImage       String?  @db.Text
+  instagram        String?
+  facebook         String?
+  website          String?
+  rating           Float?
+  reviewCount      Int?
+  yearsInBusiness  Int?
+  serviceAreas     Json?
+  businessHours    Json?
+  emailReminders   Boolean  @default(true)
+  customMessage    String?  @db.Text
+  advanceBookingDays Int    @default(30)
+
+  bannerImage          String?  @db.Text
+  bannerOverlayOpacity Int      @default(60)
+  serviceLayout        String   @default("cards")
+  bookingPageTheme     String   @default("light")
+  accentColor          String   @default("#3B82F6")
+  bookingPageTitle     String?
+  bookingPageSubtitle  String?
+  showRating           Boolean  @default(true)
+  showSocialLinks      Boolean  @default(true)
+  showServiceAreas     Boolean  @default(true)
+  showBusinessHours    Boolean  @default(true)
+  showTrustBadges      Boolean  @default(true)
+  requireDeposit       Boolean  @default(false)
+  depositPercentage    Int      @default(20)
+  thankYouMessage      String?  @db.Text
+  termsText            String?  @db.Text
+
+  smsTemplates   Json?
+  emailTemplates Json?
+  paymentMethods Json?
+
+  serviceType  String   @default("mobile")
+
+  suspended Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  packages Package[]
+  bookings Booking[]
+  staff    Staff[]
+}
+
+model Package {
+  id          String  @id @default(cuid())
+  name        String
+  description String  @db.Text
+  price       Float
+  duration    Int
+  deposit     Float?
+  active      Boolean @default(true)
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Staff {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String   @default("")
+  role      String   @default("detailer")
+  color     String   @default("#3B82F6")
+  active    Boolean  @default(true)
+  avatar    String?  @db.Text
+  password  String   @default("")
+  notes     String?  @db.Text
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings  Booking[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Booking {
+  id              String @id @default(cuid())
+  customerName    String
+  customerEmail   String
+  customerPhone   String
+  vehicleMake     String
+  vehicleModel    String
+  vehicleYear     String
+  vehicleColor    String
+  serviceId       String
+  serviceName     String
+  servicePrice    Float
+  date            String
+  time            String
+  status          String @default("pending")
+  depositPaid     Float  @default(0)
+  depositRequired Float  @default(0)
+  notes           String? @db.Text
+  address         String?
+
+  staffId   String?
+  staff     Staff?   @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PlatformSettings {
+  id                   String  @id @default("default")
+  platformName         String  @default("DetailBook")
+  supportEmail         String  @default("support@detailbook.com")
+  defaultDomain        String  @default("detailbook.app")
+  customDomainsEnabled Boolean @default(true)
+  starterPrice         Float   @default(25)
+  proPrice             Float   @default(49)
+  trialDays            Int     @default(30)
+  maintenanceMode      Boolean @default(false)
+  maintenanceMessage   String? @db.Text
+  dbHost               String  @default("localhost")
+  dbPort               Int     @default(3306)
+  dbName               String  @default("detailbook")
+  dbUser               String  @default("root")
+  dbPassword           String  @default("")
+
+  stripeEnabled        Boolean @default(false)
+  stripePublishableKey String?
+  stripeSecretKey      String?
+  stripeWebhookSecret  String?
+  cryptoEnabled        Boolean @default(false)
+  cryptoWalletAddress  String?
+  cryptoNetwork        String?
+  cryptoAcceptedCoins  Json?
+
+  updatedAt DateTime @updatedAt
+}

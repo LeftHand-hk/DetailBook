@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma:*)",
+      "Bash(npx tsc:*)",
+      "Bash(sc query:*)",
+      "Bash(where mysql:*)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/xampp/mysql/**)",
+      "Read(//c/wamp64/bin/**)",
+      "Bash(cmd /c \"C:/xampp/mysql_start.bat\")",
+      "Bash(\"C:/xampp/mysql/bin/mysqladmin\" -u root ping)",
+      "Bash(cmd /c \"C:/xampp/mysql/bin/mysqld.exe\" --console)",
+      "Bash(cat \"C:/xampp/mysql/data/\"*.err)",
+      "Bash(tasklist)",
+      "Bash(\"C:/xampp/mysql/bin/mysql\" -u root -e \"SELECT 1;\")",
+      "Bash(npm run:*)",
+      "Bash(curl -s http://localhost:3000 -o /dev/null -w \"%{http_code}\")",
+      "Bash(winget --version)",
+      "Bash(choco --version)",
+      "Bash(npm --version)",
+      "Bash(winget install:*)",
+      "Bash(export PATH=\"/c/Program Files/nodejs:$PATH\")",
+      "Bash(\"C:/xampp/mysql/bin/mysql\" -u root -e \"UPDATE detailbook.User SET plan='pro' WHERE email='mike@demo.com';\")",
+      "Bash(\"C:/xampp/mysql/bin/mysql\" -u root -e \"SELECT email, plan FROM detailbook.User WHERE email='mike@demo.com';\")",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(cmd /c \"taskkill /F /IM node.exe\")",
+      "Bash(cmd /c \"del /F /Q \\\\\"C:\\\\Users\\\\maila\\\\OneDrive\\\\Desktop\\\\new\\\\node_modules\\\\.prisma\\\\client\\\\query_engine-windows.dll.node\\\\\"\")",
+      "Bash(curl -s -o nul -w \"%{http_code}\" http://localhost:3004/signup)",
+      "Bash(taskkill /F /IM \"next-server.exe\")"
+    ]
+  }
+}

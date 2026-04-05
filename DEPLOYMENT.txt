@@ -1,0 +1,333 @@
+========================================
+  DETAILBOOK - DEPLOYMENT & TESTING GUIDE
+========================================
+
+
+========================================
+  HOW TO TEST LOCALLY
+========================================
+
+PREREQUISITES:
+- Node.js installed (nodejs.org)
+- MySQL installed and running (MySQL Server 8.0)
+- Database "detailbook" created and seeded
+
+START THE SERVER:
+1. Open terminal in the project folder (C:\Users\User\Desktop\new)
+2. Run: npm run dev
+3. Open http://localhost:3000 in your browser
+
+TEST USER LOGIN:
+1. Go to http://localhost:3000/login
+2. Click "Demo Login" button
+   OR enter manually:
+   Email:    mike@demo.com
+   Password: demo123
+3. You'll see the dashboard with real data from MySQL
+4. Test: Bookings, Calendar, Packages, Booking Page, Payments, Settings
+
+TEST ADMIN PANEL:
+1. Go to http://localhost:3000/admin/login
+2. Enter:
+   Email:    admin@detailbook.com
+   Password: admin123!
+3. You'll see the master admin dashboard
+4. Test: Users, Subscriptions, Payments, Domains, Database, Settings
+
+TEST PUBLIC BOOKING PAGE:
+1. Go to http://localhost:3000/book/mikes-mobile-detailing
+2. Select a service, pick a date/time, fill in customer details
+3. Submit the booking
+4. Check the dashboard — the booking appears in real-time from MySQL
+
+TEST SIGNUP (NEW USER):
+1. Go to http://localhost:3000/signup
+2. Create a new account with any email/password
+3. Complete onboarding
+4. The new user is saved in MySQL
+
+USEFUL COMMANDS:
+  npm run dev          Start dev server (http://localhost:3000)
+  npm run build        Build for production
+  npm start            Start production server
+  npm run db:push      Push schema changes to MySQL
+  npm run db:seed      Seed demo data
+  npm run db:reset     Reset database + reseed everything
+  npm run db:studio    Open Prisma Studio (visual DB editor at localhost:5555)
+  npm run lint         Check for code errors
+
+IF MYSQL IS NOT RUNNING:
+  Windows: Open Services (Win+R > services.msc) > find "MySQL80" > Start
+  Or run: net start MySQL80
+
+IF YOU GET DATABASE ERRORS:
+  1. Check MySQL is running
+  2. Check .env file has correct password: DATABASE_URL="mysql://root:test@localhost:3306/detailbook"
+  3. Run: npm run db:push (recreates tables)
+  4. Run: npm run db:seed (reseeds demo data)
+
+IF YOU GET "MODULE NOT FOUND" ERRORS:
+  Run: npm install
+  Then: npx prisma generate
+  Then: npm run dev
+
+
+========================================
+  LIVE DEPLOYMENT GUIDE
+========================================
+
+WHAT YOU HAVE:
+- Full Next.js application (frontend + backend)
+- MySQL database with Prisma ORM
+- Stripe payment integration (subscriptions + deposits)
+- Admin panel at /admin
+- All API routes ready
+
+========================================
+  WHAT YOU NEED TO GO LIVE
+========================================
+
+1. HOSTING (pick one):
+   - Vercel (easiest, free tier available) — vercel.com
+   - Railway (Next.js + MySQL in one place) — railway.app
+   - DigitalOcean VPS ($6/mo) — digitalocean.com
+   - Hetzner VPS (cheapest, $4/mo) — hetzner.com
+   - AWS EC2 (more complex) — aws.amazon.com
+
+2. HOSTED MYSQL DATABASE (pick one):
+   - PlanetScale (free tier) — planetscale.com
+   - Railway MySQL ($5/mo) — railway.app
+   - AWS RDS — aws.amazon.com/rds
+   - DigitalOcean Managed DB ($15/mo)
+   - Any MySQL 8.0 server
+
+3. DOMAIN NAME:
+   - Buy from Namecheap, GoDaddy, Cloudflare, or Google Domains
+   - Example: detailbook.app, detailbook.com, etc.
+   - Point DNS to your hosting provider
+
+4. STRIPE ACCOUNT (for payments):
+   - Create at stripe.com (free, you only pay per transaction)
+   - Get your API keys from dashboard.stripe.com/apikeys
+   - Set up a webhook endpoint pointing to: https://yourdomain.com/api/stripe/webhook
+   - Webhook events to listen for: checkout.session.completed, customer.subscription.deleted
+
+5. SSL CERTIFICATE:
+   - Vercel/Railway provide this automatically
+   - For VPS: use Let's Encrypt (free) with certbot
+
+========================================
+  ENVIRONMENT VARIABLES NEEDED
+========================================
+
+Create a .env file on your server (or add in hosting dashboard):
+
+DATABASE_URL="mysql://USERNAME:PASSWORD@HOST:3306/detailbook"
+JWT_SECRET="GENERATE-A-64-CHARACTER-RANDOM-STRING"
+
+Example:
+DATABASE_URL="mysql://detailbook_user:MyStr0ngP@ss!@db.example.com:3306/detailbook"
+JWT_SECRET="a8f2k9d1m4n7p0s3v6x9b2e5h8k1n4q7t0w3z6c9f2i5l8o1r4u7"
+
+========================================
+  DEPLOYMENT STEPS
+========================================
+
+OPTION A — VERCEL (Recommended for beginners)
+----------------------------------------------
+1. Push your code to GitHub:
+   git init
+   git add .
+   git commit -m "Initial commit"
+   git remote add origin https://github.com/yourusername/detailbook.git
+   git push -u origin main
+
+2. Go to vercel.com, sign in with GitHub
+
+3. Click "Import Project" and select your repo
+
+4. Add environment variables:
+   - DATABASE_URL = your hosted MySQL connection string
+   - JWT_SECRET = your random secret string
+
+5. Click Deploy
+
+6. After deploy, run the database setup:
+   npx prisma db push
+   npm run db:seed
+
+7. Set up your custom domain in Vercel dashboard
+
+
+OPTION B — VPS (Full control)
+----------------------------------------------
+1. SSH into your server
+
+2. Install Node.js 20+:
+   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+   sudo apt install -y nodejs
+
+3. Install MySQL 8:
+   sudo apt install mysql-server
+   sudo mysql_secure_installation
+
+4. Create the database:
+   mysql -u root -p -e "CREATE DATABASE detailbook;"
+   mysql -u root -p -e "CREATE USER 'detailbook'@'localhost' IDENTIFIED BY 'YourPassword';"
+   mysql -u root -p -e "GRANT ALL ON detailbook.* TO 'detailbook'@'localhost';"
+
+5. Clone and setup:
+   git clone your-repo /var/www/detailbook
+   cd /var/www/detailbook
+   npm install
+   cp .env.example .env   (then edit with your real values)
+   npx prisma db push
+   npm run db:seed
+   npm run build
+
+6. Run with PM2 (process manager):
+   npm install -g pm2
+   pm2 start npm --name "detailbook" -- start
+   pm2 save
+   pm2 startup
+
+7. Set up Nginx reverse proxy:
+   sudo apt install nginx
+
+   Create /etc/nginx/sites-available/detailbook:
+
+   server {
+       listen 80;
+       server_name yourdomain.com;
+
+       location / {
+           proxy_pass http://localhost:3000;
+           proxy_http_version 1.1;
+           proxy_set_header Upgrade $http_upgrade;
+           proxy_set_header Connection 'upgrade';
+           proxy_set_header Host $host;
+           proxy_cache_bypass $http_upgrade;
+       }
+   }
+
+   sudo ln -s /etc/nginx/sites-available/detailbook /etc/nginx/sites-enabled/
+   sudo nginx -t
+   sudo systemctl restart nginx
+
+8. SSL with Let's Encrypt:
+   sudo apt install certbot python3-certbot-nginx
+   sudo certbot --nginx -d yourdomain.com
+
+
+OPTION C — RAILWAY (Easiest all-in-one)
+----------------------------------------------
+1. Push code to GitHub
+
+2. Go to railway.app, create new project
+
+3. Add a MySQL database service (one click)
+
+4. Add a Next.js service from your GitHub repo
+
+5. Railway auto-detects Next.js and sets up build
+
+6. Add environment variables:
+   - DATABASE_URL = (Railway provides this from the MySQL service)
+   - JWT_SECRET = your random secret
+
+7. Deploy. Done.
+
+
+========================================
+  AFTER DEPLOYMENT CHECKLIST
+========================================
+
+[ ] Change admin password (currently admin123!)
+    - Go to /admin/login and log in
+    - Or update directly in the database
+
+[ ] Configure Stripe in admin panel:
+    - Go to /admin → Payments
+    - Add your Stripe Publishable Key
+    - Add your Stripe Secret Key
+    - Add your Stripe Webhook Secret
+    - Enable Stripe toggle
+
+[ ] Set up Stripe webhook:
+    - Go to dashboard.stripe.com/webhooks
+    - Add endpoint: https://yourdomain.com/api/stripe/webhook
+    - Select events: checkout.session.completed, customer.subscription.deleted
+    - Copy the webhook signing secret to your admin panel
+
+[ ] Update platform settings:
+    - Go to /admin → Settings
+    - Set your platform name
+    - Set your domain
+    - Set support email
+
+[ ] Test everything:
+    - Create a test account via /signup
+    - Create packages
+    - Test the booking page
+    - Test a real Stripe payment (use test mode first)
+    - Test admin panel functions
+
+[ ] Switch Stripe to live mode:
+    - Replace test keys with live keys in admin panel
+    - Payments are now real
+
+========================================
+  LOGIN CREDENTIALS (CHANGE THESE!)
+========================================
+
+Admin Panel:
+  URL:      /admin/login
+  Email:    admin@detailbook.com
+  Password: admin123!
+
+Demo User:
+  URL:      /login
+  Email:    mike@demo.com
+  Password: demo123
+
+========================================
+  USEFUL COMMANDS
+========================================
+
+Start dev server:          npm run dev
+Build for production:      npm run build
+Start production:          npm start
+Push schema to DB:         npm run db:push
+Seed demo data:            npm run db:seed
+Reset DB + reseed:         npm run db:reset
+Open Prisma Studio (GUI):  npm run db:studio
+Run linter:                npm run lint
+
+========================================
+  COSTS ESTIMATE (Monthly)
+========================================
+
+Cheapest setup:
+  Vercel free tier     $0
+  PlanetScale free     $0
+  Stripe fees only     2.9% + 30c per transaction
+  Domain               ~$10/year
+  TOTAL:               ~$1/month
+
+Recommended setup:
+  Vercel Pro           $20/mo
+  Railway MySQL        $5/mo
+  Stripe fees          2.9% + 30c per transaction
+  Domain               ~$10/year
+  TOTAL:               ~$26/month
+
+========================================
+  SUPPORT
+========================================
+
+Prisma docs:     prisma.io/docs
+Next.js docs:    nextjs.org/docs
+Stripe docs:     stripe.com/docs
+Vercel docs:     vercel.com/docs
+
+========================================
