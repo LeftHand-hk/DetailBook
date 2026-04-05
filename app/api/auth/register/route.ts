@@ -14,13 +14,33 @@ function generateSlug(businessName: string): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, businessName, name, phone, city } = body;
+    const { email, password, businessName, name, phone, city, promoCode } = body;
 
     if (!email || !password || !businessName || !name) {
       return NextResponse.json(
         { error: "Email, password, business name, and name are required" },
         { status: 400 }
       );
+    }
+
+    // Validate promo code if provided
+    let promoData: { code: string; discountValue: number; discountType: string } | null = null;
+    if (promoCode) {
+      const promo = await prisma.promoCode.findUnique({
+        where: { code: promoCode.toUpperCase().trim() },
+      });
+      if (
+        promo &&
+        promo.active &&
+        (!promo.expiresAt || new Date(promo.expiresAt) > new Date()) &&
+        (promo.maxUses === null || promo.usedCount < promo.maxUses)
+      ) {
+        promoData = { code: promo.code, discountValue: promo.discountValue, discountType: promo.discountType };
+        await prisma.promoCode.update({
+          where: { id: promo.id },
+          data: { usedCount: { increment: 1 } },
+        });
+      }
     }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
@@ -53,6 +73,8 @@ export async function POST(request: NextRequest) {
         slug,
         plan: "starter",
         trialEndsAt: trialEndsAt.toISOString(),
+        promoCodeUsed: promoData?.code || null,
+        promoDiscount: promoData?.discountValue || null,
       },
     });
 

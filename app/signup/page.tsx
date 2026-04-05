@@ -13,10 +13,40 @@ export default function SignupPage() {
     name: "",
     email: "",
     password: "",
+    promoCode: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPass, setShowPass] = useState(false);
+  const [promoStatus, setPromoStatus] = useState<null | { valid: boolean; message: string; discountType?: string; discountValue?: number; appliesTo?: string }>(null);
+  const [promoChecking, setPromoChecking] = useState(false);
+
+  const checkPromoCode = async () => {
+    if (!form.promoCode.trim()) return;
+    setPromoChecking(true);
+    setPromoStatus(null);
+    try {
+      const res = await fetch("/api/promo/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: form.promoCode.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok && data.valid) {
+        const label = data.discountType === "percent"
+          ? `${data.discountValue}% off`
+          : `$${data.discountValue} off`;
+        const plan = data.appliesTo === "both" ? "Starter & Pro" : data.appliesTo === "starter" ? "Starter" : "Pro";
+        setPromoStatus({ valid: true, message: `${label} on ${plan} plan`, discountType: data.discountType, discountValue: data.discountValue, appliesTo: data.appliesTo });
+      } else {
+        setPromoStatus({ valid: false, message: data.error || "Invalid promo code" });
+      }
+    } catch {
+      setPromoStatus({ valid: false, message: "Could not validate code" });
+    } finally {
+      setPromoChecking(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +71,7 @@ export default function SignupPage() {
           name: form.name,
           email: form.email,
           password: form.password,
+          promoCode: form.promoCode.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -245,6 +276,48 @@ export default function SignupPage() {
                     )}
                   </button>
                 </div>
+              </div>
+
+              {/* Promo Code */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  Promo Code <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={form.promoCode}
+                    onChange={(e) => {
+                      setForm({ ...form, promoCode: e.target.value });
+                      setPromoStatus(null);
+                    }}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); checkPromoCode(); } }}
+                    placeholder="Enter code"
+                    className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white placeholder-gray-400 text-sm transition-all uppercase"
+                  />
+                  <button
+                    type="button"
+                    onClick={checkPromoCode}
+                    disabled={!form.promoCode.trim() || promoChecking}
+                    className="px-4 py-3 bg-gray-100 hover:bg-gray-200 disabled:opacity-40 text-gray-700 text-sm font-semibold rounded-xl transition-colors flex-shrink-0"
+                  >
+                    {promoChecking ? "..." : "Apply"}
+                  </button>
+                </div>
+                {promoStatus && (
+                  <p className={`text-xs mt-1.5 flex items-center gap-1 ${promoStatus.valid ? "text-green-600" : "text-red-500"}`}>
+                    {promoStatus.valid ? (
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    )}
+                    {promoStatus.message}
+                  </p>
+                )}
               </div>
 
               {/* Password strength hint */}

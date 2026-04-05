@@ -65,13 +65,29 @@ model User {
 
   serviceType  String   @default("mobile")
 
-  suspended Boolean  @default(false)
+  suspended      Boolean  @default(false)
+  promoCodeUsed  String?
+  promoDiscount  Float?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   packages Package[]
   bookings Booking[]
   staff    Staff[]
+}
+
+model PromoCode {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  description   String?
+  discountType  String    @default("percent")
+  discountValue Float
+  appliesTo     String    @default("both")
+  maxUses       Int?
+  usedCount     Int       @default(0)
+  active        Boolean   @default(true)
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
 }
 
 model Package {
