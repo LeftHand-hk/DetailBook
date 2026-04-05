@@ -197,8 +197,8 @@ export default function PressPage() {
             </div>
             <h2 className="text-2xl font-black text-white mb-2">Media Contact</h2>
             <p className="text-gray-400 mb-1">For press inquiries, interview requests, and media assets:</p>
-            <a href="mailto:press@detailbook.app" className="text-blue-400 hover:text-blue-300 text-lg font-bold transition-colors">
-              press@detailbook.app
+            <a href="mailto:info@detailbookapp.com" className="text-blue-400 hover:text-blue-300 text-lg font-bold transition-colors">
+              info@detailbookapp.com
             </a>
             <p className="text-gray-400 text-sm mt-6 max-w-xl mx-auto leading-relaxed">
               We welcome interview requests from journalists covering small business software, the trades industry,

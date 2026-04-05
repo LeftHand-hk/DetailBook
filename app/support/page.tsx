@@ -260,7 +260,7 @@ export default function SupportPage() {
               </svg>
             </Link>
             <a
-              href="mailto:hello@detailbook.app"
+              href="mailto:info@detailbookapp.com"
               className="inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 border border-white/10 text-white font-bold px-7 py-3.5 rounded-xl transition-all duration-200"
             >
               Email Us Directly

@@ -232,7 +232,7 @@ export default function CareersPage() {
                     <p className="text-blue-400 text-sm font-semibold">{role.type}</p>
                   </div>
                   <a
-                    href="mailto:careers@detailbook.app"
+                    href="mailto:info@detailbookapp.com"
                     className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-all duration-200 shrink-0"
                   >
                     Apply Now
@@ -293,7 +293,7 @@ export default function CareersPage() {
               you can help us build better tools for detailers, we want to hear from you.
             </p>
             <a
-              href="mailto:careers@detailbook.app"
+              href="mailto:info@detailbookapp.com"
               className="inline-flex items-center gap-2 bg-slate-700 hover:bg-slate-600 border border-white/10 text-white font-bold px-7 py-3.5 rounded-xl transition-all duration-200"
             >
               Send Us Your Resume
@@ -301,7 +301,7 @@ export default function CareersPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
             </a>
-            <p className="text-gray-500 text-sm mt-3">careers@detailbook.app</p>
+            <p className="text-gray-500 text-sm mt-3">info@detailbookapp.com</p>
           </div>
         </div>
       </section>

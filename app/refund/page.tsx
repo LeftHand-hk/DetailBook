@@ -21,7 +21,7 @@ DetailBook operates as a SaaS platform for auto detailing businesses. We have tw
 - You were charged after canceling your subscription
 - Duplicate charges occurred on the same billing date
 
-To request an exception refund, contact us at billing@detailbook.io within 7 days of the charge. We will review your request and respond within 3 business days.
+To request an exception refund, contact us at info@detailbookapp.com within 7 days of the charge. We will review your request and respond within 3 business days.
 
 **Upgrades and downgrades:** When upgrading from Starter to Pro, the price difference is prorated for the remainder of the billing period. When downgrading, the change takes effect at the start of the next billing period — no partial refunds are issued.`,
   },
@@ -51,7 +51,7 @@ To request an exception refund, contact us at billing@detailbook.io within 7 day
 
 Your subscription will remain active until the end of the current billing period. After that, your account will be deactivated and your public booking page will go offline. Your data is retained for 90 days after cancellation, during which time you may reactivate by subscribing again.
 
-If you have trouble canceling, contact us at billing@detailbook.io and we will process it manually within 1 business day.`,
+If you have trouble canceling, contact us at info@detailbookapp.com and we will process it manually within 1 business day.`,
   },
   {
     id: "chargebacks",
@@ -62,20 +62,20 @@ If you have trouble canceling, contact us at billing@detailbook.io and we will p
 - Provide your bank with documentation showing the charges were valid and in accordance with these Terms
 - Recover any funds lost due to fraudulent chargebacks
 
-We strongly encourage you to contact us first at billing@detailbook.io — we are committed to resolving billing issues quickly and fairly.`,
+We strongly encourage you to contact us first at info@detailbookapp.com — we are committed to resolving billing issues quickly and fairly.`,
   },
   {
     id: "contact",
     title: "6. Contact",
     content: `For any questions about refunds or billing, please contact us:
 
-Email: billing@detailbook.io
-General: support@detailbook.io
+Email: info@detailbookapp.com
+General: info@detailbookapp.com
 
 We aim to respond to all billing inquiries within 1–2 business days.
 
 DetailBook
-United States`,
+`,
   },
 ];
 

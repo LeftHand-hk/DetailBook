@@ -87,7 +87,7 @@ While we use commercially reasonable safeguards, no security system is impenetra
 
 **California residents:** If you are a California resident, you have additional rights under the California Consumer Privacy Act (CCPA), including the right to know what personal information is collected and the right to opt-out of the sale of personal information (we do not sell personal information).
 
-To exercise any of these rights, contact us at privacy@detailbook.app.`,
+To exercise any of these rights, contact us at info@detailbookapp.com.`,
   },
   {
     id: "data-retention",
@@ -101,11 +101,11 @@ Customer data (your clients' information) collected through your booking page is
     title: "8. Contact Us",
     content: `If you have questions about this Privacy Policy or our data practices, please contact us:
 
-Email: privacy@detailbook.app
-General inquiries: hello@detailbook.app
+Email: info@detailbookapp.com
+General inquiries: info@detailbookapp.com
 
 DetailBook
-Phoenix, Arizona, USA
+
 
 We will respond to privacy-related inquiries within 30 days.`,
   },

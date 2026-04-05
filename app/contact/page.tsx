@@ -37,8 +37,8 @@ export default function ContactPage() {
         </svg>
       ),
       label: "Email",
-      value: "hello@detailbook.app",
-      href: "mailto:hello@detailbook.app",
+      value: "info@detailbookapp.com",
+      href: "mailto:info@detailbookapp.com",
     },
     {
       icon: (

@@ -108,7 +108,7 @@ Upon termination, your right to access the Service ceases immediately. We will r
   {
     id: "governing-law",
     title: "10. Governing Law",
-    content: `These Terms shall be governed by and construed in accordance with the laws of the State of Arizona, without regard to its conflict of law provisions. Any dispute arising from or relating to these Terms or the Service shall be resolved through binding arbitration administered by the American Arbitration Association under its Commercial Arbitration Rules, in Phoenix, Arizona.
+    content: `These Terms are governed by the laws of the United States. Any disputes shall be resolved through binding arbitration under applicable rules.
 
 You waive any right to participate in a class action lawsuit or class-wide arbitration. Nothing in this section prevents either party from seeking injunctive relief in a court of competent jurisdiction.`,
   },
@@ -117,11 +117,7 @@ You waive any right to participate in a class action lawsuit or class-wide arbit
     title: "11. Contact",
     content: `If you have questions about these Terms, please contact us:
 
-Email: legal@detailbook.app
-General: hello@detailbook.app
-
-DetailBook
-Phoenix, Arizona, USA`,
+Email: info@detailbookapp.com`,
   },
 ];
 
