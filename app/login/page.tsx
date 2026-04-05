@@ -276,6 +276,8 @@ export default function LoginPage() {
             <a href="/privacy" className="hover:text-gray-500 transition-colors">Privacy</a>
             {" · "}
             <a href="/terms" className="hover:text-gray-500 transition-colors">Terms</a>
+            {" · "}
+            <a href="/refund" className="hover:text-gray-500 transition-colors">Refund</a>
           </p>
         </div>
       </div>

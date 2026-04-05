@@ -873,6 +873,7 @@ export default function OnboardingPage() {
           <div className="flex items-center gap-4 text-xs text-gray-400">
             <a href="/privacy" className="hover:text-gray-600 transition-colors">Privacy</a>
             <a href="/terms" className="hover:text-gray-600 transition-colors">Terms</a>
+            <a href="/refund" className="hover:text-gray-600 transition-colors">Refund</a>
             <a href="/dashboard" className="hover:text-gray-600 transition-colors">Dashboard</a>
           </div>
         </div>
