@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { getUser, setUser, logout } from "@/lib/storage";
 import type { User, BusinessHours } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
-import { usePaddle } from "@/components/PaddleProvider";
+import type { Paddle } from "@paddle/paddle-js";
 
 const DEFAULT_HOURS: Record<string, BusinessHours> = {
   monday:    { open: "8:00 AM", close: "6:00 PM", closed: false },
@@ -43,15 +43,32 @@ export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, setUserState] = useState<User | null>(null);
-  const paddle = usePaddle();
+  const [paddle, setPaddle] = useState<Paddle | null>(null);
+
+  useEffect(() => {
+    const token = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN;
+    if (!token) return;
+    import("@paddle/paddle-js").then(({ initializePaddle }) => {
+      initializePaddle({
+        environment: (process.env.NEXT_PUBLIC_PADDLE_ENV as "sandbox" | "production") || "production",
+        token,
+      }).then((instance) => {
+        if (instance) setPaddle(instance);
+      });
+    });
+  }, []);
 
   const openCheckout = (plan: "starter" | "pro") => {
-    if (!paddle || !user) return;
+    if (!user) return;
     const priceId = plan === "pro"
       ? process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID
       : process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
     if (!priceId) {
       alert("Payment not configured yet. Contact support.");
+      return;
+    }
+    if (!paddle) {
+      alert("Payment system is loading, please try again in a moment.");
       return;
     }
     paddle.Checkout.open({
