@@ -49,9 +49,21 @@ export default function OnboardingPage() {
       initializePaddle({
         environment: (process.env.NEXT_PUBLIC_PADDLE_ENV as "sandbox" | "production") || "production",
         token,
-        eventCallback(event) {
+        async eventCallback(event) {
           if (event.name === "checkout.completed") {
-            setTimeout(() => router.push("/dashboard"), 2000);
+            const items = (event.data as any)?.items || [];
+            const priceId = items[0]?.price_id || items[0]?.price?.id || null;
+            const transactionId = (event.data as any)?.transaction_id || null;
+            try {
+              await fetch("/api/subscription/activate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ priceId, transactionId }),
+              });
+            } catch {
+              // ignore
+            }
+            setTimeout(() => router.push("/dashboard"), 1500);
           }
         },
       }).then((instance) => { if (instance) setPaddle(instance); });

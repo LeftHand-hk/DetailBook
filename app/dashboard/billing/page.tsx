@@ -23,9 +23,25 @@ export default function BillingPage() {
       initializePaddle({
         environment: (process.env.NEXT_PUBLIC_PADDLE_ENV as "sandbox" | "production") || "production",
         token,
-        eventCallback(event) {
+        async eventCallback(event) {
           if (event.name === "checkout.completed") {
-            setTimeout(() => window.location.reload(), 2000);
+            // Extract price ID from completed checkout
+            const items = (event.data as any)?.items || [];
+            const priceId = items[0]?.price_id || items[0]?.price?.id || null;
+            const transactionId = (event.data as any)?.transaction_id || null;
+
+            // Immediately activate subscription in our DB (fallback if webhook fails)
+            try {
+              await fetch("/api/subscription/activate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ priceId, transactionId }),
+              });
+            } catch {
+              // ignore, webhook may handle it
+            }
+
+            setTimeout(() => window.location.reload(), 1500);
           }
         },
       }).then((instance) => {
