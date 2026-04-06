@@ -62,6 +62,9 @@ export default function SettingsPage() {
   // Business hours
   const [hours, setHours] = useState<Record<string, BusinessHours>>(DEFAULT_HOURS);
 
+  // Service type
+  const [serviceType, setServiceType] = useState<"mobile" | "shop" | "both">("mobile");
+
   // Booking settings
   const [bookingSettings, setBookingSettings] = useState({
     slug: "",
@@ -134,6 +137,7 @@ export default function SettingsPage() {
         thankYouMessage: u.thankYouMessage || "",
         termsText: u.termsText || "",
       });
+      setServiceType((u as any).serviceType || "mobile");
       setNotifications({ emailReminders: u.emailReminders !== false });
       if (u.smsTemplates) setSmsTemplates({ ...smsTemplates, ...u.smsTemplates });
       if (u.emailTemplates) setEmailTemplates({ ...emailTemplates, ...u.emailTemplates });
@@ -183,7 +187,8 @@ export default function SettingsPage() {
       depositPercentage: bookingSettings.depositPercentage,
       thankYouMessage: bookingSettings.thankYouMessage,
       termsText: bookingSettings.termsText,
-    };
+      serviceType,
+    } as any;
     setUser(updated); setUserState(updated); flash("booking");
   };
 
@@ -225,6 +230,7 @@ export default function SettingsPage() {
   const tabs = [
     { id: "profile",      label: "Business Profile", icon: "🏢" },
     { id: "hours",        label: "Business Hours",   icon: "🕐" },
+    { id: "booking",      label: "Booking Settings", icon: "📅" },
     { id: "templates",    label: "SMS & Email",      icon: "💬" },
     { id: "subscription", label: "Subscription",     icon: "💳" },
     { id: "notifications",label: "Notifications",    icon: "🔔" },
@@ -453,6 +459,175 @@ export default function SettingsPage() {
                     Save Hours
                   </button>
                   {saved === "hours" && <SavedBadge />}
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* ── Booking Settings ── */}
+          {activeTab === "booking" && (
+            <div className="space-y-5">
+              <form onSubmit={handleSaveBookingSettings} className="space-y-5">
+
+                {/* Service Type */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+                    <h2 className="font-bold text-gray-900">Service Type</h2>
+                    <p className="text-sm text-gray-500">How do you serve your customers? This controls what customers see on your booking page.</p>
+                  </div>
+                  <div className="p-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {[
+                        {
+                          value: "mobile",
+                          label: "Mobile Service",
+                          desc: "You go to the customer's location. Customers enter their address when booking.",
+                          icon: (
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                            </svg>
+                          ),
+                        },
+                        {
+                          value: "shop",
+                          label: "Shop / Fixed Location",
+                          desc: "Customers come to you. Your shop address is shown on the booking page.",
+                          icon: (
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                          ),
+                        },
+                        {
+                          value: "both",
+                          label: "Both Options",
+                          desc: "Customers choose: mobile service or come to your shop.",
+                          icon: (
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                          ),
+                        },
+                      ].map(({ value, label, desc, icon }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setServiceType(value as "mobile" | "shop" | "both")}
+                          className={`text-left p-4 rounded-2xl border-2 transition-all ${
+                            serviceType === value
+                              ? "border-blue-500 bg-blue-50"
+                              : "border-gray-200 bg-white hover:border-gray-300"
+                          }`}
+                        >
+                          <div className={`mb-2 ${serviceType === value ? "text-blue-600" : "text-gray-400"}`}>
+                            {icon}
+                          </div>
+                          <p className={`text-sm font-bold mb-1 ${serviceType === value ? "text-blue-700" : "text-gray-800"}`}>{label}</p>
+                          <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
+                          {serviceType === value && (
+                            <div className="mt-2 flex items-center gap-1 text-blue-600 text-xs font-semibold">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Selected
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    {serviceType === "shop" && (
+                      <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs">
+                        Make sure your shop address is filled in under <strong>Business Profile → City / Address</strong> so customers can see it on your booking page.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Deposit Settings */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+                    <h2 className="font-bold text-gray-900">Deposit Settings</h2>
+                    <p className="text-sm text-gray-500">Require a deposit to confirm bookings and reduce no-shows.</p>
+                  </div>
+                  <div className="p-6 space-y-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">Require Deposit</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Customers must pay a deposit to confirm their booking</p>
+                      </div>
+                      <Toggle
+                        value={bookingSettings.requireDeposit}
+                        onChange={(v) => setBookingSettings({ ...bookingSettings, requireDeposit: v })}
+                      />
+                    </div>
+                    {bookingSettings.requireDeposit && (
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Deposit Percentage</label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="range" min="10" max="100" step="5"
+                            value={bookingSettings.depositPercentage}
+                            onChange={(e) => setBookingSettings({ ...bookingSettings, depositPercentage: Number(e.target.value) })}
+                            className="flex-1"
+                          />
+                          <span className="text-lg font-extrabold text-blue-600 w-14 text-right">{bookingSettings.depositPercentage}%</span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">e.g. for a $200 service, deposit = ${Math.round(200 * bookingSettings.depositPercentage / 100)}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Booking Page Options */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+                    <h2 className="font-bold text-gray-900">Booking Page Options</h2>
+                    <p className="text-sm text-gray-500">Control what appears on your public booking page.</p>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Advance Booking (days)</label>
+                      <input
+                        type="number" min="1" max="365"
+                        value={bookingSettings.advanceBookingDays}
+                        onChange={(e) => setBookingSettings({ ...bookingSettings, advanceBookingDays: Number(e.target.value) })}
+                        className={inputCls}
+                      />
+                      <p className="text-xs text-gray-400 mt-1">How far in advance customers can book</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Custom Welcome Message</label>
+                      <textarea
+                        rows={2}
+                        value={bookingSettings.customMessage}
+                        onChange={(e) => setBookingSettings({ ...bookingSettings, customMessage: e.target.value })}
+                        placeholder="e.g. Book online 24/7 — deposits required to confirm."
+                        className={`${inputCls} resize-none`}
+                      />
+                    </div>
+                    {[
+                      { key: "showRating",       label: "Show Rating & Reviews" },
+                      { key: "showSocialLinks",   label: "Show Social Media Links" },
+                      { key: "showServiceAreas",  label: "Show Service Areas" },
+                      { key: "showBusinessHours", label: "Show Business Hours" },
+                      { key: "showTrustBadges",   label: "Show Trust Badges" },
+                    ].map(({ key, label }) => (
+                      <div key={key} className="flex items-center justify-between py-1">
+                        <p className="text-sm text-gray-700">{label}</p>
+                        <Toggle
+                          value={bookingSettings[key as keyof typeof bookingSettings] as boolean}
+                          onChange={(v) => setBookingSettings({ ...bookingSettings, [key]: v })}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 pt-1">
+                  <button type="submit" className="bg-blue-600 text-white font-bold px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors shadow-md shadow-blue-600/20">
+                    Save Booking Settings
+                  </button>
+                  {saved === "booking" && <SavedBadge />}
                 </div>
               </form>
             </div>
