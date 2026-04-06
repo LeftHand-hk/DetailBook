@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { getUser, setUser, getPackages, setPackages, isLoggedIn, generateId, syncFromServer } from "@/lib/storage";
 import type { User, Package } from "@/types";
 import Logo from "@/components/Logo";
+import type { Paddle } from "@paddle/paddle-js";
 
 const STEPS = [
   { id: 0, label: "Business Details", icon: "🏢" },
@@ -39,6 +40,23 @@ export default function OnboardingPage() {
   const [copied, setCopied]       = useState(false);
   const [saving, setSaving]       = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<"starter" | "pro" | null>(null);
+  const [paddle, setPaddle] = useState<Paddle | null>(null);
+
+  useEffect(() => {
+    const token = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN;
+    if (!token) return;
+    import("@paddle/paddle-js").then(({ initializePaddle }) => {
+      initializePaddle({
+        environment: (process.env.NEXT_PUBLIC_PADDLE_ENV as "sandbox" | "production") || "production",
+        token,
+        eventCallback(event) {
+          if (event.name === "checkout.completed") {
+            setTimeout(() => router.push("/dashboard"), 2000);
+          }
+        },
+      }).then((instance) => { if (instance) setPaddle(instance); });
+    });
+  }, [router]);
 
   // Step 1 — business details
   const [bizForm, setBizForm] = useState({
@@ -198,6 +216,22 @@ export default function OnboardingPage() {
     }
     setSaving(false);
     setStep(3);
+  };
+
+  const openPaddleCheckout = () => {
+    if (!selectedPlan || !user) return;
+    const priceId = selectedPlan === "pro"
+      ? process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID
+      : process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
+    if (!priceId || !paddle) {
+      alert("Payment system loading, please try again.");
+      return;
+    }
+    paddle.Checkout.open({
+      items: [{ priceId, quantity: 1 }],
+      customer: { email: user.email },
+      customData: { userId: (user as any).id },
+    });
   };
 
   const bookingUrl = user
@@ -756,20 +790,30 @@ export default function OnboardingPage() {
                   >
                     ← Back
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleStep3}
-                    disabled={!selectedPlan || saving}
-                    className="flex-[2] bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-lg shadow-blue-200 disabled:shadow-none"
-                  >
-                    {saving ? (
-                      <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> Saving...</>
-                    ) : !selectedPlan ? (
-                      "Select a plan to continue"
-                    ) : (
-                      <>Start with {selectedPlan === "starter" ? "Starter" : "Pro"} →</>
-                    )}
-                  </button>
+                  <div className="flex-[2] flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => { await handleStep3(); openPaddleCheckout(); }}
+                      disabled={!selectedPlan || saving}
+                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-lg shadow-blue-200 disabled:shadow-none"
+                    >
+                      {saving ? (
+                        <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> Loading...</>
+                      ) : !selectedPlan ? (
+                        "Select a plan to continue"
+                      ) : (
+                        <>💳 Pay Now — ${selectedPlan === "starter" ? "25" : "50"}/mo</>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleStep3}
+                      disabled={!selectedPlan || saving}
+                      className="w-full bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 font-semibold py-3 rounded-xl transition-all text-sm"
+                    >
+                      {!selectedPlan ? "Select a plan first" : "Start 15-Day Free Trial →"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
