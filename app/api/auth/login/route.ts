@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { verifyPassword, signToken } from "@/lib/auth";
+import { verifyPassword, signToken, signStaffToken } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,42 +14,61 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 }
-      );
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // 1. Try business owner login
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    if (user) {
+      const isValid = await verifyPassword(password, user.password);
+      if (!isValid) {
+        return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+      }
+
+      const token = signToken({ id: user.id, email: user.email });
+      const { password: _, ...userWithoutPassword } = user;
+      const response = NextResponse.json({ user: userWithoutPassword });
+
+      response.cookies.set("detailbook_token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30,
+      });
+
+      return response;
     }
 
-    const isValid = await verifyPassword(password, user.password);
-    if (!isValid) {
-      return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 }
-      );
-    }
-
-    const token = signToken({ id: user.id, email: user.email });
-
-    const { password: _, ...userWithoutPassword } = user;
-
-    const response = NextResponse.json({ user: userWithoutPassword });
-
-    response.cookies.set("detailbook_token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30,
+    // 2. Try staff login
+    const staff = await prisma.staff.findFirst({
+      where: { email: normalizedEmail },
+      include: { user: { select: { businessName: true, slug: true, logo: true } } },
     });
 
-    return response;
+    if (staff && staff.active && staff.password) {
+      const isValid = await verifyPassword(password, staff.password);
+      if (!isValid) {
+        return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+      }
+
+      const token = signStaffToken({ id: staff.id, email: staff.email, userId: staff.userId });
+      const { password: _, ...staffData } = staff;
+      const response = NextResponse.json({ staff: staffData, isStaff: true });
+
+      response.cookies.set("detailbook_staff_token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30,
+      });
+
+      return response;
+    }
+
+    return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   } catch (error) {
     console.error("Login error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

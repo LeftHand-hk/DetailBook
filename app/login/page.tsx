@@ -33,6 +33,11 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
+      if (data.isStaff) {
+        setLoading(false);
+        router.push("/staff/dashboard");
+        return;
+      }
       login();
       await syncFromServer();
       setLoading(false);
@@ -264,6 +269,13 @@ export default function LoginPage() {
               Don&apos;t have an account?{" "}
               <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-semibold">
                 Start your free trial
+              </Link>
+            </p>
+
+            <p className="text-center text-gray-400 text-sm mt-3">
+              Staff member?{" "}
+              <Link href="/staff/login" className="text-gray-500 hover:text-gray-700 font-semibold">
+                Staff login →
               </Link>
             </p>
           </div>
