@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
         if (user) {
           await prisma.user.update({
             where: { id: user.id },
-            data: { plan: "starter", subscriptionStatus: "canceled" },
+            data: { subscriptionStatus: "canceled", suspended: true },
           });
         }
         break;

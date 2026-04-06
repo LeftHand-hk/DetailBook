@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { getUser, setUser, logout } from "@/lib/storage";
 import type { User, BusinessHours } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
-import type { Paddle } from "@paddle/paddle-js";
 
 const DEFAULT_HOURS: Record<string, BusinessHours> = {
   monday:    { open: "8:00 AM", close: "6:00 PM", closed: false },
@@ -43,40 +42,6 @@ export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, setUserState] = useState<User | null>(null);
-  const [paddle, setPaddle] = useState<Paddle | null>(null);
-
-  useEffect(() => {
-    const token = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN;
-    if (!token) return;
-    import("@paddle/paddle-js").then(({ initializePaddle }) => {
-      initializePaddle({
-        environment: (process.env.NEXT_PUBLIC_PADDLE_ENV as "sandbox" | "production") || "production",
-        token,
-      }).then((instance) => {
-        if (instance) setPaddle(instance);
-      });
-    });
-  }, []);
-
-  const openCheckout = (plan: "starter" | "pro") => {
-    if (!user) return;
-    const priceId = plan === "pro"
-      ? process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID
-      : process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
-    if (!priceId) {
-      alert("Payment not configured yet. Contact support.");
-      return;
-    }
-    if (!paddle) {
-      alert("Payment system is loading, please try again in a moment.");
-      return;
-    }
-    paddle.Checkout.open({
-      items: [{ priceId, quantity: 1 }],
-      customer: { email: user.email },
-      customData: { userId: (user as any).id },
-    });
-  };
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "profile");
   const [saved, setSaved] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -267,7 +232,6 @@ export default function SettingsPage() {
     { id: "hours",        label: "Business Hours",   icon: "🕐" },
     { id: "booking",      label: "Booking Settings", icon: "📅" },
     { id: "templates",    label: "SMS & Email",      icon: "💬" },
-    { id: "subscription", label: "Subscription",     icon: "💳" },
     { id: "notifications",label: "Notifications",    icon: "🔔" },
     { id: "danger",       label: "Danger Zone",      icon: "⚠️" },
   ];
@@ -755,133 +719,6 @@ export default function SettingsPage() {
                   {saved === "templates" && <SavedBadge />}
                 </div>
               </form>
-            </div>
-          )}
-
-          {/* ── Subscription ── */}
-          {activeTab === "subscription" && (
-            <div className="space-y-5">
-
-              {/* Current Plan */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                <h2 className="font-bold text-gray-900 mb-4">Current Plan</h2>
-                <div className={`rounded-2xl p-5 ${user?.plan === "pro" ? "bg-gradient-to-r from-blue-600 to-indigo-600" : "bg-gradient-to-r from-gray-50 to-blue-50 border border-blue-100"}`}>
-                  <div className="flex items-center justify-between flex-wrap gap-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`text-xl font-extrabold capitalize ${user?.plan === "pro" ? "text-white" : "text-gray-900"}`}>
-                          {user?.plan} Plan
-                        </span>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full uppercase ${user?.plan === "pro" ? "bg-white/20 text-white" : "bg-green-100 text-green-700"}`}>
-                          {(user as any)?.subscriptionStatus === "active" ? "Active" : user?.trialEndsAt ? "Trial" : "Active"}
-                        </span>
-                      </div>
-                      <p className={`text-sm ${user?.plan === "pro" ? "text-blue-200" : "text-gray-600"}`}>
-                        {user?.plan === "starter" ? "$25/month" : "$50/month"}
-                      </p>
-                      {user?.trialEndsAt && (
-                        <p className={`text-xs mt-1 ${user?.plan === "pro" ? "text-blue-300" : "text-gray-400"}`}>
-                          Trial ends: {new Date(user.trialEndsAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-                        </p>
-                      )}
-                    </div>
-                    {user?.plan === "starter" && (
-                      <button
-                        onClick={() => openCheckout("pro")}
-                        className="bg-blue-600 text-white font-bold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors text-sm shadow-md shadow-blue-600/30"
-                      >
-                        Upgrade to Pro →
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Plan Cards */}
-              <div className="grid sm:grid-cols-2 gap-4">
-                {/* Starter */}
-                <div className={`bg-white rounded-2xl border-2 p-6 flex flex-col ${user?.plan === "starter" ? "border-blue-500" : "border-gray-100"}`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <h3 className="font-extrabold text-gray-900 text-lg">Starter</h3>
-                    {user?.plan === "starter" && (
-                      <span className="text-xs bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full">Current</span>
-                    )}
-                  </div>
-                  <div className="mb-4">
-                    <span className="text-3xl font-black text-gray-900">$25</span>
-                    <span className="text-gray-400 text-sm">/month</span>
-                  </div>
-                  <ul className="space-y-2 mb-6 flex-1">
-                    {["Online booking page", "Payment & deposit collection", "Calendar management", "Vehicle-type booking", "Before/after photos", "Email reminders", "Analytics dashboard"].map((f) => (
-                      <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
-                        <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                        </svg>
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  {user?.plan === "starter" ? (
-                    <button
-                      onClick={() => openCheckout("starter")}
-                      className="w-full bg-gray-900 text-white font-bold py-3 rounded-xl hover:bg-gray-800 transition-colors text-sm"
-                    >
-                      Subscribe to Starter — $25/mo
-                    </button>
-                  ) : (
-                    <button disabled className="w-full bg-gray-100 text-gray-400 font-bold py-3 rounded-xl text-sm cursor-not-allowed">
-                      Downgrade not available
-                    </button>
-                  )}
-                </div>
-
-                {/* Pro */}
-                <div className={`rounded-2xl border-2 p-6 flex flex-col ${user?.plan === "pro" ? "bg-gradient-to-br from-blue-600 to-indigo-700 border-blue-500" : "bg-gradient-to-br from-slate-900 to-blue-950 border-slate-800"}`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <h3 className="font-extrabold text-white text-lg">Pro</h3>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs bg-amber-400 text-amber-900 font-bold px-2 py-0.5 rounded-full">Most Popular</span>
-                      {user?.plan === "pro" && (
-                        <span className="text-xs bg-white/20 text-white font-bold px-2 py-0.5 rounded-full">Current</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mb-4">
-                    <span className="text-3xl font-black text-white">$50</span>
-                    <span className="text-white/50 text-sm">/month</span>
-                  </div>
-                  <ul className="space-y-2 mb-6 flex-1">
-                    {["Everything in Starter", "SMS reminders", "Multiple staff & calendars", "Google Calendar sync", "Advanced analytics", "Review request automation", "Priority support"].map((f) => (
-                      <li key={f} className="flex items-center gap-2 text-sm text-white/80">
-                        <svg className="w-4 h-4 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                        </svg>
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  {user?.plan === "pro" ? (
-                    <button disabled className="w-full bg-white/10 text-white/60 font-bold py-3 rounded-xl text-sm cursor-not-allowed">
-                      You&apos;re on Pro
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => openCheckout("pro")}
-                      className="w-full bg-white text-blue-700 font-bold py-3 rounded-xl hover:bg-blue-50 transition-colors text-sm shadow-lg"
-                    >
-                      Upgrade to Pro — $50/mo
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Billing info */}
-              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 text-sm text-gray-500 space-y-1.5">
-                <p className="font-semibold text-gray-700">Billing Notes</p>
-                <p>• Subscriptions are billed monthly. Cancel any time from your account.</p>
-                <p>• Your plan is active for the full billing period after cancellation.</p>
-                <p>• Need help? Contact us at <a href="mailto:info@detailbookapp.com" className="text-blue-600 hover:underline">info@detailbookapp.com</a></p>
-              </div>
             </div>
           )}
 

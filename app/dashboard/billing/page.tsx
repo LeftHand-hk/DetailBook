@@ -236,18 +236,6 @@ export default function BillingPage() {
             {trialDaysLeft !== null && !isSubscribed && ` · Free trial ends in ${trialDaysLeft} day${trialDaysLeft !== 1 ? "s" : ""}`}
           </p>
         </div>
-        {!isSubscribed && (
-          <button
-            onClick={() => openCheckout(isPro ? "pro" : "starter")}
-            className={`font-bold px-5 py-2.5 rounded-xl text-sm transition-colors shadow-md ${
-              isPro
-                ? "bg-white text-blue-700 hover:bg-blue-50"
-                : "bg-blue-600 text-white hover:bg-blue-700 shadow-blue-600/30"
-            }`}
-          >
-            Subscribe Now →
-          </button>
-        )}
       </div>
 
       {/* Plan Cards */}
@@ -325,7 +313,7 @@ export default function BillingPage() {
       {/* Billing Notes */}
       <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 text-sm text-gray-500 space-y-1.5">
         <p className="font-semibold text-gray-700">Billing Notes</p>
-        <p>• Subscriptions are billed monthly. Cancel any time — access continues until end of period.</p>
+        <p>• Subscriptions are billed monthly. You can cancel any time from this page.</p>
         <p>• After your 15-day trial, you will need to subscribe to keep access.</p>
         <p>• Questions? Email us at <a href="mailto:info@detailbookapp.com" className="text-blue-600 hover:underline">info@detailbookapp.com</a></p>
       </div>
@@ -335,7 +323,7 @@ export default function BillingPage() {
         <div className="mt-6 bg-white border border-red-100 rounded-2xl p-5">
           <h3 className="font-bold text-gray-900 mb-1">Cancel Subscription</h3>
           <p className="text-sm text-gray-500 mb-4">
-            Canceling will disable your account at the end of the current billing period. Your data will be preserved.
+            Canceling will immediately disable your account and log you out. Your data will be preserved — resubscribe any time to restore access.
           </p>
           <button
             onClick={() => setShowCancelModal(true)}
