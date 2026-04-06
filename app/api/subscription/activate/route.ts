@@ -15,9 +15,13 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { priceId, transactionId } = body;
+    const { priceId, transactionId, plan: planDirect } = body;
 
-    let plan = priceId ? PRICE_TO_PLAN[priceId] : null;
+    // Use directly passed plan name if available (most reliable)
+    let plan: string | null = planDirect || null;
+
+    // Fallback: resolve from priceId
+    if (!plan && priceId) plan = PRICE_TO_PLAN[priceId] || null;
 
     // If we have a transactionId but no priceId resolved, try fetching from Paddle API
     if (!plan && transactionId && process.env.PADDLE_API_KEY) {
@@ -41,7 +45,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (!plan) {
+    if (!plan || !["starter", "pro"].includes(plan)) {
       return NextResponse.json({ error: "Could not determine plan" }, { status: 400 });
     }
 

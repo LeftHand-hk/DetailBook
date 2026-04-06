@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getUser } from "@/lib/storage";
 import type { User } from "@/types";
 import type { Paddle } from "@paddle/paddle-js";
@@ -12,6 +12,7 @@ export default function BillingPage() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [cancelDone, setCancelDone] = useState(false);
+  const pendingPlanRef = useRef<"starter" | "pro">("starter");
 
   useEffect(() => {
     const u = getUser();
@@ -25,22 +26,15 @@ export default function BillingPage() {
         token,
         async eventCallback(event) {
           if (event.name === "checkout.completed") {
-            // Extract price ID from completed checkout
-            const items = (event.data as any)?.items || [];
-            const priceId = items[0]?.price_id || items[0]?.price?.id || null;
-            const transactionId = (event.data as any)?.transaction_id || null;
-
-            // Immediately activate subscription in our DB (fallback if webhook fails)
             try {
               await fetch("/api/subscription/activate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ priceId, transactionId }),
+                body: JSON.stringify({ plan: pendingPlanRef.current }),
               });
             } catch {
-              // ignore, webhook may handle it
+              // ignore
             }
-
             setTimeout(() => window.location.reload(), 1500);
           }
         },
@@ -75,6 +69,7 @@ export default function BillingPage() {
       alert("Payment system loading, please try again.");
       return;
     }
+    pendingPlanRef.current = plan;
     setLoading(true);
     paddle.Checkout.open({
       items: [{ priceId, quantity: 1 }],
