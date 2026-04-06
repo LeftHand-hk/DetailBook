@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getUser, setUser, getPackages, setPackages, isLoggedIn, generateId, syncFromServer } from "@/lib/storage";
 import type { User, Package } from "@/types";
@@ -41,6 +41,7 @@ export default function OnboardingPage() {
   const [saving, setSaving]       = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<"starter" | "pro" | null>(null);
   const [paddle, setPaddle] = useState<Paddle | null>(null);
+  const selectedPlanRef = useRef<"starter" | "pro">("starter");
 
   useEffect(() => {
     const token = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN;
@@ -51,19 +52,17 @@ export default function OnboardingPage() {
         token,
         async eventCallback(event) {
           if (event.name === "checkout.completed") {
-            const items = (event.data as any)?.items || [];
-            const priceId = items[0]?.price_id || items[0]?.price?.id || null;
-            const transactionId = (event.data as any)?.transaction_id || null;
+            // Activate the plan and save business info only after payment succeeds
             try {
               await fetch("/api/subscription/activate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ priceId, transactionId }),
+                body: JSON.stringify({ plan: selectedPlanRef.current }),
               });
             } catch {
-              // ignore
+              // ignore — webhook will catch it
             }
-            setTimeout(() => router.push("/dashboard"), 1500);
+            router.push("/dashboard");
           }
         },
       }).then((instance) => { if (instance) setPaddle(instance); });
@@ -207,7 +206,7 @@ export default function OnboardingPage() {
     setStep(2);
   };
 
-  // ── Step 3 — plan selection ────────────────────────────────────────────────
+  // ── Step 3 — free trial path ───────────────────────────────────────────────
   const handleStep3 = async () => {
     if (!selectedPlan) return;
     setSaving(true);
@@ -230,8 +229,10 @@ export default function OnboardingPage() {
     setStep(3);
   };
 
-  const openPaddleCheckout = () => {
+  // ── Pay Now path — open Paddle first, activate only after payment ──────────
+  const handlePayNow = () => {
     if (!selectedPlan || !user) return;
+    selectedPlanRef.current = selectedPlan;
     const priceId = selectedPlan === "pro"
       ? process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID
       : process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
@@ -805,7 +806,7 @@ export default function OnboardingPage() {
                   <div className="flex-[2] flex flex-col gap-2">
                     <button
                       type="button"
-                      onClick={async () => { await handleStep3(); openPaddleCheckout(); }}
+                      onClick={handlePayNow}
                       disabled={!selectedPlan || saving}
                       className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-lg shadow-blue-200 disabled:shadow-none"
                     >
