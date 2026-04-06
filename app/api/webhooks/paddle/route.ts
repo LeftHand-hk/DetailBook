@@ -7,12 +7,12 @@ const PRICE_TO_PLAN: Record<string, string> = {
   [process.env.PADDLE_PRO_PRICE_ID || ""]: "pro",
 };
 
-function getPlanFromItems(items: any[]): string {
+function getPlanFromItems(items: any[]): string | null {
   for (const item of items || []) {
     const priceId = item.price?.id || item.price_id;
     if (priceId && PRICE_TO_PLAN[priceId]) return PRICE_TO_PLAN[priceId];
   }
-  return "starter";
+  return null; // unknown price — do NOT overwrite plan
 }
 
 async function verifyPaddleSignature(req: NextRequest, body: string): Promise<boolean> {
@@ -71,27 +71,23 @@ export async function POST(req: NextRequest) {
         const userId = customData.userId;
         const plan = getPlanFromItems(data.items);
 
+        // Build update — only include plan if we successfully mapped it
+        const updateData: Record<string, string> = {
+          paddleSubscriptionId: data.id,
+          paddleCustomerId: data.customer_id,
+          subscriptionStatus: "active",
+          trialEndsAt: "",
+        };
+        if (plan) updateData.plan = plan;
+
         if (userId) {
-          await prisma.user.update({
-            where: { id: userId },
-            data: {
-              plan,
-              paddleSubscriptionId: data.id,
-              paddleCustomerId: data.customer_id,
-              subscriptionStatus: "active",
-              trialEndsAt: "",
-            },
-          });
+          await prisma.user.update({ where: { id: userId }, data: updateData });
         } else if (data.customer_id) {
-          // Fallback: find by paddle customer id
           const existingUser = await prisma.user.findFirst({
             where: { paddleCustomerId: data.customer_id },
           });
           if (existingUser) {
-            await prisma.user.update({
-              where: { id: existingUser.id },
-              data: { plan, paddleSubscriptionId: data.id, subscriptionStatus: "active", trialEndsAt: "" },
-            });
+            await prisma.user.update({ where: { id: existingUser.id }, data: updateData });
           }
         }
         break;
@@ -104,10 +100,9 @@ export async function POST(req: NextRequest) {
 
         const user = await prisma.user.findFirst({ where: { paddleSubscriptionId: subId } });
         if (user) {
-          await prisma.user.update({
-            where: { id: user.id },
-            data: { plan, subscriptionStatus: status },
-          });
+          const updateData: Record<string, string> = { subscriptionStatus: status };
+          if (plan) updateData.plan = plan;
+          await prisma.user.update({ where: { id: user.id }, data: updateData });
         }
         break;
       }
