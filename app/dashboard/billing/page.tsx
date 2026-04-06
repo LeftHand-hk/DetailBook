@@ -12,6 +12,9 @@ export default function BillingPage() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [cancelDone, setCancelDone] = useState(false);
+  const [checkoutOpened, setCheckoutOpened] = useState(false);
+  const [activating, setActivating] = useState(false);
+  const [activateError, setActivateError] = useState("");
   const pendingPlanRef = useRef<"starter" | "pro">("starter");
 
   useEffect(() => {
@@ -26,16 +29,17 @@ export default function BillingPage() {
         token,
         async eventCallback(event) {
           if (event.name === "checkout.completed") {
+            // Auto-activate on event (bonus, may not fire reliably in sandbox)
             try {
               await fetch("/api/subscription/activate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ plan: pendingPlanRef.current }),
               });
+              setTimeout(() => window.location.reload(), 1000);
             } catch {
-              // ignore
+              // Show manual button as fallback
             }
-            setTimeout(() => window.location.reload(), 1500);
           }
         },
       }).then((instance) => {
@@ -70,13 +74,35 @@ export default function BillingPage() {
       return;
     }
     pendingPlanRef.current = plan;
-    setLoading(true);
+    setCheckoutOpened(true);
+    setActivateError("");
     paddle.Checkout.open({
       items: [{ priceId, quantity: 1 }],
       customer: { email: user.email },
       customData: { userId: (user as any).id },
     });
-    setLoading(false);
+  };
+
+  const handleActivatePlan = async () => {
+    setActivating(true);
+    setActivateError("");
+    try {
+      const res = await fetch("/api/subscription/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: pendingPlanRef.current }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        setActivateError(data.error || "Failed to activate. Please contact support.");
+      }
+    } catch {
+      setActivateError("Network error. Please try again.");
+    } finally {
+      setActivating(false);
+    }
   };
 
   const isPro = user?.plan === "pro";
@@ -128,6 +154,27 @@ export default function BillingPage() {
         <h1 className="text-2xl font-extrabold text-gray-900">Billing & Subscription</h1>
         <p className="text-gray-500 text-sm mt-1">Manage your plan and subscription.</p>
       </div>
+
+      {/* Payment completed banner — shown after checkout is opened */}
+      {checkoutOpened && !isSubscribed && (
+        <div className="mb-6 bg-green-50 border border-green-200 rounded-2xl p-5">
+          <p className="font-semibold text-green-800 mb-1">Did you complete the payment?</p>
+          <p className="text-sm text-green-700 mb-4">
+            Click the button below after your payment goes through to activate your{" "}
+            <strong className="capitalize">{pendingPlanRef.current}</strong> plan.
+          </p>
+          <button
+            onClick={handleActivatePlan}
+            disabled={activating}
+            className="bg-green-600 text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-green-700 disabled:opacity-50 transition-colors"
+          >
+            {activating ? "Activating..." : "Yes, I paid — Activate My Plan"}
+          </button>
+          {activateError && (
+            <p className="mt-2 text-sm text-red-600">{activateError}</p>
+          )}
+        </div>
+      )}
 
       {/* Current Plan Banner */}
       <div className={`rounded-2xl p-5 mb-6 flex items-center justify-between flex-wrap gap-4 ${
@@ -251,7 +298,7 @@ export default function BillingPage() {
 
       {/* Cancel Subscription */}
       {isSubscribed && (
-        <div className="bg-white border border-red-100 rounded-2xl p-5">
+        <div className="mt-6 bg-white border border-red-100 rounded-2xl p-5">
           <h3 className="font-bold text-gray-900 mb-1">Cancel Subscription</h3>
           <p className="text-sm text-gray-500 mb-4">
             Canceling will disable your account at the end of the current billing period. Your data will be preserved.
