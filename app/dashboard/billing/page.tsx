@@ -1,25 +1,46 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { getUser } from "@/lib/storage";
-import type { User } from "@/types";
 import type { Paddle } from "@paddle/paddle-js";
 
+interface UserData {
+  id: string;
+  email: string;
+  plan: string;
+  subscriptionStatus?: string;
+  trialEndsAt?: string;
+}
+
 export default function BillingPage() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserData | null>(null);
+  const [userLoading, setUserLoading] = useState(true);
   const [paddle, setPaddle] = useState<Paddle | null>(null);
-  const [loading, setLoading] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [cancelDone, setCancelDone] = useState(false);
   const [checkoutOpened, setCheckoutOpened] = useState(false);
   const [activating, setActivating] = useState(false);
   const [activateError, setActivateError] = useState("");
+  const [activateSuccess, setActivateSuccess] = useState(false);
   const pendingPlanRef = useRef<"starter" | "pro">("starter");
 
+  // Fetch user directly from API — not localStorage
+  const fetchUser = async () => {
+    try {
+      const res = await fetch("/api/user");
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data.user);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setUserLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const u = getUser();
-    if (u) setUser(u);
+    fetchUser();
 
     const token = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN;
     if (!token) return;
@@ -29,17 +50,7 @@ export default function BillingPage() {
         token,
         async eventCallback(event) {
           if (event.name === "checkout.completed") {
-            // Auto-activate on event (bonus, may not fire reliably in sandbox)
-            try {
-              await fetch("/api/subscription/activate", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ plan: pendingPlanRef.current }),
-              });
-              setTimeout(() => window.location.reload(), 1000);
-            } catch {
-              // Show manual button as fallback
-            }
+            await activatePlan(pendingPlanRef.current);
           }
         },
       }).then((instance) => {
@@ -47,6 +58,35 @@ export default function BillingPage() {
       });
     });
   }, []);
+
+  const activatePlan = async (plan: "starter" | "pro") => {
+    setActivating(true);
+    setActivateError("");
+    try {
+      const res = await fetch("/api/subscription/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        // Re-fetch user from API to get fresh data
+        const userRes = await fetch("/api/user");
+        if (userRes.ok) {
+          const userData = await userRes.json();
+          setUser(userData.user);
+        }
+        setActivateSuccess(true);
+        setCheckoutOpened(false);
+      } else {
+        setActivateError(data.error || "Failed to activate plan. Please contact support.");
+      }
+    } catch {
+      setActivateError("Network error. Please try again.");
+    } finally {
+      setActivating(false);
+    }
+  };
 
   const handleCancel = async () => {
     setCanceling(true);
@@ -76,40 +116,19 @@ export default function BillingPage() {
     pendingPlanRef.current = plan;
     setCheckoutOpened(true);
     setActivateError("");
+    setActivateSuccess(false);
     paddle.Checkout.open({
       items: [{ priceId, quantity: 1 }],
       customer: { email: user.email },
-      customData: { userId: (user as any).id },
+      customData: { userId: user.id },
     });
   };
 
-  const handleActivatePlan = async () => {
-    setActivating(true);
-    setActivateError("");
-    try {
-      const res = await fetch("/api/subscription/activate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: pendingPlanRef.current }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        window.location.reload();
-      } else {
-        setActivateError(data.error || "Failed to activate. Please contact support.");
-      }
-    } catch {
-      setActivateError("Network error. Please try again.");
-    } finally {
-      setActivating(false);
-    }
-  };
-
   const isPro = user?.plan === "pro";
-  const isSubscribed = (user as any)?.subscriptionStatus === "active";
+  const isSubscribed = user?.subscriptionStatus === "active";
   const trialDaysLeft = (() => {
-    if (!(user as any)?.trialEndsAt) return null;
-    const diff = new Date((user as any).trialEndsAt).getTime() - Date.now();
+    if (!user?.trialEndsAt) return null;
+    const diff = new Date(user.trialEndsAt).getTime() - Date.now();
     const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
     return days > 0 ? days : 0;
   })();
@@ -119,7 +138,6 @@ export default function BillingPage() {
       id: "starter" as const,
       name: "Starter",
       price: 25,
-      color: "gray",
       features: [
         "Online booking page",
         "Payment & deposit collection",
@@ -134,7 +152,6 @@ export default function BillingPage() {
       id: "pro" as const,
       name: "Pro",
       price: 50,
-      color: "blue",
       popular: true,
       features: [
         "Everything in Starter",
@@ -148,6 +165,14 @@ export default function BillingPage() {
     },
   ];
 
+  if (userLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="text-gray-400 text-sm">Loading billing info...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto">
       <div className="mb-6">
@@ -155,24 +180,36 @@ export default function BillingPage() {
         <p className="text-gray-500 text-sm mt-1">Manage your plan and subscription.</p>
       </div>
 
-      {/* Payment completed banner — shown after checkout is opened */}
+      {/* Payment completed — manual activate banner */}
       {checkoutOpened && !isSubscribed && (
         <div className="mb-6 bg-green-50 border border-green-200 rounded-2xl p-5">
-          <p className="font-semibold text-green-800 mb-1">Did you complete the payment?</p>
+          <p className="font-semibold text-green-800 mb-1">
+            Did you complete your payment?
+          </p>
           <p className="text-sm text-green-700 mb-4">
-            Click the button below after your payment goes through to activate your{" "}
-            <strong className="capitalize">{pendingPlanRef.current}</strong> plan.
+            Click below to activate your{" "}
+            <strong className="capitalize">{pendingPlanRef.current}</strong> plan immediately.
           </p>
           <button
-            onClick={handleActivatePlan}
+            onClick={() => activatePlan(pendingPlanRef.current)}
             disabled={activating}
             className="bg-green-600 text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-green-700 disabled:opacity-50 transition-colors"
           >
             {activating ? "Activating..." : "Yes, I paid — Activate My Plan"}
           </button>
           {activateError && (
-            <p className="mt-2 text-sm text-red-600">{activateError}</p>
+            <p className="mt-3 text-sm text-red-600 font-medium">{activateError}</p>
           )}
+        </div>
+      )}
+
+      {/* Activate success */}
+      {activateSuccess && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-2xl p-5">
+          <p className="font-semibold text-blue-800">
+            Plan activated! You are now on the{" "}
+            <span className="capitalize">{user?.plan}</span> plan.
+          </p>
         </div>
       )}
 
@@ -202,7 +239,6 @@ export default function BillingPage() {
         {!isSubscribed && (
           <button
             onClick={() => openCheckout(isPro ? "pro" : "starter")}
-            disabled={loading}
             className={`font-bold px-5 py-2.5 rounded-xl text-sm transition-colors shadow-md ${
               isPro
                 ? "bg-white text-blue-700 hover:bg-blue-50"
@@ -261,22 +297,20 @@ export default function BillingPage() {
               ) : isCurrent && !isSubscribed ? (
                 <button
                   onClick={() => openCheckout(plan.id)}
-                  disabled={loading}
                   className={`w-full font-bold py-3 rounded-xl text-sm transition-colors ${
                     plan.id === "pro"
                       ? "bg-white text-blue-700 hover:bg-blue-50 shadow-lg"
                       : "bg-gray-900 text-white hover:bg-gray-800"
                   }`}
                 >
-                  {loading ? "Loading..." : `Subscribe to ${plan.name} — $${plan.price}/mo`}
+                  {`Subscribe to ${plan.name} — $${plan.price}/mo`}
                 </button>
               ) : !isCurrent && plan.id === "pro" ? (
                 <button
                   onClick={() => openCheckout("pro")}
-                  disabled={loading}
                   className="w-full bg-white text-blue-700 font-bold py-3 rounded-xl hover:bg-blue-50 transition-colors text-sm shadow-lg"
                 >
-                  {loading ? "Loading..." : "Upgrade to Pro →"}
+                  Upgrade to Pro →
                 </button>
               ) : (
                 <div className="w-full text-center text-gray-400 text-sm py-3">
