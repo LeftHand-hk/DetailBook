@@ -9,6 +9,9 @@ export default function BillingPage() {
   const [user, setUser] = useState<User | null>(null);
   const [paddle, setPaddle] = useState<Paddle | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [canceling, setCanceling] = useState(false);
+  const [cancelDone, setCancelDone] = useState(false);
 
   useEffect(() => {
     const u = getUser();
@@ -30,6 +33,22 @@ export default function BillingPage() {
       });
     });
   }, []);
+
+  const handleCancel = async () => {
+    setCanceling(true);
+    try {
+      const res = await fetch("/api/subscription/cancel", { method: "POST" });
+      if (res.ok) {
+        setCancelDone(true);
+        setTimeout(() => window.location.href = "/login", 3000);
+      }
+    } catch {
+      alert("Something went wrong. Please contact support.");
+    } finally {
+      setCanceling(false);
+      setShowCancelModal(false);
+    }
+  };
 
   const openCheckout = (plan: "starter" | "pro") => {
     if (!user) return;
@@ -218,6 +237,69 @@ export default function BillingPage() {
         <p>• After your 15-day trial, you will need to subscribe to keep access.</p>
         <p>• Questions? Email us at <a href="mailto:info@detailbookapp.com" className="text-blue-600 hover:underline">info@detailbookapp.com</a></p>
       </div>
+
+      {/* Cancel Subscription */}
+      {isSubscribed && (
+        <div className="bg-white border border-red-100 rounded-2xl p-5">
+          <h3 className="font-bold text-gray-900 mb-1">Cancel Subscription</h3>
+          <p className="text-sm text-gray-500 mb-4">
+            Canceling will disable your account at the end of the current billing period. Your data will be preserved.
+          </p>
+          <button
+            onClick={() => setShowCancelModal(true)}
+            className="px-4 py-2.5 text-sm font-semibold text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition-colors"
+          >
+            Cancel Subscription
+          </button>
+        </div>
+      )}
+
+      {/* Cancel done message */}
+      {cancelDone && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl p-8 text-center max-w-sm mx-4 shadow-xl">
+            <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-7 h-7 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Subscription Canceled</h3>
+            <p className="text-sm text-gray-500">Your account has been disabled. Redirecting to login...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Confirmation Modal */}
+      {showCancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 text-center mb-2">Cancel Subscription?</h3>
+            <p className="text-sm text-gray-500 text-center mb-6">
+              Your account will be <strong>disabled</strong> immediately. You will be logged out and will need to resubscribe to regain access.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowCancelModal(false)}
+                className="flex-1 py-2.5 text-sm font-semibold border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-gray-700"
+              >
+                Keep Plan
+              </button>
+              <button
+                onClick={handleCancel}
+                disabled={canceling}
+                className="flex-1 py-2.5 text-sm font-semibold bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {canceling ? "Canceling..." : "Yes, Cancel"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
