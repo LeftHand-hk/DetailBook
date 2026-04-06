@@ -85,7 +85,7 @@ export default function DashboardPage() {
     { icon: "⚙️", title: "2. Set Up Your Business Profile", desc: "Add your business name, logo, phone number, service areas, and business hours in Settings. This info shows on your public booking page.", action: { label: "Go to Settings", href: "/dashboard/settings" } },
     { icon: "🔗", title: "3. Share Your Booking Link", desc: "Copy your unique booking link and share it with customers via text, social media, or your website. Customers can book and pay deposits online.", action: { label: "Copy Link", onClick: handleCopyLink } },
     { icon: "📋", title: "4. Manage Your Bookings", desc: "When bookings come in, you'll see them here and in the Bookings tab. Confirm, complete, or cancel appointments. Track deposits and payments.", action: { label: "View Bookings", href: "/dashboard/bookings" } },
-    { icon: "💳", title: "5. Subscribe Before Trial Ends", desc: "Your 15-day free trial includes the Starter plan. Subscribe before it ends to keep your booking page live and continue receiving appointments.", action: { label: "Subscribe Now", href: "/dashboard/settings" } },
+    { icon: "💳", title: "5. Subscribe Before Trial Ends", desc: "Your 15-day free trial includes the Starter plan. Subscribe before it ends to keep your booking page live and continue receiving appointments.", action: { label: "Subscribe Now", href: "/dashboard/billing" } },
   ];
 
   const proGuideSteps = [
@@ -513,7 +513,7 @@ export default function DashboardPage() {
                   </div>
                 ))}
               </div>
-              <Link href="/dashboard/settings"
+              <Link href="/dashboard/billing"
                 className="block w-full text-center bg-white text-gray-900 text-sm font-bold py-3 rounded-xl hover:bg-gray-100 transition-all">
                 Upgrade to Pro — $50/mo
               </Link>

@@ -248,7 +248,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <p className="text-slate-500 text-[11px] leading-relaxed mb-3">
               Unlock analytics, reviews, SMS & more
             </p>
-            <Link href="/dashboard/settings" onClick={() => setSidebarOpen(false)}
+            <Link href="/dashboard/billing" onClick={() => setSidebarOpen(false)}
               className="block w-full text-center bg-white text-gray-900 text-xs font-bold py-2 rounded-lg hover:bg-gray-100 transition-all">
               Upgrade — $50/mo
             </Link>
@@ -356,7 +356,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </span>
             </div>
             <Link
-              href="/dashboard/settings#billing"
+              href="/dashboard/billing"
               className={`flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${
                 trialDaysLeft <= 3
                   ? "bg-red-600 text-white hover:bg-red-700"

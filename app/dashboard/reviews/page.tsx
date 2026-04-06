@@ -71,7 +71,7 @@ export default function ReviewsPage() {
               </div>
 
               <Link
-                href="/dashboard/settings"
+                href="/dashboard/billing"
                 className="inline-flex items-center gap-2 bg-white text-blue-700 font-bold text-sm px-6 py-3 rounded-xl hover:bg-blue-50 transition-all shadow-lg shadow-black/10"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
