@@ -93,6 +93,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [user, setUserState] = useState<User | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [checked, setChecked] = useState(false);
+  const [upgradeDismissed, setUpgradeDismissed] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && localStorage.getItem("upgrade_banner_dismissed") === "true") {
+      setUpgradeDismissed(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (!isLoggedIn()) {
@@ -237,10 +244,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
       </div>
 
-      {/* Upgrade Banner (Starter only) */}
-      {!isPro && (
+      {/* Upgrade Banner (Starter only, dismissible) */}
+      {!isPro && !upgradeDismissed && (
         <div className="px-3 pb-3 flex-shrink-0">
-          <div className="bg-white/[0.05] border border-white/[0.08] rounded-xl p-4">
+          <div className="bg-white/[0.05] border border-white/[0.08] rounded-xl p-4 relative">
+            <button
+              onClick={() => { setUpgradeDismissed(true); localStorage.setItem("upgrade_banner_dismissed", "true"); }}
+              className="absolute top-2 right-2 text-white/20 hover:text-white/50 transition-colors"
+              aria-label="Dismiss"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
             <div className="flex items-center gap-2 mb-1.5">
               <svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
               <p className="text-white/60 text-xs font-bold">Upgrade to Pro</p>
