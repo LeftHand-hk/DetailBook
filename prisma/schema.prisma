@@ -65,9 +65,12 @@ model User {
 
   serviceType  String   @default("mobile")
 
-  suspended      Boolean  @default(false)
-  promoCodeUsed  String?
-  promoDiscount  Float?
+  suspended            Boolean  @default(false)
+  promoCodeUsed        String?
+  promoDiscount        Float?
+  paddleCustomerId     String?
+  paddleSubscriptionId String?
+  subscriptionStatus   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

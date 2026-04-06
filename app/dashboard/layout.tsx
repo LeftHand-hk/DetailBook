@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { isLoggedIn, logout, getUser, initializeDemo, syncFromServer } from "@/lib/storage";
 import type { User } from "@/types";
 import { LogoIcon, LogoWordmark } from "@/components/Logo";
+import { PaddleProvider } from "@/components/PaddleProvider";
 
 interface NavItem {
   label: string;
@@ -365,7 +366,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto bg-gray-50/80">
-          {children}
+          <PaddleProvider>
+            {children}
+          </PaddleProvider>
         </main>
       </div>
     </div>
