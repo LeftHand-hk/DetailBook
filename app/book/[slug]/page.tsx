@@ -947,7 +947,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                     </div>
                     <div>
                       <h3 className="font-bold text-gray-900">Service Location</h3>
-                      <p className="text-xs text-gray-400">Choose how you'd like to be served</p>
+                      <p className="text-xs text-gray-400">Choose how you&apos;d like to be served</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3 mb-4">
