@@ -144,7 +144,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       depositPaid: depositAmount,
       depositRequired: selectedPackage.deposit || 0,
       notes: form.notes,
-      address: (serviceType === "both" && selectedServiceMode === "shop") ? `SHOP: ${user.address || ""}` : customerAddress || undefined,
+      address: (serviceType === "both" && selectedServiceMode === "shop") ? `SHOP: ${user?.address || ""}` : customerAddress || undefined,
       staffId: selectedStaff?.id,
       staffName: selectedStaff?.name,
     };
