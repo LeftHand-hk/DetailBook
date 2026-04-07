@@ -353,8 +353,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           )}
         </div>
 
-        {/* Trial Banner */}
-        {isOnTrial && (
+        {/* Trial Banner — only show if NOT actively subscribed */}
+        {isOnTrial && (user as any)?.subscriptionStatus !== "active" && (
           <div className={`flex-shrink-0 flex items-center justify-between gap-3 px-4 py-2.5 text-sm ${
             trialDaysLeft <= 3
               ? "bg-red-50 border-b border-red-100 text-red-700"

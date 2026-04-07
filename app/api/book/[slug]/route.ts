@@ -34,6 +34,21 @@ export async function GET(
       );
     }
 
+    // Fetch confirmed/pending bookings for availability (next 60 days only)
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 60);
+    const bookedSlots = await prisma.booking.findMany({
+      where: {
+        userId: user.id,
+        status: { in: ["confirmed", "pending", "in_progress"] },
+        date: {
+          gte: new Date().toISOString().split("T")[0],
+          lte: futureDate.toISOString().split("T")[0],
+        },
+      },
+      select: { date: true, time: true, staffId: true },
+    });
+
     // Return public profile data (exclude sensitive fields like password)
     const profile = {
       id: user.id,
@@ -76,6 +91,7 @@ export async function GET(
       serviceType: (user as any).serviceType ?? "mobile",
       packages: user.packages,
       staff: (user as any).staff ?? [],
+      bookedSlots,
     };
 
     return NextResponse.json(profile);

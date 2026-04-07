@@ -37,7 +37,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
 
   const handleLogout = async () => {
     await fetch("/api/staff-auth/logout", { method: "POST" });
-    router.push("/staff/login");
+    router.push("/login");
   };
 
   if (!checked) {

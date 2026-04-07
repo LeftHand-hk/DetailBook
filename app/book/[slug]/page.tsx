@@ -86,6 +86,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   const [serviceType, setServiceType] = useState<"mobile" | "shop" | "both">("mobile");
   const [customerAddress, setCustomerAddress] = useState("");
   const [selectedServiceMode, setSelectedServiceMode] = useState<"mobile" | "shop" | null>(null);
+  const [bookedSlots, setBookedSlots] = useState<{ date: string; time: string; staffId: string | null }[]>([]);
 
   useEffect(() => {
     initializeDemo();
@@ -97,6 +98,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
           if (data.staff && Array.isArray(data.staff)) setStaffList(data.staff);
           if (data.serviceType) setServiceType(data.serviceType);
           if (data.packages) setPackages(data.packages.filter((p: any) => p.active));
+          if (data.bookedSlots && Array.isArray(data.bookedSlots)) setBookedSlots(data.bookedSlots);
           // Build user object from API response (more up-to-date than localStorage)
           setUser(data);
         } else {
@@ -115,6 +117,41 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
 
   const isPro = user?.plan === "pro";
 
+  // Check if a time slot is available for the selected date + staff
+  const isTimeBooked = (time: string): boolean => {
+    if (!selectedDate) return false;
+    if (selectedStaff) {
+      // Specific staff selected — blocked if that staff has a booking
+      return bookedSlots.some((s) => s.date === selectedDate && s.time === time && s.staffId === selectedStaff.id);
+    }
+    if (staffList.length === 0) {
+      // No staff — just check if any booking exists at that time for this business
+      return bookedSlots.some((s) => s.date === selectedDate && s.time === time);
+    }
+    // "Any available" — blocked only if ALL staff members are booked at that time
+    const staffWithBooking = bookedSlots.filter((s) => s.date === selectedDate && s.time === time).map((s) => s.staffId);
+    return staffList.every((st) => staffWithBooking.includes(st.id));
+  };
+
+  // Auto-assign: pick the staff member with fewest bookings on that date
+  const autoAssignStaff = (): string | undefined => {
+    if (staffList.length === 0 || !selectedDate || !selectedTime) return undefined;
+    if (selectedStaff) return selectedStaff.id;
+    // Find staff not booked at this time
+    const bookedAtTime = bookedSlots
+      .filter((s) => s.date === selectedDate && s.time === selectedTime)
+      .map((s) => s.staffId);
+    const available = staffList.filter((st) => !bookedAtTime.includes(st.id));
+    if (available.length === 0) return undefined;
+    // Pick one with fewest bookings on that day
+    const dayCounts = available.map((st) => ({
+      id: st.id,
+      count: bookedSlots.filter((s) => s.date === selectedDate && s.staffId === st.id).length,
+    }));
+    dayCounts.sort((a, b) => a.count - b.count);
+    return dayCounts[0].id;
+  };
+
   const depositAmount = selectedPackage ? Math.round(selectedPackage.price * 0.25) : 0;
 
   const formatDate = (dateStr: string) =>
@@ -128,9 +165,12 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     // For "both" type, a mode must be selected
     if (serviceType === "both" && !selectedServiceMode) return;
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    const newBooking: Booking = {
-      id: generateId(),
+    const assignedStaffId = selectedStaff?.id || autoAssignStaff();
+    const assignedStaffName = selectedStaff?.name || staffList.find((s) => s.id === assignedStaffId)?.name;
+    const bookingAddress = (serviceType === "both" && selectedServiceMode === "shop") ? `SHOP: ${user?.address || ""}` : customerAddress || undefined;
+
+    const bookingData = {
+      userId: (user as any)?.id,
       customerName: form.customerName,
       customerEmail: form.customerEmail,
       customerPhone: form.customerPhone,
@@ -144,12 +184,47 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       depositPaid: depositAmount,
       depositRequired: selectedPackage.deposit || 0,
       notes: form.notes,
-      address: (serviceType === "both" && selectedServiceMode === "shop") ? `SHOP: ${user?.address || ""}` : customerAddress || undefined,
-      staffId: selectedStaff?.id,
-      staffName: selectedStaff?.name,
+      address: bookingAddress,
+      staffId: assignedStaffId,
+    };
+
+    try {
+      const res = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bookingData),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setBookingId(created.id);
+      } else {
+        setBookingId(generateId());
+      }
+    } catch {
+      setBookingId(generateId());
+    }
+
+    // Also save locally for backward compat
+    const newBooking: Booking = {
+      id: bookingId || generateId(),
+      customerName: form.customerName,
+      customerEmail: form.customerEmail,
+      customerPhone: form.customerPhone,
+      vehicle: { make: form.make, model: form.model, year: form.year, color: form.color },
+      serviceId: selectedPackage.id,
+      serviceName: selectedPackage.name,
+      servicePrice: selectedPackage.price,
+      date: selectedDate,
+      time: selectedTime,
+      status: "pending",
+      depositPaid: depositAmount,
+      depositRequired: selectedPackage.deposit || 0,
+      notes: form.notes,
+      address: bookingAddress,
+      staffId: assignedStaffId,
+      staffName: assignedStaffName,
     };
     setBookings([...getBookings(), newBooking]);
-    setBookingId(newBooking.id);
     setSubmitting(false);
     setStep(3);
   };
@@ -891,16 +966,21 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                 </h3>
                 <p className="text-gray-400 text-xs mb-4">{formatDate(selectedDate)}</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-                  {TIMES.map((time) => (
-                    <button key={time} onClick={() => setSelectedTime(time)}
-                      className={`py-3 rounded-xl text-sm font-semibold transition-all duration-200 border-2 ${
-                        selectedTime === time
-                          ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/30 scale-105"
-                          : "border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
-                      }`}>
-                      {time}
-                    </button>
-                  ))}
+                  {TIMES.map((time) => {
+                    const booked = isTimeBooked(time);
+                    return (
+                      <button key={time} onClick={() => !booked && setSelectedTime(time)} disabled={booked}
+                        className={`py-3 rounded-xl text-sm font-semibold transition-all duration-200 border-2 ${
+                          booked
+                            ? "border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed line-through"
+                            : selectedTime === time
+                              ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/30 scale-105"
+                              : "border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
+                        }`}>
+                        {booked ? "Booked" : time}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}

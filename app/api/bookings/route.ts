@@ -101,6 +101,7 @@ export async function POST(request: NextRequest) {
         notes: notes || null,
         address: address || null,
         status: status || "pending",
+        staffId: body.staffId || null,
       },
     });
 
