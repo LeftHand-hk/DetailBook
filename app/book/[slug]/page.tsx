@@ -943,7 +943,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                     const isSelected = dateStr === selectedDate;
                     const isTodayDate = dateStr === new Date().toISOString().split("T")[0];
                     return (
-                      <button key={i} onClick={() => !disabled && setSelectedDate(dateStr)} disabled={disabled}
+                      <button key={i} onClick={() => { if (!disabled) { setSelectedDate(dateStr); setSelectedTime(null); setSelectedStaff(null); } }} disabled={disabled}
                         className={`aspect-square w-full rounded-xl text-sm font-medium transition-all duration-200 ${
                           disabled ? "text-gray-300 cursor-not-allowed" :
                           isSelected ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30 scale-105" :
@@ -1164,10 +1164,14 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                       </div>
                       <div>
                         <p className="text-xs font-bold text-gray-800">No Preference</p>
-                        <p className="text-[10px] text-gray-400">Any available</p>
+                        <p className="text-[10px] text-gray-400">We&apos;ll assign the best available</p>
                       </div>
                     </button>
-                    {staffList.map((member) => (
+                    {staffList.filter((member) => {
+                      // Hide staff who are booked at the selected date+time
+                      if (!selectedDate || !selectedTime) return true;
+                      return !bookedSlots.some((s) => s.date === selectedDate && s.time === selectedTime && s.staffId === member.id);
+                    }).map((member) => (
                       <button
                         key={member.id}
                         type="button"
