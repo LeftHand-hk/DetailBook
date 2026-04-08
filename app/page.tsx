@@ -523,7 +523,7 @@ export default function LandingPage() {
                 <span className="text-blue-200 ml-1">/month</span>
               </div>
               <ul className="space-y-3 mb-8 flex-1">
-                {["Everything in Starter","Unlimited service packages","SMS + Email reminders","Google Calendar sync","Custom domain","Priority support","Analytics dashboard","Automated deposit refunds"].map((item) => (
+                {["Everything in Starter","Unlimited service packages","SMS + Email reminders","Multiple staff & calendars","Google Calendar sync","Custom domain","Priority support","Analytics dashboard"].map((item) => (
                   <li key={item} className="flex items-center gap-3 text-white text-sm">
                     <svg className="w-5 h-5 text-blue-200 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />

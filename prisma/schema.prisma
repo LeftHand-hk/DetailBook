@@ -71,6 +71,11 @@ model User {
   paddleCustomerId     String?
   paddleSubscriptionId String?
   subscriptionStatus   String?
+
+  googleAccessToken    String?  @db.Text
+  googleRefreshToken   String?  @db.Text
+  googleCalendarId     String?
+  googleCalendarEnabled Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

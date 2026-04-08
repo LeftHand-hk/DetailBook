@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
+import { syncBookingToGoogleCalendar } from "@/lib/google-calendar";
 
 export async function GET(request: NextRequest) {
   try {
@@ -104,6 +105,9 @@ export async function POST(request: NextRequest) {
         staffId: body.staffId || null,
       },
     });
+
+    // Auto-sync to Google Calendar (non-blocking)
+    syncBookingToGoogleCalendar(booking).catch(() => {});
 
     return NextResponse.json(booking, { status: 201 });
   } catch (error) {
