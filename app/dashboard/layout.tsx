@@ -85,6 +85,11 @@ const settingsNav: NavItem[] = [
     href: "/dashboard/billing",
     icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>,
   },
+  {
+    label: "Support",
+    href: "/dashboard/support",
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+  },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -177,6 +182,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       >
         <span className={active ? "text-white" : "text-slate-500 group-hover:text-slate-300 transition-colors"}>{item.icon}</span>
         <span className="flex-1">{item.label}</span>
+        {item.href === "/dashboard/support" && isPro && (
+          <span className="text-[9px] font-bold bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-1.5 py-0.5 rounded uppercase tracking-wider">Priority</span>
+        )}
         {item.badge && (
           <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full min-w-[20px] text-center">{item.badge}</span>
         )}
