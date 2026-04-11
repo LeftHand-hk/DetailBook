@@ -40,10 +40,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       },
     });
 
-    // Set ticket back to open so admin sees it needs attention
+    // Mark as unread for admin (don't change status - stays as-is)
     await prisma.supportTicket.update({
       where: { id: ticket.id },
-      data: { status: "open" },
+      data: { adminUnread: true },
     });
 
     // Email admin about follow-up

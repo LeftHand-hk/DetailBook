@@ -27,6 +27,7 @@ interface Ticket {
   status: string;
   adminReply?: string | null;
   repliedAt?: string | null;
+  adminUnread?: boolean;
   createdAt: string;
   user: TicketUser;
   messages?: TicketMessage[];
@@ -80,6 +81,21 @@ export default function AdminTicketsPage() {
       }
     } catch { /* silent */ }
     setLoading(false);
+  };
+
+  const handleSelectTicket = async (ticket: Ticket) => {
+    setSelected(ticket);
+    // If unread, fetch full ticket to mark as read
+    if (ticket.adminUnread) {
+      try {
+        const res = await fetch(`/api/admin/tickets/${ticket.id}`);
+        if (res.ok) {
+          const full = await res.json();
+          setSelected(full);
+          setTickets((prev) => prev.map((t) => t.id === full.id ? { ...t, adminUnread: false } : t));
+        }
+      } catch { /* silent */ }
+    }
   };
 
   const handleReply = async () => {
@@ -151,36 +167,38 @@ export default function AdminTicketsPage() {
   const priorityCount = tickets.filter((t) => t.priority === "priority" && t.status !== "resolved" && t.status !== "closed").length;
 
   return (
-    <div className="p-6 max-w-[1600px] mx-auto">
+    <div className="p-4 max-w-[1600px] mx-auto flex flex-col h-full">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Support Tickets</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage and reply to customer support requests.</p>
+      <div className="mb-3 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Support Tickets</h1>
+          <p className="text-xs text-gray-500">Manage and reply to customer support requests.</p>
+        </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3">
-          <p className="text-xl font-bold text-gray-900">{tickets.length}</p>
-          <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Total</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+        <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 flex items-center gap-2">
+          <p className="text-lg font-bold text-gray-900">{tickets.length}</p>
+          <p className="text-[11px] text-gray-500 font-medium uppercase tracking-wide">Total</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3">
-          <p className="text-xl font-bold text-amber-700">{openCount}</p>
-          <p className="text-xs text-amber-600 font-medium uppercase tracking-wide">Open</p>
+        <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 flex items-center gap-2">
+          <p className="text-lg font-bold text-amber-700">{openCount}</p>
+          <p className="text-[11px] text-amber-600 font-medium uppercase tracking-wide">Open</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3">
-          <p className="text-xl font-bold text-blue-700">{priorityCount}</p>
-          <p className="text-xs text-blue-600 font-medium uppercase tracking-wide">Priority</p>
+        <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 flex items-center gap-2">
+          <p className="text-lg font-bold text-blue-700">{priorityCount}</p>
+          <p className="text-[11px] text-blue-600 font-medium uppercase tracking-wide">Priority</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3">
-          <p className="text-xl font-bold text-green-700">{tickets.filter((t) => t.status === "resolved").length}</p>
-          <p className="text-xs text-green-600 font-medium uppercase tracking-wide">Resolved</p>
+        <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 flex items-center gap-2">
+          <p className="text-lg font-bold text-green-700">{tickets.filter((t) => t.status === "resolved").length}</p>
+          <p className="text-[11px] text-green-600 font-medium uppercase tracking-wide">Resolved</p>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-[400px_1fr] gap-4">
+      <div className="grid lg:grid-cols-[380px_1fr] gap-4 flex-1 min-h-0">
         {/* ── Ticket list ── */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col max-h-[calc(100vh-300px)]">
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col h-full">
           {/* Filters */}
           <div className="p-3 border-b border-gray-100 space-y-2">
             <div className="relative">
@@ -239,29 +257,36 @@ export default function AdminTicketsPage() {
             ) : (
               filteredTickets.map((ticket) => {
                 const isSelected = selected?.id === ticket.id;
-                const unread = ticket.status === "open";
+                const hasUnread = ticket.adminUnread;
                 return (
                   <button
                     key={ticket.id}
-                    onClick={() => setSelected(ticket)}
+                    onClick={() => handleSelectTicket(ticket)}
                     className={`w-full text-left p-4 transition-colors ${
-                      isSelected ? "bg-gray-50" : "hover:bg-gray-50"
+                      isSelected ? "bg-blue-50/60 border-l-2 border-blue-500" : "hover:bg-gray-50 border-l-2 border-transparent"
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      {/* Avatar */}
-                      <div className="w-9 h-9 bg-gradient-to-br from-gray-700 to-gray-900 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-bold">
-                        {ticket.user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                      {/* Avatar with unread dot */}
+                      <div className="relative flex-shrink-0">
+                        <div className="w-9 h-9 bg-gradient-to-br from-gray-700 to-gray-900 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                          {ticket.user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                        </div>
+                        {hasUnread && (
+                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center border-2 border-white">
+                            <span className="text-[8px] text-white font-bold leading-none">!</span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-0.5">
-                          <p className={`text-sm truncate ${unread ? "font-bold text-gray-900" : "font-semibold text-gray-700"}`}>
+                          <p className={`text-sm truncate ${hasUnread ? "font-bold text-gray-900" : "font-semibold text-gray-700"}`}>
                             {ticket.user.name}
                           </p>
                           <span className="text-[10px] text-gray-400 flex-shrink-0">{formatRelative(ticket.createdAt)}</span>
                         </div>
-                        <p className={`text-xs truncate mb-1 ${unread ? "font-semibold text-gray-900" : "text-gray-600"}`}>
+                        <p className={`text-xs truncate mb-1 ${hasUnread ? "font-semibold text-gray-900" : "text-gray-600"}`}>
                           {ticket.subject}
                         </p>
                         <p className="text-xs text-gray-400 truncate">{ticket.user.businessName}</p>
@@ -277,12 +302,13 @@ export default function AdminTicketsPage() {
                           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${STATUS_STYLES[ticket.status] || STATUS_STYLES.open}`}>
                             {STATUS_LABEL[ticket.status] || ticket.status}
                           </span>
+                          {hasUnread && (
+                            <span className="text-[9px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-100">
+                              NEW
+                            </span>
+                          )}
                         </div>
                       </div>
-
-                      {unread && (
-                        <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-2" />
-                      )}
                     </div>
                   </button>
                 );
@@ -292,7 +318,7 @@ export default function AdminTicketsPage() {
         </div>
 
         {/* ── Detail panel ── */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col max-h-[calc(100vh-300px)]">
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col h-full">
           {!selected ? (
             <div className="flex-1 flex items-center justify-center p-10">
               <div className="text-center">

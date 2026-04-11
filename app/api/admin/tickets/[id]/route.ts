@@ -30,7 +30,15 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json(ticket);
+  // Mark as read when admin opens the ticket
+  if (ticket.adminUnread) {
+    await prisma.supportTicket.update({
+      where: { id: params.id },
+      data: { adminUnread: false },
+    });
+  }
+
+  return NextResponse.json({ ...ticket, adminUnread: false });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
