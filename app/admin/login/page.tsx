@@ -99,7 +99,7 @@ export default function AdminLoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@detailbook.com"
+                placeholder="admin@detailbookapp.com"
                 className="w-full px-4 py-3 bg-white/[0.06] border border-white/[0.08] rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent placeholder-gray-600"
               />
             </div>
