@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
           plan: true,
         },
       },
+      messages: { orderBy: { createdAt: "asc" } },
     },
   });
 

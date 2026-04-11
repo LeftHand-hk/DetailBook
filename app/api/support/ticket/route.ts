@@ -15,6 +15,9 @@ export async function GET() {
     where: { userId: session.id },
     orderBy: { createdAt: "desc" },
     take: 20,
+    include: {
+      messages: { orderBy: { createdAt: "asc" } },
+    },
   });
 
   return NextResponse.json(tickets);
@@ -59,6 +62,12 @@ export async function POST(req: NextRequest) {
         message: message.trim(),
         category: category || "general",
         priority,
+        messages: {
+          create: {
+            sender: "user",
+            content: message.trim(),
+          },
+        },
       },
     });
 

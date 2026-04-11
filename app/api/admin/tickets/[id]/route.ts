@@ -22,6 +22,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
           plan: true,
         },
       },
+      messages: { orderBy: { createdAt: "asc" } },
     },
   });
 
@@ -57,7 +58,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (adminReply !== undefined && adminReply !== null) {
     data.adminReply = adminReply;
     data.repliedAt = new Date();
-    if (!status) data.status = "resolved";
+    if (!status) data.status = "in_progress";
+  }
+
+  // Create TicketMessage for admin reply
+  if (adminReply !== undefined && adminReply !== null && adminReply.trim()) {
+    await prisma.ticketMessage.create({
+      data: {
+        ticketId: params.id,
+        sender: "admin",
+        content: adminReply.trim(),
+      },
+    });
   }
 
   const updated = await prisma.supportTicket.update({
@@ -74,6 +86,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
           plan: true,
         },
       },
+      messages: { orderBy: { createdAt: "asc" } },
     },
   });
 

@@ -11,6 +11,13 @@ interface TicketUser {
   plan: string;
 }
 
+interface TicketMessage {
+  id: string;
+  sender: "user" | "admin";
+  content: string;
+  createdAt: string;
+}
+
 interface Ticket {
   id: string;
   subject: string;
@@ -22,6 +29,7 @@ interface Ticket {
   repliedAt?: string | null;
   createdAt: string;
   user: TicketUser;
+  messages?: TicketMessage[];
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -151,28 +159,28 @@ export default function AdminTicketsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3">
+          <p className="text-xl font-bold text-gray-900">{tickets.length}</p>
           <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Total</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{tickets.length}</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3">
+          <p className="text-xl font-bold text-amber-700">{openCount}</p>
           <p className="text-xs text-amber-600 font-medium uppercase tracking-wide">Open</p>
-          <p className="text-2xl font-bold text-amber-700 mt-1">{openCount}</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3">
+          <p className="text-xl font-bold text-blue-700">{priorityCount}</p>
           <p className="text-xs text-blue-600 font-medium uppercase tracking-wide">Priority</p>
-          <p className="text-2xl font-bold text-blue-700 mt-1">{priorityCount}</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3">
+          <p className="text-xl font-bold text-green-700">{tickets.filter((t) => t.status === "resolved").length}</p>
           <p className="text-xs text-green-600 font-medium uppercase tracking-wide">Resolved</p>
-          <p className="text-2xl font-bold text-green-700 mt-1">{tickets.filter((t) => t.status === "resolved").length}</p>
         </div>
       </div>
 
       <div className="grid lg:grid-cols-[400px_1fr] gap-4">
         {/* ── Ticket list ── */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col max-h-[calc(100vh-220px)]">
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col max-h-[calc(100vh-300px)]">
           {/* Filters */}
           <div className="p-3 border-b border-gray-100 space-y-2">
             <div className="relative">
@@ -284,7 +292,7 @@ export default function AdminTicketsPage() {
         </div>
 
         {/* ── Detail panel ── */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col max-h-[calc(100vh-220px)]">
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col max-h-[calc(100vh-300px)]">
           {!selected ? (
             <div className="flex-1 flex items-center justify-center p-10">
               <div className="text-center">
@@ -348,6 +356,7 @@ export default function AdminTicketsPage() {
                         </span>
                       </div>
                       <p className="text-xs text-gray-500">{selected.user.businessName}</p>
+                      <p className="text-xs text-blue-600 font-medium">{selected.user.email}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <a href={`mailto:${selected.user.email}`}
@@ -373,41 +382,50 @@ export default function AdminTicketsPage() {
 
               {/* Messages thread */}
               <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-gray-50/30">
-                {/* User message */}
-                <div className="flex gap-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-gray-700 to-gray-900 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[10px] font-bold">
-                    {selected.user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="text-xs font-bold text-gray-900">{selected.user.name}</p>
-                      <p className="text-[10px] text-gray-400">{formatDate(selected.createdAt)}</p>
-                    </div>
-                    <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm p-4">
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{selected.message}</p>
-                    </div>
-                  </div>
-                </div>
+                {(() => {
+                  // Build thread: prefer messages array, fall back to original fields
+                  const thread: { sender: "user" | "admin"; content: string; createdAt: string }[] =
+                    selected.messages && selected.messages.length > 0
+                      ? selected.messages.map((m) => ({ sender: m.sender, content: m.content, createdAt: m.createdAt }))
+                      : [
+                          { sender: "user", content: selected.message, createdAt: selected.createdAt },
+                          ...(selected.adminReply
+                            ? [{ sender: "admin" as const, content: selected.adminReply, createdAt: selected.repliedAt || selected.createdAt }]
+                            : []),
+                        ];
 
-                {/* Admin reply */}
-                {selected.adminReply && (
-                  <div className="flex gap-3 flex-row-reverse">
-                    <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[10px] font-bold">
-                      DB
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 justify-end">
-                        <p className="text-[10px] text-gray-400">
-                          {selected.repliedAt ? formatDate(selected.repliedAt) : ""}
-                        </p>
-                        <p className="text-xs font-bold text-blue-700">DetailBook Support</p>
+                  return thread.map((msg, i) => (
+                    <div key={i} className={`flex gap-3 ${msg.sender === "admin" ? "flex-row-reverse" : ""}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[10px] font-bold ${
+                        msg.sender === "admin" ? "bg-blue-600" : "bg-gradient-to-br from-gray-700 to-gray-900"
+                      }`}>
+                        {msg.sender === "admin" ? "DB" : selected.user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                       </div>
-                      <div className="bg-blue-600 text-white rounded-2xl rounded-tr-sm p-4">
-                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{selected.adminReply}</p>
+                      <div className="flex-1 min-w-0">
+                        <div className={`flex items-center gap-2 mb-1 ${msg.sender === "admin" ? "justify-end" : ""}`}>
+                          {msg.sender === "admin" ? (
+                            <>
+                              <p className="text-[10px] text-gray-400">{formatDate(msg.createdAt)}</p>
+                              <p className="text-xs font-bold text-blue-700">DetailBook Support</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-xs font-bold text-gray-900">{selected.user.name}</p>
+                              <p className="text-[10px] text-gray-400">{formatDate(msg.createdAt)}</p>
+                            </>
+                          )}
+                        </div>
+                        <div className={`rounded-2xl p-4 ${
+                          msg.sender === "admin"
+                            ? "bg-blue-600 text-white rounded-tr-sm"
+                            : "bg-white border border-gray-200 rounded-tl-sm"
+                        }`}>
+                          <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  ));
+                })()}
               </div>
 
               {/* Reply composer */}
@@ -416,7 +434,7 @@ export default function AdminTicketsPage() {
                   value={reply}
                   onChange={(e) => setReply(e.target.value)}
                   placeholder={selected.adminReply ? "Send another reply..." : "Type your reply..."}
-                  rows={4}
+                  rows={3}
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none placeholder-gray-400"
                 />
                 <div className="flex items-center justify-between mt-3">
