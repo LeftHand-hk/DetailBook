@@ -157,7 +157,7 @@ export default function SupportPage() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
               <h2 className="font-bold text-gray-900">Submit a Ticket</h2>
-              <p className="text-sm text-gray-500">Tell us what's going on and we'll get back to you by email.</p>
+              <p className="text-sm text-gray-500">Tell us what&apos;s going on and we&apos;ll get back to you by email.</p>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -168,7 +168,7 @@ export default function SupportPage() {
                   </svg>
                   <div>
                     <p className="text-sm font-bold text-green-700">Ticket submitted!</p>
-                    <p className="text-xs text-green-600 mt-0.5">We've received your message and will reply to your account email.</p>
+                    <p className="text-xs text-green-600 mt-0.5">We&apos;ve received your message and will reply to your account email.</p>
                   </div>
                 </div>
               )}
@@ -221,7 +221,7 @@ export default function SupportPage() {
 
               <div className="flex items-center justify-between pt-2">
                 <p className="text-xs text-gray-500">
-                  We'll reply to your account email
+                  We&apos;ll reply to your account email
                 </p>
                 <button
                   type="submit"
