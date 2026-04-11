@@ -151,7 +151,7 @@ export default function SupportPage() {
             )}
           </div>
           <p className="text-sm text-gray-500">
-            {isPro ? "Priority response within ~1 hour during business hours." : "Response within 5-10 hours. Upgrade to Pro for ~1h response."}
+            {isPro ? "Priority response within 1 hour during business hours." : "Response within 1-3 hours. Upgrade to Pro for guaranteed 1h response."}
           </p>
         </div>
 
@@ -250,7 +250,7 @@ export default function SupportPage() {
                     <div className="w-2 h-2 rounded-full bg-gray-400" />
                     <span className="text-sm text-gray-600">Standard</span>
                   </div>
-                  <span className="text-sm font-bold text-gray-900">5-10h</span>
+                  <span className="text-sm font-bold text-gray-900">1-3h</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -585,7 +585,7 @@ function ConversationModal({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <p className="text-xs text-amber-700 font-medium">
-                {ticket.priority === "priority" ? "Priority response within ~1 hour during business hours." : "Response within 5-10 hours during business hours."}
+                {ticket.priority === "priority" ? "Priority response within 1 hour during business hours." : "Response within 1-3 hours during business hours."}
               </p>
             </div>
           )}
