@@ -33,6 +33,12 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
+      if (data.isAdmin) {
+        localStorage.setItem("detailbook_admin", JSON.stringify({ email: data.admin?.email, loggedIn: true, loginAt: new Date().toISOString() }));
+        setLoading(false);
+        router.push("/admin");
+        return;
+      }
       if (data.isStaff) {
         setLoading(false);
         router.push("/staff/dashboard");

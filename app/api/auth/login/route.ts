@@ -66,6 +66,29 @@ export async function POST(request: NextRequest) {
       return response;
     }
 
+    // 3. Try admin login
+    const admin = await prisma.admin.findUnique({ where: { email: normalizedEmail } });
+    if (admin) {
+      const isValid = await verifyPassword(password, admin.password);
+      if (!isValid) {
+        return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+      }
+
+      const token = signToken({ id: admin.id, email: admin.email, role: "admin" });
+      const { password: _, ...adminData } = admin;
+      const response = NextResponse.json({ admin: adminData, isAdmin: true });
+
+      response.cookies.set("detailbook_admin_token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30,
+      });
+
+      return response;
+    }
+
     return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   } catch (error) {
     console.error("Login error:", error);
