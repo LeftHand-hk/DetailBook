@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
   if (error || !code || !state) {
-    return NextResponse.redirect(`${appUrl}/dashboard/settings?tab=integrations&gcal=error`);
+    return NextResponse.redirect(`${appUrl}/dashboard/calendar?gcal=error`);
   }
 
   try {
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     const tokenData = await tokenRes.json();
     if (!tokenRes.ok || !tokenData.access_token) {
       console.error("Google token exchange failed:", tokenData);
-      return NextResponse.redirect(`${appUrl}/dashboard/settings?tab=integrations&gcal=error`);
+      return NextResponse.redirect(`${appUrl}/dashboard/calendar?gcal=error`);
     }
 
     // Get user's primary calendar ID
@@ -54,9 +54,9 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return NextResponse.redirect(`${appUrl}/dashboard/settings?tab=integrations&gcal=success`);
+    return NextResponse.redirect(`${appUrl}/dashboard/calendar?gcal=success`);
   } catch (err) {
     console.error("Google Calendar callback error:", err);
-    return NextResponse.redirect(`${appUrl}/dashboard/settings?tab=integrations&gcal=error`);
+    return NextResponse.redirect(`${appUrl}/dashboard/calendar?gcal=error`);
   }
 }

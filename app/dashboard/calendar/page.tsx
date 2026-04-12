@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { getBookings } from "@/lib/storage";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { getBookings, getUser } from "@/lib/storage";
 import type { Booking } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
 
@@ -333,7 +334,141 @@ export default function CalendarPage() {
         </div>
       )}
 
+      {/* ── Google Calendar Integration ── */}
+      <div className="mt-5">
+        <Suspense fallback={null}>
+          <GoogleCalendarSection userPlan={getUser()?.plan} />
+        </Suspense>
+      </div>
+
       <DashboardHelp page="calendar" />
+    </div>
+  );
+}
+
+function GoogleCalendarSection({ userPlan }: { userPlan?: string }) {
+  const [status, setStatus] = useState<{ connected: boolean; calendarId?: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ synced: number; errors: number } | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const searchParams = useSearchParams();
+  const gcalParam = searchParams.get("gcal");
+  const isPro = userPlan === "pro";
+
+  useEffect(() => {
+    fetch("/api/google-calendar/status")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data) setStatus(data); })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleConnect = () => { window.location.href = "/api/google-calendar/connect"; };
+
+  const handleDisconnect = async () => {
+    setDisconnecting(true);
+    try {
+      const res = await fetch("/api/google-calendar/disconnect", { method: "POST" });
+      if (res.ok) setStatus({ connected: false });
+    } catch { /* silent */ }
+    setDisconnecting(false);
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch("/api/google-calendar/sync", { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        setSyncResult(data);
+      }
+    } catch { /* silent */ }
+    setSyncing(false);
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+        <h2 className="text-white font-bold text-base">Google Calendar</h2>
+      </div>
+      <div className="p-5">
+        {gcalParam === "success" && (
+          <div className="mb-4 bg-green-50 border border-green-200 text-green-700 text-sm font-semibold px-4 py-3 rounded-xl flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+            </svg>
+            Google Calendar connected successfully!
+          </div>
+        )}
+        {gcalParam === "error" && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm font-semibold px-4 py-3 rounded-xl">
+            Failed to connect Google Calendar. Please try again.
+          </div>
+        )}
+
+        <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm">
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                <rect width="24" height="24" rx="4" fill="#4285F4" />
+                <path d="M12 6.5C13.93 6.5 15.5 7.57 16.28 9.15L18.2 7.23C16.87 5.56 14.57 4.5 12 4.5C8.24 4.5 5.07 6.78 3.69 10L5.96 11.78C6.63 9.33 9.11 7.5 12 7.5V6.5Z" fill="#EA4335" />
+                <path d="M18.64 12.2C18.64 11.57 18.58 10.97 18.46 10.4H12V13.7H15.73C15.33 14.9 14.39 15.86 13.14 16.38V18.62H15.97C17.66 17.07 18.64 14.83 18.64 12.2Z" fill="#4285F4" />
+                <path d="M12 20.5C14.97 20.5 17.46 19.54 18.97 17.8L16.14 15.56C15.37 16.09 14.29 16.5 12 16.5C9.11 16.5 6.63 14.67 5.96 12.22L3.69 14C5.07 17.22 8.24 19.5 12 19.5V20.5Z" fill="#34A853" />
+                <path d="M3.69 14L5.96 12.22C5.84 11.65 5.78 11.05 5.78 10.4C5.78 9.75 5.84 9.15 5.96 8.58L3.69 10C3.35 10.75 3.14 11.55 3.14 12.4C3.14 13.25 3.35 14.05 3.69 14Z" fill="#FBBC04" />
+              </svg>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold text-gray-900">Google Calendar</p>
+                {!isPro && (
+                  <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Pro</span>
+                )}
+                {status?.connected && (
+                  <span className="text-[10px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Connected</span>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {status?.connected
+                  ? `Syncing to: ${status.calendarId || "Primary calendar"}`
+                  : "Sync your bookings to Google Calendar automatically."}
+              </p>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="w-5 h-5 border-2 border-gray-200 border-t-blue-600 rounded-full animate-spin flex-shrink-0 mt-1" />
+          ) : !isPro ? (
+            <a href="/dashboard/billing"
+              className="flex-shrink-0 bg-blue-600 text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+              Upgrade
+            </a>
+          ) : status?.connected ? (
+            <div className="flex gap-2 flex-shrink-0">
+              <button onClick={handleSync} disabled={syncing}
+                className="text-xs font-bold text-blue-600 hover:text-blue-700 px-3 py-2 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50">
+                {syncing ? "Syncing..." : "Sync Now"}
+              </button>
+              <button onClick={handleDisconnect} disabled={disconnecting}
+                className="text-xs font-bold text-red-600 hover:text-red-700 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50">
+                {disconnecting ? "..." : "Disconnect"}
+              </button>
+            </div>
+          ) : (
+            <button onClick={handleConnect}
+              className="flex-shrink-0 bg-blue-600 text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+              Connect
+            </button>
+          )}
+        </div>
+
+        {syncResult && (
+          <div className="mt-3 text-xs text-gray-600 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
+            Sync complete: <strong>{syncResult.synced}</strong> bookings synced
+            {syncResult.errors > 0 && <span className="text-red-500">, {syncResult.errors} errors</span>}.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

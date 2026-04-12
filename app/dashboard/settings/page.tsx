@@ -410,7 +410,37 @@ export default function SettingsPage() {
           )}
 
           {/* ── Integrations ── */}
-          {activeTab === "integrations" && <GoogleCalendarSection userPlan={user?.plan} />}
+          {activeTab === "integrations" && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100">
+                <h2 className="font-bold text-gray-900">Integrations</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Connect third-party tools to your account.</p>
+              </div>
+              <div className="p-5">
+                <a href="/dashboard/calendar"
+                  className="flex items-center justify-between gap-4 p-4 rounded-xl border border-gray-200 hover:border-blue-200 hover:bg-blue-50/30 transition-all group">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm">
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                        <rect width="24" height="24" rx="4" fill="#4285F4" />
+                        <path d="M12 6.5C13.93 6.5 15.5 7.57 16.28 9.15L18.2 7.23C16.87 5.56 14.57 4.5 12 4.5C8.24 4.5 5.07 6.78 3.69 10L5.96 11.78C6.63 9.33 9.11 7.5 12 7.5V6.5Z" fill="#EA4335" />
+                        <path d="M18.64 12.2C18.64 11.57 18.58 10.97 18.46 10.4H12V13.7H15.73C15.33 14.9 14.39 15.86 13.14 16.38V18.62H15.97C17.66 17.07 18.64 14.83 18.64 12.2Z" fill="#4285F4" />
+                        <path d="M12 20.5C14.97 20.5 17.46 19.54 18.97 17.8L16.14 15.56C15.37 16.09 14.29 16.5 12 16.5C9.11 16.5 6.63 14.67 5.96 12.22L3.69 14C5.07 17.22 8.24 19.5 12 19.5V20.5Z" fill="#34A853" />
+                        <path d="M3.69 14L5.96 12.22C5.84 11.65 5.78 11.05 5.78 10.4C5.78 9.75 5.84 9.15 5.96 8.58L3.69 10C3.35 10.75 3.14 11.55 3.14 12.4C3.14 13.25 3.35 14.05 3.69 14Z" fill="#FBBC04" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-gray-900">Google Calendar</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Manage your Google Calendar connection in the Calendar page.</p>
+                    </div>
+                  </div>
+                  <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+          )}
 
           {/* ── Account ── */}
           {activeTab === "account" && (
