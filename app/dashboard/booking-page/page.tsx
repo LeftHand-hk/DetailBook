@@ -76,6 +76,15 @@ export default function BookingPagePage() {
   const [bannerOverlayOpacity, setBannerOverlayOpacity] = useState(60);
   const [serviceLayout, setServiceLayout] = useState<"cards" | "list" | "compact" | "featured" | "minimal">("cards");
   const bannerInputRef = useRef<HTMLInputElement>(null);
+  // Business Profile state
+  const [businessName, setBusinessName] = useState("");
+  const [ownerName, setOwnerName] = useState("");
+  const [bio, setBio] = useState("");
+  const [address, setAddress] = useState("");
+  const [yearsInBusiness, setYearsInBusiness] = useState<number | "">(0);
+  const [logo, setLogo] = useState<string | undefined>(undefined);
+  const [serviceAreasText, setServiceAreasText] = useState("");
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const initialLoadDone = useRef(false);
 
@@ -106,6 +115,13 @@ export default function BookingPagePage() {
       setBannerImage(u.bannerImage);
       setBannerOverlayOpacity(u.bannerOverlayOpacity ?? 60);
       setServiceLayout(u.serviceLayout || "cards");
+      setBusinessName(u.businessName || "");
+      setOwnerName(u.name || "");
+      setBio(u.bio || "");
+      setAddress(u.address || "");
+      setYearsInBusiness(u.yearsInBusiness || 0);
+      setLogo(u.logo);
+      setServiceAreasText((u.serviceAreas || []).join(", "));
     }
     setTimeout(() => { initialLoadDone.current = true; }, 100);
   }, []);
@@ -141,6 +157,13 @@ export default function BookingPagePage() {
         bannerImage,
         bannerOverlayOpacity,
         serviceLayout,
+        businessName,
+        name: ownerName,
+        bio,
+        address,
+        yearsInBusiness: yearsInBusiness === "" ? 0 : yearsInBusiness,
+        logo,
+        serviceAreas: serviceAreasText.split(",").map((s) => s.trim()).filter(Boolean),
       };
       setUser(updated);
       setUserState(updated);
@@ -150,7 +173,7 @@ export default function BookingPagePage() {
     }, 600);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug, customMessage, advanceBookingDays, bookingPageTheme, accentColor, bookingPageTitle, bookingPageSubtitle, showRating, showSocialLinks, showServiceAreas, showBusinessHours, showTrustBadges, requireDeposit, depositPercentage, thankYouMessage, termsText, instagram, facebook, website, phone, bannerImage, bannerOverlayOpacity, serviceLayout]);
+  }, [slug, customMessage, advanceBookingDays, bookingPageTheme, accentColor, bookingPageTitle, bookingPageSubtitle, showRating, showSocialLinks, showServiceAreas, showBusinessHours, showTrustBadges, requireDeposit, depositPercentage, thankYouMessage, termsText, instagram, facebook, website, phone, bannerImage, bannerOverlayOpacity, serviceLayout, businessName, ownerName, bio, address, yearsInBusiness, logo, serviceAreasText]);
 
   const isPro = user?.plan === "pro";
 
@@ -187,6 +210,131 @@ export default function BookingPagePage() {
           </svg>
           Preview
         </a>
+      </div>
+
+      {/* ── Card: Business Profile ── */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+          <h2 className="text-white font-bold text-base">Business Profile</h2>
+        </div>
+        <div className="p-6 space-y-5">
+          {/* Logo */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-3">Logo</label>
+            <div className="flex items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
+                {logo ? (
+                  <img src={logo} alt="Logo" className="w-full h-full object-cover" />
+                ) : (
+                  <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <input ref={logoInputRef} type="file" accept="image/*" className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (ev) => setLogo(ev.target?.result as string);
+                    reader.readAsDataURL(file);
+                  }} />
+                <button type="button" onClick={() => logoInputRef.current?.click()}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-colors">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Upload Logo
+                </button>
+                {logo && (
+                  <button type="button" onClick={() => setLogo(undefined)}
+                    className="px-4 py-2 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-50 transition-colors text-left">
+                    Remove
+                  </button>
+                )}
+                <p className="text-xs text-gray-400">Recommended: 200×200px. PNG or JPG.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Business Name */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Business Name</label>
+            <input
+              type="text"
+              value={businessName}
+              onChange={(e) => setBusinessName(e.target.value)}
+              placeholder="e.g. Elite Auto Detailing"
+              className={INPUT_CLASS}
+            />
+          </div>
+
+          {/* Owner Name */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Your Name</label>
+            <input
+              type="text"
+              value={ownerName}
+              onChange={(e) => setOwnerName(e.target.value)}
+              placeholder="e.g. John Smith"
+              className={INPUT_CLASS}
+            />
+          </div>
+
+          {/* Address */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Business Address</label>
+            <input
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="e.g. 123 Main St, Los Angeles, CA"
+              className={INPUT_CLASS}
+            />
+          </div>
+
+          {/* Bio */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">About Your Business</label>
+            <textarea
+              rows={3}
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              placeholder="Tell customers about your business, your experience, and what makes you different..."
+              className={INPUT_CLASS + " resize-none"}
+            />
+          </div>
+
+          {/* Years in Business */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Years in Business</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={yearsInBusiness}
+                onChange={(e) => setYearsInBusiness(e.target.value === "" ? "" : Math.max(0, Number(e.target.value)))}
+                className={INPUT_CLASS + " max-w-[120px]"}
+              />
+              <span className="text-sm text-gray-500 font-medium">years</span>
+            </div>
+          </div>
+
+          {/* Service Areas */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Service Areas</label>
+            <input
+              type="text"
+              value={serviceAreasText}
+              onChange={(e) => setServiceAreasText(e.target.value)}
+              placeholder="e.g. Los Angeles, Beverly Hills, Santa Monica"
+              className={INPUT_CLASS}
+            />
+            <p className="text-xs text-gray-400 mt-1.5">Separate multiple areas with commas.</p>
+          </div>
+        </div>
       </div>
 
       {/* ── Card 1: URL ── */}
