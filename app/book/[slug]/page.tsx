@@ -79,6 +79,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [form, setForm] = useState<BookingForm>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
@@ -152,7 +153,12 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     return dayCounts[0].id;
   };
 
-  const depositAmount = selectedPackage ? Math.round(selectedPackage.price * 0.25) : 0;
+  // Use business owner's deposit settings, not hardcoded 25%
+  const requireDeposit = (user as any)?.requireDeposit ?? false;
+  const depositPercentage = (user as any)?.depositPercentage ?? 20;
+  const depositAmount = (selectedPackage && requireDeposit)
+    ? Math.round(selectedPackage.price * (depositPercentage / 100))
+    : 0;
 
   const formatDate = (dateStr: string) =>
     new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
@@ -162,12 +168,20 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPackage || !selectedDate || !selectedTime) return;
-    // For "both" type, a mode must be selected
     if (serviceType === "both" && !selectedServiceMode) return;
+
+    // Validate mobile address
+    const needsAddress = serviceType === "mobile" || (serviceType === "both" && selectedServiceMode === "mobile");
+    if (needsAddress && !customerAddress.trim()) {
+      setBookingError("Please enter your service address so we can come to you.");
+      return;
+    }
+
+    setBookingError(null);
     setSubmitting(true);
     const assignedStaffId = selectedStaff?.id || autoAssignStaff();
     const assignedStaffName = selectedStaff?.name || staffList.find((s) => s.id === assignedStaffId)?.name;
-    const bookingAddress = (serviceType === "both" && selectedServiceMode === "shop") ? `SHOP: ${user?.address || ""}` : customerAddress || undefined;
+    const bookingAddress = (serviceType === "both" && selectedServiceMode === "shop") ? `SHOP: ${user?.address || ""}` : customerAddress.trim() || undefined;
 
     const bookingData = {
       userId: (user as any)?.id,
@@ -181,8 +195,8 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       date: selectedDate,
       time: selectedTime,
       status: "pending",
-      depositPaid: depositAmount,
-      depositRequired: selectedPackage.deposit || 0,
+      depositPaid: 0,
+      depositRequired: depositAmount,
       notes: form.notes,
       address: bookingAddress,
       staffId: assignedStaffId,
@@ -197,36 +211,17 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       if (res.ok) {
         const created = await res.json();
         setBookingId(created.id);
+        setSubmitting(false);
+        setStep(3);
       } else {
-        setBookingId(generateId());
+        const errData = await res.json().catch(() => ({}));
+        setBookingError(errData.error || "Failed to create booking. Please try again.");
+        setSubmitting(false);
       }
     } catch {
-      setBookingId(generateId());
+      setBookingError("Network error. Please check your connection and try again.");
+      setSubmitting(false);
     }
-
-    // Also save locally for backward compat
-    const newBooking: Booking = {
-      id: bookingId || generateId(),
-      customerName: form.customerName,
-      customerEmail: form.customerEmail,
-      customerPhone: form.customerPhone,
-      vehicle: { make: form.make, model: form.model, year: form.year, color: form.color },
-      serviceId: selectedPackage.id,
-      serviceName: selectedPackage.name,
-      servicePrice: selectedPackage.price,
-      date: selectedDate,
-      time: selectedTime,
-      status: "pending",
-      depositPaid: depositAmount,
-      depositRequired: selectedPackage.deposit || 0,
-      notes: form.notes,
-      address: bookingAddress,
-      staffId: assignedStaffId,
-      staffName: assignedStaffName,
-    };
-    setBookings([...getBookings(), newBooking]);
-    setSubmitting(false);
-    setStep(3);
   };
 
   const year = calendarDate.getFullYear();
@@ -1358,6 +1353,15 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                 </div>
               </div>
 
+              {bookingError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm font-medium px-4 py-3 rounded-xl flex items-start gap-2">
+                  <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {bookingError}
+                </div>
+              )}
+
               <button type="submit" disabled={submitting}
                 className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 text-white font-extrabold text-base py-4 rounded-2xl transition-all duration-300 shadow-lg shadow-blue-600/30 hover:-translate-y-0.5 flex items-center justify-center gap-3">
                 {submitting ? (
@@ -1370,7 +1374,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    Confirm Booking · ${depositAmount} Deposit
+                    {depositAmount > 0 ? `Confirm Booking · $${depositAmount} Deposit` : "Confirm Booking"}
                   </>
                 )}
               </button>
