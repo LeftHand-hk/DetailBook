@@ -233,6 +233,33 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   for (let i = 0; i < firstDay; i++) calendarDays.push(null);
   for (let d = 1; d <= daysInMonth; d++) calendarDays.push(new Date(year, month, d));
 
+  // Convert "8:00 AM" / "14:00" style strings to minutes from midnight
+  const timeToMinutes = (t: string): number => {
+    const ampm = t.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (ampm) {
+      let h = parseInt(ampm[1]);
+      const m = parseInt(ampm[2]);
+      if (ampm[3].toUpperCase() === "PM" && h !== 12) h += 12;
+      if (ampm[3].toUpperCase() === "AM" && h === 12) h = 0;
+      return h * 60 + m;
+    }
+    const h24 = t.match(/^(\d{1,2}):(\d{2})$/);
+    if (h24) return parseInt(h24[1]) * 60 + parseInt(h24[2]);
+    return 0;
+  };
+
+  const isTimeOutsideBusinessHours = (time: string): boolean => {
+    if (!selectedDate || !user?.businessHours) return false;
+    const date = new Date(selectedDate + "T00:00:00");
+    const dayName = DAY_NAMES[date.getDay()];
+    const hours = user.businessHours[dayName];
+    if (!hours || hours.closed) return true;
+    const slotMin = timeToMinutes(time);
+    const openMin = timeToMinutes(hours.open);
+    const closeMin = timeToMinutes(hours.close);
+    return slotMin < openMin || slotMin >= closeMin;
+  };
+
   const isDateDisabled = (date: Date) => {
     if (date < today) return true;
     // Enforce advance booking window
@@ -412,7 +439,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
           )}
 
           <button
-            onClick={() => { setStep(0); setSelectedPackage(null); setSelectedDate(null); setSelectedTime(null); setForm(EMPTY_FORM); }}
+            onClick={() => { setStep(0); setSelectedPackage(null); setSelectedDate(null); setSelectedTime(null); setForm(EMPTY_FORM); setBookingId(null); setBookingError(null); setCustomerAddress(""); setSelectedStaff(null); setSelectedServiceMode(null); }}
             className="w-full glass border border-white/20 text-white font-semibold py-3.5 rounded-2xl hover:bg-white/10 transition-all"
           >
             Book Another Appointment
@@ -976,16 +1003,18 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
                   {TIMES.map((time) => {
                     const booked = isTimeBooked(time);
+                    const outsideHours = isTimeOutsideBusinessHours(time);
+                    const disabled = booked || outsideHours;
                     return (
-                      <button key={time} onClick={() => !booked && setSelectedTime(time)} disabled={booked}
+                      <button key={time} onClick={() => !disabled && setSelectedTime(time)} disabled={disabled}
                         className={`py-3 rounded-xl text-sm font-semibold transition-all duration-200 border-2 ${
-                          booked
+                          disabled
                             ? "border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed line-through"
                             : selectedTime === time
                               ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/30 scale-105"
                               : "border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
                         }`}>
-                        {booked ? "Booked" : time}
+                        {booked ? "Booked" : outsideHours ? "Closed" : time}
                       </button>
                     );
                   })}
