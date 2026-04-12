@@ -233,7 +233,20 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   for (let i = 0; i < firstDay; i++) calendarDays.push(null);
   for (let d = 1; d <= daysInMonth; d++) calendarDays.push(new Date(year, month, d));
 
-  const isDateDisabled = (date: Date) => date < today;
+  const isDateDisabled = (date: Date) => {
+    if (date < today) return true;
+    // Enforce advance booking window
+    const advanceDays = (user as any)?.advanceBookingDays ?? 30;
+    const maxDate = new Date(today);
+    maxDate.setDate(maxDate.getDate() + advanceDays);
+    if (date > maxDate) return true;
+    // Disable days the business is closed
+    if (user?.businessHours) {
+      const dayName = DAY_NAMES[date.getDay()];
+      if (user.businessHours[dayName]?.closed) return true;
+    }
+    return false;
+  };
 
   const formatDuration = (minutes: number) => {
     const h = Math.floor(minutes / 60), m = minutes % 60;
@@ -318,7 +331,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
               { label: "Date",       value: selectedDate ? formatDate(selectedDate) : "" },
               { label: "Time",       value: selectedTime },
               { label: "Total",      value: `$${selectedPackage?.price}` },
-              { label: "Deposit Due",value: `$${depositAmount}`, highlight: true },
+              ...(depositAmount > 0 ? [{ label: "Deposit Due", value: `$${depositAmount}`, highlight: true }] : []),
               ...(selectedStaff ? [{ label: "Detailer", value: selectedStaff.name }] : []),
             ].map(({ label, value, mono, highlight }) => (
               <div key={label} className="flex justify-between text-sm">
@@ -1295,15 +1308,17 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                   )}
                 </div>
 
-                <div className="bg-blue-500/20 border border-blue-500/30 rounded-xl p-4 mb-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="text-blue-300 text-xs font-bold uppercase tracking-widest">Deposit Required Now</p>
-                      <p className="text-white/50 text-xs mt-0.5">25% · Secures your booking</p>
+                {depositAmount > 0 && (
+                  <div className="bg-blue-500/20 border border-blue-500/30 rounded-xl p-4 mb-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-blue-300 text-xs font-bold uppercase tracking-widest">Deposit Required</p>
+                        <p className="text-white/50 text-xs mt-0.5">{depositPercentage}% · Secures your booking</p>
+                      </div>
+                      <p className="text-3xl font-extrabold text-white">${depositAmount}</p>
                     </div>
-                    <p className="text-3xl font-extrabold text-white">${depositAmount}</p>
                   </div>
-                </div>
+                )}
 
                 {/* Payment Methods */}
                 {(() => {
@@ -1348,7 +1363,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                 })()}
 
                 <div className="flex justify-between items-center pt-3 border-t border-white/10 text-sm">
-                  <span className="text-white/50">Balance due on service day</span>
+                  <span className="text-white/50">{depositAmount > 0 ? "Balance due on service day" : "Total due on service day"}</span>
                   <span className="text-lg font-bold">${(selectedPackage?.price ?? 0) - depositAmount}</span>
                 </div>
               </div>
