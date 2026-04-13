@@ -389,113 +389,23 @@ export default function SettingsPage() {
 
           {/* ── Notifications ── */}
           {activeTab === "notifications" && (
-            <div className="space-y-4">
-              {/* Email Notifications */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
-                  <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            <a href="/dashboard/messages"
+              className="flex items-center justify-between gap-4 p-5 bg-white rounded-2xl border border-gray-200 hover:border-blue-200 hover:bg-blue-50/30 transition-all group">
+              <div className="flex items-center gap-4">
+                <div className="w-11 h-11 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                   </svg>
-                  <div>
-                    <h2 className="font-bold text-gray-900">Email Notifications</h2>
-                    <p className="text-xs text-gray-500">Sent via your connected SMTP (info@detailbookapp.com)</p>
-                  </div>
                 </div>
-                <div className="p-5 space-y-3">
-                  {[
-                    {
-                      key: "emailConfirmations",
-                      label: "Booking Confirmation Email",
-                      desc: "Send a confirmation email to the customer immediately when they book.",
-                      value: notifications.emailConfirmations,
-                      onChange: (v: boolean) => setNotifications({ ...notifications, emailConfirmations: v }),
-                      pro: false,
-                    },
-                    {
-                      key: "emailReminders",
-                      label: "Owner New Booking Alert",
-                      desc: "You receive an email notification every time a new booking is made.",
-                      value: notifications.emailReminders,
-                      onChange: (v: boolean) => setNotifications({ ...notifications, emailReminders: v }),
-                      pro: false,
-                    },
-                  ].map(({ key, label, desc, value, onChange, pro }) => (
-                    <div key={key} className="flex items-start justify-between gap-4 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
-                      <div>
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <p className="text-sm font-bold text-gray-900">{label}</p>
-                          {pro && <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Pro</span>}
-                        </div>
-                        <p className="text-xs text-gray-500">{desc}</p>
-                      </div>
-                      <div className="flex-shrink-0 mt-0.5">
-                        <Toggle value={value} onChange={onChange} />
-                      </div>
-                    </div>
-                  ))}
+                <div>
+                  <p className="font-bold text-gray-900 text-sm">Notification Settings</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Turn email and SMS notifications on/off and customize message templates.</p>
                 </div>
               </div>
-
-              {/* SMS Notifications */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
-                  <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                  </svg>
-                  <div>
-                    <h2 className="font-bold text-gray-900 flex items-center gap-2">
-                      SMS Notifications
-                      <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Pro</span>
-                    </h2>
-                    <p className="text-xs text-gray-500">Sent via Twilio · requires Pro plan</p>
-                  </div>
-                </div>
-                <div className="p-5 space-y-3">
-                  {user?.plan !== "pro" && (
-                    <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700 font-medium">
-                      Upgrade to Pro to enable SMS notifications.
-                    </div>
-                  )}
-                  {[
-                    {
-                      key: "smsConfirmations",
-                      label: "Booking Confirmation SMS",
-                      desc: "Send a text message to the customer as soon as they book.",
-                      value: notifications.smsConfirmations,
-                      onChange: (v: boolean) => setNotifications({ ...notifications, smsConfirmations: v }),
-                    },
-                    {
-                      key: "smsRemindersEnabled",
-                      label: "2-Hour Reminder SMS",
-                      desc: "Automatically text the customer 2 hours before their appointment.",
-                      value: notifications.smsRemindersEnabled,
-                      onChange: (v: boolean) => setNotifications({ ...notifications, smsRemindersEnabled: v }),
-                    },
-                  ].map(({ key, label, desc, value, onChange }) => (
-                    <div key={key} className="flex items-start justify-between gap-4 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
-                      <div>
-                        <p className="text-sm font-bold text-gray-900 mb-0.5">{label}</p>
-                        <p className="text-xs text-gray-500">{desc}</p>
-                      </div>
-                      <div className="flex-shrink-0 mt-0.5">
-                        <Toggle
-                          value={value}
-                          onChange={user?.plan === "pro" ? onChange : () => {}}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button onClick={handleSaveNotifications}
-                  className="bg-blue-600 text-white font-bold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors text-sm">
-                  Save Preferences
-                </button>
-                {saved === "notifications" && <SavedBadge />}
-              </div>
-            </div>
+              <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </a>
           )}
 
           {/* ── Integrations ── */}
