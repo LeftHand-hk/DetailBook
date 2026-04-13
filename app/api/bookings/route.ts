@@ -138,39 +138,7 @@ export async function POST(request: NextRequest) {
       weekday: "long", month: "long", day: "numeric", year: "numeric",
     });
 
-    // 1. Confirmation email to customer (only if emailConfirmations is enabled, default true)
-    if (customerEmail && (user as any).emailConfirmations !== false) {
-      const depositNote = booking.depositRequired > 0
-        ? `<p style="font-size:14px;color:#374151;">A deposit of <strong>$${booking.depositRequired}</strong> is due at the time of service.</p>`
-        : "";
-      const customerHtml = `
-        <div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;">
-          <div style="background:#2563EB;color:white;padding:24px;border-radius:8px 8px 0 0;">
-            <div style="font-size:12px;opacity:0.85;text-transform:uppercase;letter-spacing:1px;">${user.businessName}</div>
-            <h1 style="margin:8px 0 0;font-size:22px;">Booking Confirmed!</h1>
-          </div>
-          <div style="background:#f9fafb;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
-            <p style="font-size:14px;color:#374151;">Hi ${customerName}, your booking has been received. Here are your details:</p>
-            <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0;">
-              <table style="width:100%;font-size:14px;border-collapse:collapse;">
-                <tr><td style="padding:6px 0;color:#6b7280;width:40%;">Service</td><td style="padding:6px 0;font-weight:600;color:#111827;">${serviceName}</td></tr>
-                <tr><td style="padding:6px 0;color:#6b7280;">Date</td><td style="padding:6px 0;font-weight:600;color:#111827;">${formattedDate}</td></tr>
-                <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;font-weight:600;color:#111827;">${time}</td></tr>
-                <tr><td style="padding:6px 0;color:#6b7280;">Vehicle</td><td style="padding:6px 0;font-weight:600;color:#111827;">${vYear} ${vMake} ${vModel} (${vColor})</td></tr>
-                <tr><td style="padding:6px 0;color:#6b7280;">Price</td><td style="padding:6px 0;font-weight:600;color:#111827;">$${booking.servicePrice}</td></tr>
-                ${booking.address ? `<tr><td style="padding:6px 0;color:#6b7280;">Address</td><td style="padding:6px 0;font-weight:600;color:#111827;">${booking.address}</td></tr>` : ""}
-              </table>
-            </div>
-            ${depositNote}
-            ${user.phone ? `<p style="font-size:13px;color:#6b7280;">Questions? Contact us at <strong>${user.phone}</strong></p>` : ""}
-            <p style="font-size:13px;color:#6b7280;">— ${user.businessName}</p>
-          </div>
-        </div>`;
-      const customerText = `Booking Confirmed!\n\nHi ${customerName},\n\nService: ${serviceName}\nDate: ${formattedDate}\nTime: ${time}\nVehicle: ${vYear} ${vMake} ${vModel} (${vColor})\nPrice: $${booking.servicePrice}${booking.address ? `\nAddress: ${booking.address}` : ""}\n${booking.depositRequired > 0 ? `\nDeposit due: $${booking.depositRequired}` : ""}\n\n— ${user.businessName}`;
-      sendEmail({ to: customerEmail, subject: `Booking Confirmed – ${serviceName} on ${formattedDate}`, html: customerHtml, text: customerText }).catch(() => {});
-    }
-
-    // 2. Notification email to business owner (only if emailReminders enabled, default true)
+    // 1. Notification email to business owner (only if emailReminders enabled, default true)
     if (user.email && user.emailReminders !== false) {
       const ownerHtml = `
         <div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;">
@@ -198,17 +166,6 @@ export async function POST(request: NextRequest) {
           </div>
         </div>`;
       sendEmail({ to: user.email, subject: `New Booking: ${customerName} – ${serviceName} on ${formattedDate}`, html: ownerHtml }).catch(() => {});
-    }
-
-    // 3. Confirmation SMS to customer (Pro plan only, if smsConfirmations enabled)
-    if (user.plan === "pro" && (user as any).smsConfirmations && customerPhone) {
-      const smsBody =
-        `Booking confirmed with ${user.businessName}!\n` +
-        `Service: ${serviceName}\n` +
-        `Date: ${formattedDate} at ${time}\n` +
-        (booking.depositRequired > 0 ? `Deposit due: $${booking.depositRequired}\n` : "") +
-        (user.phone ? `Questions? Call ${user.phone}` : "");
-      sendSms(customerPhone, smsBody).catch(() => {});
     }
 
     return NextResponse.json(booking, { status: 201 });
