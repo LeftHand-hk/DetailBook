@@ -315,7 +315,7 @@ export default function MessagesPage() {
                   </div>
                 );
               })}
-              <p className="text-[10px] text-gray-400 pt-1">Changes saved with "Save Templates"</p>
+              <p className="text-[10px] text-gray-400 pt-1">Changes saved with &quot;Save Templates&quot;</p>
             </div>
           </div>
 
