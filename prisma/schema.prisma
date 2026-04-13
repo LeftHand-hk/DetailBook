@@ -76,6 +76,12 @@ model User {
   googleRefreshToken   String?  @db.Text
   googleCalendarId     String?
   googleCalendarEnabled Boolean @default(false)
+
+  // Notification settings
+  emailConfirmations   Boolean @default(true)
+  smsConfirmations     Boolean @default(false)
+  smsRemindersEnabled  Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -179,6 +185,8 @@ model Booking {
   depositRequired Float  @default(0)
   notes           String? @db.Text
   address         String?
+
+  reminderSentAt DateTime?
 
   staffId   String?
   staff     Staff?   @relation(fields: [staffId], references: [id], onDelete: SetNull)

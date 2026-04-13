@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/reminders?secret=detailbook-cron-secret-2026",
+      "schedule": "*/30 * * * *"
+    }
+  ]
+}

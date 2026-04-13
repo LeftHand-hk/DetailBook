@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { syncBookingToGoogleCalendar } from "@/lib/google-calendar";
 import { sendEmail } from "@/lib/email";
+import { sendSms } from "@/lib/twilio";
 
 export async function GET(request: NextRequest) {
   try {
@@ -137,8 +138,8 @@ export async function POST(request: NextRequest) {
       weekday: "long", month: "long", day: "numeric", year: "numeric",
     });
 
-    // 1. Confirmation email to customer
-    if (customerEmail) {
+    // 1. Confirmation email to customer (only if emailConfirmations is enabled, default true)
+    if (customerEmail && (user as any).emailConfirmations !== false) {
       const depositNote = booking.depositRequired > 0
         ? `<p style="font-size:14px;color:#374151;">A deposit of <strong>$${booking.depositRequired}</strong> is due at the time of service.</p>`
         : "";
@@ -169,8 +170,8 @@ export async function POST(request: NextRequest) {
       sendEmail({ to: customerEmail, subject: `Booking Confirmed – ${serviceName} on ${formattedDate}`, html: customerHtml, text: customerText }).catch(() => {});
     }
 
-    // 2. Notification email to business owner
-    if (user.email) {
+    // 2. Notification email to business owner (only if emailReminders enabled, default true)
+    if (user.email && user.emailReminders !== false) {
       const ownerHtml = `
         <div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;">
           <div style="background:#2563EB;color:white;padding:24px;border-radius:8px 8px 0 0;">
@@ -197,6 +198,17 @@ export async function POST(request: NextRequest) {
           </div>
         </div>`;
       sendEmail({ to: user.email, subject: `New Booking: ${customerName} – ${serviceName} on ${formattedDate}`, html: ownerHtml }).catch(() => {});
+    }
+
+    // 3. Confirmation SMS to customer (Pro plan only, if smsConfirmations enabled)
+    if (user.plan === "pro" && (user as any).smsConfirmations && customerPhone) {
+      const smsBody =
+        `Booking confirmed with ${user.businessName}!\n` +
+        `Service: ${serviceName}\n` +
+        `Date: ${formattedDate} at ${time}\n` +
+        (booking.depositRequired > 0 ? `Deposit due: $${booking.depositRequired}\n` : "") +
+        (user.phone ? `Questions? Call ${user.phone}` : "");
+      sendSms(customerPhone, smsBody).catch(() => {});
     }
 
     return NextResponse.json(booking, { status: 201 });

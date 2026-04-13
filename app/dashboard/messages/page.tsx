@@ -19,7 +19,7 @@ const DEFAULT_SMS: Record<string, string> = {
   bookingConfirmation:
     "Hi {customerName}, your {serviceName} appointment is confirmed for {date} at {time}. — {businessName}",
   reminder24h:
-    "Reminder: Your {serviceName} appointment is tomorrow at {time}. See you then! — {businessName}",
+    "Reminder: Your {serviceName} appointment is in 2 hours at {time}. See you soon! — {businessName}",
   followUp:
     "Thanks for choosing {businessName}! We hope your vehicle looks amazing. Leave us a review? {reviewLink}",
 };
@@ -28,7 +28,7 @@ const DEFAULT_EMAIL: Record<string, string> = {
   bookingConfirmation:
     "Dear {customerName},\n\nYour booking for {serviceName} has been confirmed!\n\nDate: {date}\nTime: {time}\n\nWe look forward to seeing you!\n\n— {businessName}",
   reminder24h:
-    "Hi {customerName},\n\nJust a friendly reminder that your {serviceName} appointment is tomorrow at {time}.\n\nPlease make sure your vehicle is accessible and ready.\n\nSee you soon!\n— {businessName}",
+    "Hi {customerName},\n\nJust a friendly reminder that your {serviceName} appointment is in 2 hours at {time}.\n\nPlease make sure your vehicle is accessible and ready.\n\nSee you soon!\n— {businessName}",
   followUp:
     "Hi {customerName},\n\nThank you for choosing {businessName}! We hope your vehicle looks amazing.\n\nWe'd love to hear how we did. Please take a moment to leave us a review.\n\nSee you next time!\n— {businessName}",
 };
@@ -49,8 +49,8 @@ const TEMPLATES: Template[] = [
   },
   {
     id: "reminder24h",
-    label: "24h Reminder",
-    description: "Sent 24 hours before the appointment",
+    label: "2-Hour Reminder",
+    description: "Sent 2 hours before the appointment",
     proOnly: true,
     smsKey: "reminder24h",
     emailKey: "reminder24h",
@@ -91,25 +91,51 @@ export default function MessagesPage() {
   const [emailTemplates, setEmailTemplates] = useState<Record<string, string>>(DEFAULT_EMAIL);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Per-message on/off toggles (map to DB notification fields)
+  const [notifToggles, setNotifToggles] = useState({
+    emailConfirmations: true,
+    smsConfirmations: false,
+    smsRemindersEnabled: false,
+    emailReminders: true,
+  });
 
   useEffect(() => {
-    const u = getUser();
-    setUserState(u);
-    if (u?.smsTemplates) {
-      setSmsTemplates({
-        bookingConfirmation: u.smsTemplates.bookingConfirmation || DEFAULT_SMS.bookingConfirmation,
-        reminder24h: u.smsTemplates.reminder24h || DEFAULT_SMS.reminder24h,
-        followUp: u.smsTemplates.followUp || DEFAULT_SMS.followUp,
-      });
-    }
-    if (u?.emailTemplates) {
-      setEmailTemplates({
-        bookingConfirmation: u.emailTemplates.bookingConfirmation || DEFAULT_EMAIL.bookingConfirmation,
-        reminder24h: u.emailTemplates.reminder24h || DEFAULT_EMAIL.reminder24h,
-        followUp: u.emailTemplates.followUp || DEFAULT_EMAIL.followUp,
-      });
-    }
-    setMounted(true);
+    const local = getUser();
+    if (local) setUserState(local);
+
+    fetch("/api/user")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        const u: any = data?.user || local;
+        if (!u) return;
+        setUserState(u);
+        setUser(u);
+        if (u.smsTemplates) {
+          setSmsTemplates({
+            bookingConfirmation: u.smsTemplates.bookingConfirmation || DEFAULT_SMS.bookingConfirmation,
+            reminder24h: u.smsTemplates.reminder24h || DEFAULT_SMS.reminder24h,
+            followUp: u.smsTemplates.followUp || DEFAULT_SMS.followUp,
+          });
+        }
+        if (u.emailTemplates) {
+          setEmailTemplates({
+            bookingConfirmation: u.emailTemplates.bookingConfirmation || DEFAULT_EMAIL.bookingConfirmation,
+            reminder24h: u.emailTemplates.reminder24h || DEFAULT_EMAIL.reminder24h,
+            followUp: u.emailTemplates.followUp || DEFAULT_EMAIL.followUp,
+          });
+        }
+        setNotifToggles({
+          emailConfirmations: u.emailConfirmations !== false,
+          smsConfirmations: u.smsConfirmations === true,
+          smsRemindersEnabled: u.smsRemindersEnabled === true,
+          emailReminders: u.emailReminders !== false,
+        });
+      })
+      .catch(() => {
+        const u = getUser();
+        setUserState(u);
+      })
+      .finally(() => setMounted(true));
   }, []);
 
   if (!mounted) {
@@ -123,7 +149,7 @@ export default function MessagesPage() {
 
   const isPro = user?.plan === "pro";
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!user) return;
     setSaving(true);
 
@@ -144,11 +170,24 @@ export default function MessagesPage() {
     setUser(updatedUser);
     setUserState(updatedUser);
 
-    setTimeout(() => {
-      setSaving(false);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
-    }, 400);
+    try {
+      await fetch("/api/user", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          smsTemplates: updatedUser.smsTemplates,
+          emailTemplates: updatedUser.emailTemplates,
+          emailConfirmations: notifToggles.emailConfirmations,
+          smsConfirmations: notifToggles.smsConfirmations,
+          smsRemindersEnabled: notifToggles.smsRemindersEnabled,
+          emailReminders: notifToggles.emailReminders,
+        }),
+      });
+    } catch {}
+
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
   };
 
   const currentTemplate = TEMPLATES.find((t) => t.id === activeTemplate)!;
@@ -245,6 +284,38 @@ export default function MessagesPage() {
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          {/* Enable/Disable per notification */}
+          <div className="mt-4 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fadeInUp" style={{ animationDelay: "150ms", opacity: 0 }}>
+            <div className="px-4 py-3 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900 text-xs uppercase tracking-wider">On / Off</h3>
+            </div>
+            <div className="p-3 space-y-2">
+              {[
+                { key: "emailConfirmations", label: "Confirmation Email", pro: false },
+                { key: "emailReminders", label: "Owner Alert Email", pro: false },
+                { key: "smsConfirmations", label: "Confirmation SMS", pro: true },
+                { key: "smsRemindersEnabled", label: "2-Hour Reminder SMS", pro: true },
+              ].map(({ key, label, pro }) => {
+                const locked = pro && isPro === false;
+                const value = notifToggles[key as keyof typeof notifToggles];
+                return (
+                  <div key={key} className="flex items-center justify-between gap-2 px-1 py-1">
+                    <span className={`text-xs font-medium ${locked ? "text-gray-300" : "text-gray-700"}`}>{label}</span>
+                    <button
+                      type="button"
+                      disabled={locked}
+                      onClick={() => !locked && setNotifToggles((prev) => ({ ...prev, [key]: !value }))}
+                      className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors flex-shrink-0 ${locked ? "opacity-40 cursor-not-allowed bg-gray-200" : value ? "bg-blue-600" : "bg-gray-200"}`}
+                    >
+                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${value ? "translate-x-5" : "translate-x-1"}`} />
+                    </button>
+                  </div>
+                );
+              })}
+              <p className="text-[10px] text-gray-400 pt-1">Changes saved with "Save Templates"</p>
             </div>
           </div>
 

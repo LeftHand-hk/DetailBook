@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getUser, getPackages, getBookings, setBookings, initializeDemo, generateId } from "@/lib/storage";
-import type { User, Package, Booking } from "@/types";
+import { getUser, getPackages } from "@/lib/storage";
+import type { User, Package } from "@/types";
 import { usePlatformName } from "@/components/PlatformName";
 
 const TIMES = [
@@ -90,7 +90,6 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   const [bookedSlots, setBookedSlots] = useState<{ date: string; time: string; staffId: string | null }[]>([]);
 
   useEffect(() => {
-    initializeDemo();
     // Fetch public business data (staff + serviceType) from API
     fetch(`/api/book/${slug}`)
       .then((r) => r.ok ? r.json() : null)
@@ -200,6 +199,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       notes: form.notes,
       address: bookingAddress,
       staffId: assignedStaffId,
+      staffName: assignedStaffName,
     };
 
     try {
@@ -376,15 +376,33 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
           {isPro && (
             <>
               {/* Add to Calendar button */}
-              <button
-                type="button"
+              <a
+                href={(() => {
+                  if (!selectedDate || !selectedTime || !selectedPackage) return "#";
+                  const [y, mo, d] = selectedDate.split("-").map(Number);
+                  const ampm = selectedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+                  let h = ampm ? parseInt(ampm[1]) : 0;
+                  const m = ampm ? parseInt(ampm[2]) : 0;
+                  if (ampm && ampm[3].toUpperCase() === "PM" && h !== 12) h += 12;
+                  if (ampm && ampm[3].toUpperCase() === "AM" && h === 12) h = 0;
+                  const pad = (n: number) => String(n).padStart(2, "0");
+                  const start = new Date(y, mo - 1, d, h, m, 0);
+                  const end = new Date(start.getTime() + (selectedPackage.duration || 60) * 60000);
+                  const fmt = (dt: Date) => `${dt.getFullYear()}${pad(dt.getMonth()+1)}${pad(dt.getDate())}T${pad(dt.getHours())}${pad(dt.getMinutes())}00`;
+                  const title = encodeURIComponent(`${selectedPackage.name} – ${user.businessName}`);
+                  const details = encodeURIComponent(`Booking ID: #${bookingId}\nService: ${selectedPackage.name}\nBusiness: ${user.businessName}${user.phone ? `\nPhone: ${user.phone}` : ""}`);
+                  const location = encodeURIComponent(customerAddress || (user as any).address || "");
+                  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${fmt(start)}/${fmt(end)}&details=${details}&location=${location}`;
+                })()}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-full glass border border-white/20 text-white font-semibold py-3.5 rounded-2xl hover:bg-white/10 transition-all mb-3 flex items-center justify-center gap-2"
               >
                 <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 Add to Calendar
-              </button>
+              </a>
 
               {/* What to Expect section */}
               <div className="bg-white/5 border border-white/10 rounded-2xl p-5 text-left mb-6">
@@ -403,8 +421,8 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                     },
                     {
                       step: "2",
-                      title: "Reminder 24h before",
-                      description: "We'll send you a reminder the day before your appointment.",
+                      title: "Reminder 2 hours before",
+                      description: "We'll send you a reminder 2 hours before your appointment.",
                       icon: (
                         <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -560,7 +578,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
               </a>
             )}
             {user.website && (
-              <a href={`https://${user.website}`} target="_blank" rel="noopener noreferrer"
+              <a href={user.website.startsWith("http") ? user.website : `https://${user.website}`} target="_blank" rel="noopener noreferrer"
                 className="glass w-9 h-9 flex items-center justify-center rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-all">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9" />
@@ -603,8 +621,8 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
         </div>
       </div>
 
-      {/* Enhancement 2: Pro Photo Gallery Placeholder */}
-      {isPro && (
+      {/* Gallery — only shown when the business has actual photos */}
+      {isPro && (user as any).galleryPhotos && Array.isArray((user as any).galleryPhotos) && (user as any).galleryPhotos.length > 0 && (
         <div className="bg-white border-b border-gray-100">
           <div className="max-w-2xl mx-auto px-4 py-6">
             <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
@@ -614,20 +632,10 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
               Gallery
             </h3>
             <div className="flex gap-3 overflow-x-auto pb-2 sm:grid sm:grid-cols-4 sm:overflow-x-visible sm:pb-0">
-              {[1, 2, 3, 4].map((i) => (
-                <div
-                  key={i}
-                  className="flex-shrink-0 w-36 h-28 sm:w-full sm:h-32 bg-gray-100 rounded-xl flex flex-col items-center justify-center gap-2 border-2 border-dashed border-gray-200"
-                >
-                  <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <span className="text-gray-400 text-[10px] font-medium">Photo {i}</span>
-                </div>
+              {(user as any).galleryPhotos.map((url: string, i: number) => (
+                <img key={i} src={url} alt={`Gallery ${i + 1}`} className="flex-shrink-0 w-36 h-28 sm:w-full sm:h-32 rounded-xl object-cover" />
               ))}
             </div>
-            <p className="text-gray-400 text-xs text-center mt-3">Photos coming soon</p>
           </div>
         </div>
       )}

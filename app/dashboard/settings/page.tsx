@@ -120,31 +120,53 @@ export default function SettingsPage() {
   const [serviceType, setServiceType] = useState<"mobile" | "shop" | "both">("mobile");
 
   // Notifications
-  const [notifications, setNotifications] = useState({ emailReminders: true });
+  const [notifications, setNotifications] = useState({
+    emailReminders: true,
+    emailConfirmations: true,
+    smsConfirmations: false,
+    smsRemindersEnabled: false,
+  });
 
   useEffect(() => {
-    const u = getUser();
-    if (u) {
-      setUserState(u);
-      setHours(u.businessHours ? { ...DEFAULT_HOURS, ...u.businessHours } : DEFAULT_HOURS);
-      setServiceType((u as any).serviceType || "mobile");
-      setBookingSettings({
-        advanceBookingDays: u.advanceBookingDays || 30,
-        customMessage: u.customMessage || "",
-        bookingPageTheme: u.bookingPageTheme || "light",
-        accentColor: u.accentColor || "#3B82F6",
-        bookingPageTitle: u.bookingPageTitle || "",
-        bookingPageSubtitle: u.bookingPageSubtitle || "Book your appointment online",
-        showRating: u.showRating !== false,
-        showSocialLinks: u.showSocialLinks !== false,
-        showServiceAreas: u.showServiceAreas !== false,
-        showBusinessHours: u.showBusinessHours !== false,
-        showTrustBadges: u.showTrustBadges !== false,
-        thankYouMessage: u.thankYouMessage || "",
-        termsText: u.termsText || "",
+    // First load from localStorage for instant render
+    const local = getUser();
+    if (local) setUserState(local);
+
+    // Then fetch fresh data from DB (has up-to-date plan + notification settings)
+    fetch("/api/user")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        const u: any = data?.user || local;
+        if (!u) return;
+        setUserState(u);
+        setUser(u);
+        setHours(u.businessHours ? { ...DEFAULT_HOURS, ...u.businessHours } : DEFAULT_HOURS);
+        setServiceType(u.serviceType || "mobile");
+        setBookingSettings({
+          advanceBookingDays: u.advanceBookingDays || 30,
+          customMessage: u.customMessage || "",
+          bookingPageTheme: u.bookingPageTheme || "light",
+          accentColor: u.accentColor || "#3B82F6",
+          bookingPageTitle: u.bookingPageTitle || "",
+          bookingPageSubtitle: u.bookingPageSubtitle || "Book your appointment online",
+          showRating: u.showRating !== false,
+          showSocialLinks: u.showSocialLinks !== false,
+          showServiceAreas: u.showServiceAreas !== false,
+          showBusinessHours: u.showBusinessHours !== false,
+          showTrustBadges: u.showTrustBadges !== false,
+          thankYouMessage: u.thankYouMessage || "",
+          termsText: u.termsText || "",
+        });
+        setNotifications({
+          emailReminders: u.emailReminders !== false,
+          emailConfirmations: u.emailConfirmations !== false,
+          smsConfirmations: u.smsConfirmations === true,
+          smsRemindersEnabled: u.smsRemindersEnabled === true,
+        });
+      })
+      .catch(() => {
+        // Fallback already set from localStorage above
       });
-      setNotifications({ emailReminders: u.emailReminders !== false });
-    }
   }, []);
 
   const flash = (key: string) => { setSaved(key); setTimeout(() => setSaved(""), 2500); };
@@ -163,10 +185,23 @@ export default function SettingsPage() {
     setUser(updated); setUserState(updated); flash("booking");
   };
 
-  const handleSaveNotifications = () => {
+  const handleSaveNotifications = async () => {
     if (!user) return;
-    const updated = { ...user, ...notifications };
-    setUser(updated); setUserState(updated); flash("notifications");
+    const updated = { ...user, ...notifications } as any;
+    setUser(updated); setUserState(updated);
+    try {
+      await fetch("/api/user", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          emailReminders: notifications.emailReminders,
+          emailConfirmations: notifications.emailConfirmations,
+          smsConfirmations: notifications.smsConfirmations,
+          smsRemindersEnabled: notifications.smsRemindersEnabled,
+        }),
+      });
+    } catch {}
+    flash("notifications");
   };
 
   const handleDeleteAccount = () => {
@@ -354,57 +389,111 @@ export default function SettingsPage() {
 
           {/* ── Notifications ── */}
           {activeTab === "notifications" && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100">
-                <h2 className="font-bold text-gray-900">Notification Preferences</h2>
-                <p className="text-sm text-gray-500 mt-0.5">Choose how customers get notified.</p>
-              </div>
-              <div className="p-5 space-y-3">
-                {[
-                  {
-                    key: "emailReminders", label: "Email Reminders", pro: false,
-                    desc: "Send customers a reminder email 24h before their appointment.",
-                    value: notifications.emailReminders,
-                    onChange: (v: boolean) => setNotifications({ ...notifications, emailReminders: v }),
-                  },
-                  {
-                    key: "sms", label: "SMS Reminders", pro: true,
-                    desc: "Text message reminders (requires Pro plan + Twilio).",
-                    value: false, onChange: () => {},
-                  },
-                  {
-                    key: "newb", label: "New Booking Alerts", pro: false,
-                    desc: "Get notified instantly when a new booking comes in.",
-                    value: true, onChange: () => {},
-                  },
-                  {
-                    key: "rev", label: "Review Request Emails", pro: true,
-                    desc: "Automatically request a Google review after job completion.",
-                    value: false, onChange: () => {},
-                  },
-                ].map(({ key, label, desc, pro, value, onChange }) => (
-                  <div key={key} className="flex items-start justify-between gap-4 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
-                    <div>
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <p className="text-sm font-bold text-gray-900">{label}</p>
-                        {pro && (
-                          <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Pro</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500">{desc}</p>
-                    </div>
-                    <div className="flex-shrink-0 mt-0.5">
-                      <Toggle value={value} onChange={pro ? () => {} : onChange} />
-                    </div>
+            <div className="space-y-4">
+              {/* Email Notifications */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  <div>
+                    <h2 className="font-bold text-gray-900">Email Notifications</h2>
+                    <p className="text-xs text-gray-500">Sent via your connected SMTP (info@detailbookapp.com)</p>
                   </div>
-                ))}
-                <div className="flex items-center gap-3 pt-2">
-                  <button onClick={handleSaveNotifications}
-                    className="bg-blue-600 text-white font-bold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors text-sm">
-                    Save Preferences
-                  </button>
-                  {saved === "notifications" && <SavedBadge />}
                 </div>
+                <div className="p-5 space-y-3">
+                  {[
+                    {
+                      key: "emailConfirmations",
+                      label: "Booking Confirmation Email",
+                      desc: "Send a confirmation email to the customer immediately when they book.",
+                      value: notifications.emailConfirmations,
+                      onChange: (v: boolean) => setNotifications({ ...notifications, emailConfirmations: v }),
+                      pro: false,
+                    },
+                    {
+                      key: "emailReminders",
+                      label: "Owner New Booking Alert",
+                      desc: "You receive an email notification every time a new booking is made.",
+                      value: notifications.emailReminders,
+                      onChange: (v: boolean) => setNotifications({ ...notifications, emailReminders: v }),
+                      pro: false,
+                    },
+                  ].map(({ key, label, desc, value, onChange, pro }) => (
+                    <div key={key} className="flex items-start justify-between gap-4 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
+                      <div>
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <p className="text-sm font-bold text-gray-900">{label}</p>
+                          {pro && <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Pro</span>}
+                        </div>
+                        <p className="text-xs text-gray-500">{desc}</p>
+                      </div>
+                      <div className="flex-shrink-0 mt-0.5">
+                        <Toggle value={value} onChange={onChange} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* SMS Notifications */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                  </svg>
+                  <div>
+                    <h2 className="font-bold text-gray-900 flex items-center gap-2">
+                      SMS Notifications
+                      <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Pro</span>
+                    </h2>
+                    <p className="text-xs text-gray-500">Sent via Twilio · requires Pro plan</p>
+                  </div>
+                </div>
+                <div className="p-5 space-y-3">
+                  {user?.plan !== "pro" && (
+                    <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700 font-medium">
+                      Upgrade to Pro to enable SMS notifications.
+                    </div>
+                  )}
+                  {[
+                    {
+                      key: "smsConfirmations",
+                      label: "Booking Confirmation SMS",
+                      desc: "Send a text message to the customer as soon as they book.",
+                      value: notifications.smsConfirmations,
+                      onChange: (v: boolean) => setNotifications({ ...notifications, smsConfirmations: v }),
+                    },
+                    {
+                      key: "smsRemindersEnabled",
+                      label: "2-Hour Reminder SMS",
+                      desc: "Automatically text the customer 2 hours before their appointment.",
+                      value: notifications.smsRemindersEnabled,
+                      onChange: (v: boolean) => setNotifications({ ...notifications, smsRemindersEnabled: v }),
+                    },
+                  ].map(({ key, label, desc, value, onChange }) => (
+                    <div key={key} className="flex items-start justify-between gap-4 p-4 rounded-xl border border-gray-100 bg-gray-50/30">
+                      <div>
+                        <p className="text-sm font-bold text-gray-900 mb-0.5">{label}</p>
+                        <p className="text-xs text-gray-500">{desc}</p>
+                      </div>
+                      <div className="flex-shrink-0 mt-0.5">
+                        <Toggle
+                          value={value}
+                          onChange={user?.plan === "pro" ? onChange : () => {}}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button onClick={handleSaveNotifications}
+                  className="bg-blue-600 text-white font-bold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors text-sm">
+                  Save Preferences
+                </button>
+                {saved === "notifications" && <SavedBadge />}
               </div>
             </div>
           )}
