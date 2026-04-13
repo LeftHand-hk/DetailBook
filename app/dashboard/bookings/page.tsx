@@ -28,16 +28,33 @@ export default function BookingsPage() {
   const [selected, setSelected] = useState<Booking | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [staffList, setStaffList] = useState<Staff[]>([]);
-  const isPro = getUser()?.plan === "pro";
+  const [isPro, setIsPro] = useState(false);
 
   useEffect(() => {
-    setBookings(getBookings());
-    if (isPro) {
-      fetch("/api/staff").then((r) => r.ok ? r.json() : []).then(setStaffList).catch(() => {});
-    }
-  }, [isPro]);
+    // Load from API (source of truth)
+    fetch("/api/bookings")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: Booking[]) => {
+        // Sort by createdAt newest first
+        const sorted = [...data].sort((a, b) =>
+          new Date((b as any).createdAt).getTime() - new Date((a as any).createdAt).getTime()
+        );
+        setBookings(sorted);
+      })
+      .catch(() => setBookings(getBookings()));
 
-  const updateStatus = (id: string, newStatus: string) => {
+    fetch("/api/user")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.user?.plan === "pro") setIsPro(true);
+      })
+      .catch(() => setIsPro(getUser()?.plan === "pro"));
+
+    fetch("/api/staff").then((r) => r.ok ? r.json() : []).then(setStaffList).catch(() => {});
+  }, []);
+
+  const updateStatus = async (id: string, newStatus: string) => {
+    // Optimistic update
     const updated = bookings.map((b) =>
       b.id === id ? { ...b, status: newStatus } : b
     );
@@ -46,6 +63,14 @@ export default function BookingsPage() {
     if (selected && selected.id === id) {
       setSelected({ ...selected, status: newStatus });
     }
+    // Persist to DB + triggers confirmation email/SMS on "confirmed"
+    try {
+      await fetch(`/api/bookings/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+    } catch { /* silent — optimistic update already applied */ }
   };
 
   const assignStaff = async (bookingId: string, staffId: string) => {
@@ -103,7 +128,7 @@ export default function BookingsPage() {
     if (filter === "cancelled") return b.status === "cancelled";
     if (filter === "pending") return b.status === "pending";
     return true;
-  }).sort((a, b) => b.date.localeCompare(a.date));
+  });
 
   const formatDate = (date: string) =>
     new Date(date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
