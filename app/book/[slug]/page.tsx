@@ -368,9 +368,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
             ))}
           </div>
 
-          <p className="text-white/40 text-xs mb-6">
-            Confirmation sent to <span className="text-white/70">{form.customerEmail}</span>
-          </p>
+
 
           {/* Enhancement 6: Pro Enhanced Success Screen */}
           {isPro && (
