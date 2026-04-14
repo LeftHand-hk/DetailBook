@@ -34,9 +34,19 @@ export default function BookingsPage() {
     // Load from API (source of truth)
     fetch("/api/bookings")
       .then((r) => r.ok ? r.json() : [])
-      .then((data: Booking[]) => {
+      .then((data: any[]) => {
+        // Map flat DB fields to nested shape the page expects
+        const mapped: Booking[] = data.map((b) => ({
+          ...b,
+          vehicle: b.vehicle || {
+            make: b.vehicleMake || "",
+            model: b.vehicleModel || "",
+            year: b.vehicleYear || "",
+            color: b.vehicleColor || "",
+          },
+        }));
         // Sort by createdAt newest first
-        const sorted = [...data].sort((a, b) =>
+        const sorted = mapped.sort((a, b) =>
           new Date((b as any).createdAt).getTime() - new Date((a as any).createdAt).getTime()
         );
         setBookings(sorted);
