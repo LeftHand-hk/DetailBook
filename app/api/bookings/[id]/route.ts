@@ -61,6 +61,7 @@ export async function PUT(
     // Send confirmation email + SMS when status changes to "confirmed"
     if (body.status === "confirmed" && existing.status !== "confirmed") {
       const user = (updated as any).user;
+      console.log("[CONFIRM EMAIL] Attempting to send to:", updated.customerEmail, "| SMTP_HOST:", process.env.SMTP_HOST || "NOT SET", "| emailConfirmations:", user?.emailConfirmations);
       const formattedDate = new Date(updated.date + "T00:00:00").toLocaleDateString("en-US", {
         weekday: "long", month: "long", day: "numeric", year: "numeric",
       });
@@ -94,7 +95,7 @@ export async function PUT(
             </div>
           </div>`;
         const customerText = `Booking Confirmed!\n\nHi ${updated.customerName},\n\nService: ${updated.serviceName}\nDate: ${formattedDate}\nTime: ${updated.time}\nPrice: $${updated.servicePrice}${updated.address ? `\nAddress: ${updated.address}` : ""}${updated.depositRequired > 0 ? `\nDeposit due: $${updated.depositRequired}` : ""}\n\n— ${user.businessName}`;
-        sendEmail({ to: updated.customerEmail, subject: `Booking Confirmed – ${updated.serviceName} on ${formattedDate}`, html: customerHtml, text: customerText }).catch(() => {});
+        sendEmail({ to: updated.customerEmail, subject: `Booking Confirmed – ${updated.serviceName} on ${formattedDate}`, html: customerHtml, text: customerText }).then((r) => console.log("[CONFIRM EMAIL] Result:", r)).catch((e) => console.error("[CONFIRM EMAIL] Error:", e));
       }
 
       // Confirmation SMS to customer (Pro only)
