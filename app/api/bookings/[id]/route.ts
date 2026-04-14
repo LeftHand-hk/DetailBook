@@ -95,7 +95,8 @@ export async function PUT(
             </div>
           </div>`;
         const customerText = `Booking Confirmed!\n\nHi ${updated.customerName},\n\nService: ${updated.serviceName}\nDate: ${formattedDate}\nTime: ${updated.time}\nPrice: $${updated.servicePrice}${updated.address ? `\nAddress: ${updated.address}` : ""}${updated.depositRequired > 0 ? `\nDeposit due: $${updated.depositRequired}` : ""}\n\n— ${user.businessName}`;
-        sendEmail({ to: updated.customerEmail, subject: `Booking Confirmed – ${updated.serviceName} on ${formattedDate}`, html: customerHtml, text: customerText }).then((r) => console.log("[CONFIRM EMAIL] Result:", r)).catch((e) => console.error("[CONFIRM EMAIL] Error:", e));
+        const emailResult = await sendEmail({ to: updated.customerEmail, subject: `Booking Confirmed – ${updated.serviceName} on ${formattedDate}`, html: customerHtml, text: customerText });
+        console.log("[CONFIRM EMAIL] Result:", emailResult);
       }
 
       // Confirmation SMS to customer (Pro only)
@@ -107,7 +108,7 @@ export async function PUT(
           `Date: ${formattedDate2} at ${updated.time}\n` +
           (updated.depositRequired > 0 ? `Deposit due: $${updated.depositRequired}\n` : "") +
           (user.phone ? `Questions? Call ${user.phone}` : "");
-        sendSms(updated.customerPhone, smsBody).catch(() => {});
+        await sendSms(updated.customerPhone, smsBody).catch(() => {});
       }
     }
 
