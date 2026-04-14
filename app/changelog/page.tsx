@@ -71,7 +71,7 @@ const versions: Version[] = [
       { type: "new", text: "Service package builder — create named packages with descriptions, prices, and duration" },
       { type: "new", text: "Deposit collection — require a deposit at booking with Stripe-powered checkout" },
       { type: "new", text: "Appointment calendar — view and manage all bookings from a clean dashboard" },
-      { type: "new", text: "SMS reminders — automated 24-hour and 1-hour appointment reminders" },
+      { type: "new", text: "SMS reminders — automated 2-hour appointment reminders to reduce no-shows" },
       { type: "new", text: "Customer management — view customer history and contact details" },
       { type: "new", text: "Availability settings — set your working hours and block off time" },
       { type: "new", text: "30-day free trial — no credit card required to get started" },

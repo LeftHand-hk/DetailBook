@@ -63,6 +63,7 @@ export default function AdminTicketsPage() {
   const [sending, setSending] = useState(false);
   const [filter, setFilter] = useState<{ status: string; priority: string }>({ status: "open", priority: "all" });
   const [search, setSearch] = useState("");
+  const [mobileShowDetail, setMobileShowDetail] = useState(false);
 
   useEffect(() => {
     fetchTickets();
@@ -85,7 +86,7 @@ export default function AdminTicketsPage() {
 
   const handleSelectTicket = async (ticket: Ticket) => {
     setSelected(ticket);
-    // If unread, fetch full ticket to mark as read
+    setMobileShowDetail(true);
     if (ticket.adminUnread) {
       try {
         const res = await fetch(`/api/admin/tickets/${ticket.id}`);
@@ -96,6 +97,10 @@ export default function AdminTicketsPage() {
         }
       } catch { /* silent */ }
     }
+  };
+
+  const handleBack = () => {
+    setMobileShowDetail(false);
   };
 
   const handleReply = async () => {
@@ -167,12 +172,12 @@ export default function AdminTicketsPage() {
   const priorityCount = tickets.filter((t) => t.priority === "priority" && t.status !== "resolved" && t.status !== "closed").length;
 
   return (
-    <div className="p-4 max-w-[1600px] mx-auto flex flex-col h-full">
+    <div className="p-3 sm:p-4 max-w-[1600px] mx-auto flex flex-col h-full">
       {/* Header */}
       <div className="mb-3 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Support Tickets</h1>
-          <p className="text-xs text-gray-500">Manage and reply to customer support requests.</p>
+          <h1 className="text-lg sm:text-xl font-bold text-gray-900">Support Tickets</h1>
+          <p className="text-xs text-gray-500 hidden sm:block">Manage and reply to customer support requests.</p>
         </div>
       </div>
 
@@ -196,9 +201,10 @@ export default function AdminTicketsPage() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-[380px_1fr] gap-4 flex-1 min-h-0">
+      {/* Main content — on mobile show list OR detail, on desktop show both */}
+      <div className="flex-1 min-h-0 lg:grid lg:grid-cols-[380px_1fr] lg:gap-4">
         {/* ── Ticket list ── */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col h-full">
+        <div className={`bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col h-full ${mobileShowDetail ? "hidden lg:flex" : "flex"}`}>
           {/* Filters */}
           <div className="p-3 border-b border-gray-100 space-y-2">
             <div className="relative">
@@ -262,19 +268,19 @@ export default function AdminTicketsPage() {
                   <button
                     key={ticket.id}
                     onClick={() => handleSelectTicket(ticket)}
-                    className={`w-full text-left p-4 transition-colors ${
+                    className={`w-full text-left p-3 sm:p-4 transition-colors ${
                       isSelected ? "bg-blue-50/60 border-l-2 border-blue-500" : "hover:bg-gray-50 border-l-2 border-transparent"
                     }`}
                   >
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-2.5 sm:gap-3">
                       {/* Avatar with unread dot */}
                       <div className="relative flex-shrink-0">
-                        <div className="w-9 h-9 bg-gradient-to-br from-gray-700 to-gray-900 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                        <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-gray-700 to-gray-900 rounded-full flex items-center justify-center text-white text-[10px] sm:text-xs font-bold">
                           {ticket.user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                         </div>
                         {hasUnread && (
-                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center border-2 border-white">
-                            <span className="text-[8px] text-white font-bold leading-none">!</span>
+                          <div className="absolute -top-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-red-500 rounded-full flex items-center justify-center border-2 border-white">
+                            <span className="text-[7px] sm:text-[8px] text-white font-bold leading-none">!</span>
                           </div>
                         )}
                       </div>
@@ -290,7 +296,7 @@ export default function AdminTicketsPage() {
                           {ticket.subject}
                         </p>
                         <p className="text-xs text-gray-400 truncate">{ticket.user.businessName}</p>
-                        <div className="flex items-center gap-1.5 mt-1.5">
+                        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                           {ticket.priority === "priority" && (
                             <span className="inline-flex items-center gap-0.5 text-[9px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100">
                               <svg className="w-2 h-2" fill="currentColor" viewBox="0 0 24 24">
@@ -318,7 +324,7 @@ export default function AdminTicketsPage() {
         </div>
 
         {/* ── Detail panel ── */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col h-full">
+        <div className={`bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col h-full ${mobileShowDetail ? "flex" : "hidden lg:flex"} ${!mobileShowDetail && !selected ? "lg:flex" : ""} mt-4 lg:mt-0`}>
           {!selected ? (
             <div className="flex-1 flex items-center justify-center p-10">
               <div className="text-center">
@@ -334,11 +340,22 @@ export default function AdminTicketsPage() {
           ) : (
             <>
               {/* Header */}
-              <div className="p-5 border-b border-gray-100">
-                <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="p-3 sm:p-5 border-b border-gray-100">
+                {/* Back button — mobile only */}
+                <button
+                  onClick={handleBack}
+                  className="lg:hidden flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 mb-3 -ml-0.5"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Back to tickets
+                </button>
+
+                <div className="flex items-start justify-between gap-2 sm:gap-3 mb-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <h2 className="text-lg font-bold text-gray-900">{selected.subject}</h2>
+                      <h2 className="text-base sm:text-lg font-bold text-gray-900 break-words">{selected.subject}</h2>
                       {selected.priority === "priority" && (
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-blue-600 text-white px-2 py-0.5 rounded">
                           <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24">
@@ -348,14 +365,14 @@ export default function AdminTicketsPage() {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-[10px] sm:text-xs text-gray-400">
                       Ticket #{selected.id.slice(-8)} · {CATEGORY_LABEL[selected.category] || selected.category} · {formatDate(selected.createdAt)}
                     </p>
                   </div>
                   <select
                     value={selected.status}
                     onChange={(e) => handleStatusChange(e.target.value)}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-lg border cursor-pointer focus:outline-none focus:ring-1 focus:ring-gray-900 ${STATUS_STYLES[selected.status] || STATUS_STYLES.open}`}
+                    className={`text-[10px] sm:text-xs font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border cursor-pointer focus:outline-none focus:ring-1 focus:ring-gray-900 flex-shrink-0 ${STATUS_STYLES[selected.status] || STATUS_STYLES.open}`}
                   >
                     <option value="open">Open</option>
                     <option value="in_progress">In Progress</option>
@@ -366,12 +383,12 @@ export default function AdminTicketsPage() {
 
                 {/* Customer info */}
                 <div className="bg-gray-50 rounded-xl p-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-gray-700 to-gray-900 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-bold">
+                  <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap sm:flex-nowrap">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-gray-700 to-gray-900 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[10px] sm:text-xs font-bold">
                       {selected.user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-semibold text-sm text-gray-900">{selected.user.name}</p>
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
                           selected.user.plan === "pro"
@@ -381,10 +398,10 @@ export default function AdminTicketsPage() {
                           {selected.user.plan.toUpperCase()}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500">{selected.user.businessName}</p>
-                      <p className="text-xs text-blue-600 font-medium">{selected.user.email}</p>
+                      <p className="text-xs text-gray-500 truncate">{selected.user.businessName}</p>
+                      <p className="text-xs text-blue-600 font-medium truncate">{selected.user.email}</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       <a href={`mailto:${selected.user.email}`}
                         title={selected.user.email}
                         className="w-8 h-8 bg-white border border-gray-200 rounded-lg flex items-center justify-center text-gray-500 hover:text-gray-900 hover:border-gray-300 transition-colors">
@@ -407,9 +424,8 @@ export default function AdminTicketsPage() {
               </div>
 
               {/* Messages thread */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-gray-50/30">
+              <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-3 sm:space-y-4 bg-gray-50/30">
                 {(() => {
-                  // Build thread: prefer messages array, fall back to original fields
                   const thread: { sender: "user" | "admin"; content: string; createdAt: string }[] =
                     selected.messages && selected.messages.length > 0
                       ? selected.messages.map((m) => ({ sender: m.sender, content: m.content, createdAt: m.createdAt }))
@@ -421,32 +437,32 @@ export default function AdminTicketsPage() {
                         ];
 
                   return thread.map((msg, i) => (
-                    <div key={i} className={`flex gap-3 ${msg.sender === "admin" ? "flex-row-reverse" : ""}`}>
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[10px] font-bold ${
+                    <div key={i} className={`flex gap-2 sm:gap-3 ${msg.sender === "admin" ? "flex-row-reverse" : ""}`}>
+                      <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[9px] sm:text-[10px] font-bold ${
                         msg.sender === "admin" ? "bg-blue-600" : "bg-gradient-to-br from-gray-700 to-gray-900"
                       }`}>
                         {msg.sender === "admin" ? "DB" : selected.user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className={`flex items-center gap-2 mb-1 ${msg.sender === "admin" ? "justify-end" : ""}`}>
+                      <div className="flex-1 min-w-0 max-w-[85%] sm:max-w-[75%]">
+                        <div className={`flex items-center gap-2 mb-1 flex-wrap ${msg.sender === "admin" ? "justify-end" : ""}`}>
                           {msg.sender === "admin" ? (
                             <>
-                              <p className="text-[10px] text-gray-400">{formatDate(msg.createdAt)}</p>
-                              <p className="text-xs font-bold text-blue-700">DetailBook Support</p>
+                              <p className="text-[9px] sm:text-[10px] text-gray-400">{formatDate(msg.createdAt)}</p>
+                              <p className="text-[11px] sm:text-xs font-bold text-blue-700">DetailBook Support</p>
                             </>
                           ) : (
                             <>
-                              <p className="text-xs font-bold text-gray-900">{selected.user.name}</p>
-                              <p className="text-[10px] text-gray-400">{formatDate(msg.createdAt)}</p>
+                              <p className="text-[11px] sm:text-xs font-bold text-gray-900">{selected.user.name}</p>
+                              <p className="text-[9px] sm:text-[10px] text-gray-400">{formatDate(msg.createdAt)}</p>
                             </>
                           )}
                         </div>
-                        <div className={`rounded-2xl p-4 ${
+                        <div className={`rounded-2xl p-3 sm:p-4 ${
                           msg.sender === "admin"
                             ? "bg-blue-600 text-white rounded-tr-sm"
                             : "bg-white border border-gray-200 rounded-tl-sm"
                         }`}>
-                          <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                          <p className="text-[13px] sm:text-sm whitespace-pre-wrap leading-relaxed break-words">{msg.content}</p>
                         </div>
                       </div>
                     </div>
@@ -455,32 +471,34 @@ export default function AdminTicketsPage() {
               </div>
 
               {/* Reply composer */}
-              <div className="p-4 border-t border-gray-100 bg-white">
+              <div className="p-3 sm:p-4 border-t border-gray-100 bg-white">
                 <textarea
                   value={reply}
                   onChange={(e) => setReply(e.target.value)}
                   placeholder={selected.adminReply ? "Send another reply..." : "Type your reply..."}
                   rows={3}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none placeholder-gray-400"
+                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none placeholder-gray-400"
                 />
-                <div className="flex items-center justify-between mt-3">
-                  <p className="text-xs text-gray-400">
-                    Sends an email to <strong>{selected.user.email}</strong>
+                <div className="flex items-center justify-between mt-2 sm:mt-3 gap-2">
+                  <p className="text-[10px] sm:text-xs text-gray-400 truncate">
+                    Sends email to <strong className="truncate">{selected.user.email}</strong>
                   </p>
                   <button
                     onClick={handleReply}
                     disabled={sending || !reply.trim()}
-                    className="bg-gray-900 hover:bg-gray-800 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="bg-gray-900 hover:bg-gray-800 text-white text-xs sm:text-sm font-bold px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 sm:gap-2 flex-shrink-0"
                   >
                     {sending ? (
                       <>
-                        <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Sending...
+                        <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span className="hidden sm:inline">Sending...</span>
+                        <span className="sm:hidden">...</span>
                       </>
                     ) : (
                       <>
-                        Send Reply
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <span className="hidden sm:inline">Send Reply</span>
+                        <span className="sm:hidden">Send</span>
+                        <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                         </svg>
                       </>

@@ -89,7 +89,7 @@ const helpData: Record<PageKey, HelpContent> = {
   messages: {
     title: "SMS & Email Templates",
     steps: [
-      { title: "Choose Template", desc: "Select which template to edit: Booking Confirmation, 24h Reminder, or Follow-Up." },
+      { title: "Choose Template", desc: "Select which template to edit: Booking Confirmation, 2-Hour Reminder, or Follow-Up." },
       { title: "Use Variables", desc: "Insert {customerName}, {serviceName}, {date}, {time}, {businessName} into your templates. They get replaced with real data." },
       { title: "Preview", desc: "See a live preview of how your SMS and email will look with sample data." },
       { title: "Save Templates", desc: "Click Save to persist your changes. Templates are used automatically when events trigger." },

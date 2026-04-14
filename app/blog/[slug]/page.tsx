@@ -30,11 +30,11 @@ Set your deposit at 20–30% of the service price. Make it clear in your booking
 
 Right after booking, send an automated confirmation with the date, time, service, and address. This creates a paper trail and sets expectations immediately. If the customer gave you the wrong address or booked the wrong date, this is when they'll catch it — before you're standing in someone else's driveway.
 
-**3. Send Reminder Messages at 24 Hours and 1 Hour**
+**3. Send Reminder Messages Before the Appointment**
 
-Most no-shows happen because people forget. Life is busy. A reminder text 24 hours before the appointment — and a second one an hour before — dramatically reduces this. Keep the messages warm but firm. Include the appointment details and your cancellation policy.
+Most no-shows happen because people forget. Life is busy. A reminder text 2 hours before the appointment dramatically reduces this. Keep the messages warm but firm. Include the appointment details and your cancellation policy.
 
-DetailBook automates both of these reminders on the Pro plan, so you never have to think about it.
+DetailBook automates these reminders on the Pro plan, so you never have to think about it.
 
 **4. Have a Clear Cancellation Policy**
 
@@ -370,7 +370,7 @@ Your booking page is live at detailbook.app/book/[your-handle]. Share it everywh
 
 **Step 6: Enable SMS Reminders**
 
-In Settings > Reminders, enable the 24-hour and 1-hour reminder messages. These are sent automatically — you don't have to do anything. This step alone will cut your no-shows significantly.
+In Dashboard > Messages, enable the 2-hour reminder. These are sent automatically — you don't have to do anything. This step alone will cut your no-shows significantly.
 
 That's it. You now have a professional booking system that looks great, collects deposits, and reminds customers automatically. What used to take 20 text messages now takes 2 minutes.
     `,

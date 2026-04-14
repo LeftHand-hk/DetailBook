@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { sendSms } from "@/lib/twilio";
 
-// Secured cron endpoint — called every 30 minutes by Vercel Cron
+// Secured cron endpoint — called every 30 minutes by cron-job.org
 // Sends SMS reminders to customers whose appointment is ~2 hours away
 export async function GET(request: NextRequest) {
   // Verify cron secret so it can't be triggered by random people

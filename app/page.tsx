@@ -31,7 +31,7 @@ export default function LandingPage() {
   const features = [
     { icon: "📅", title: "Online Booking Page", desc: "Your own branded booking link. Customers book appointments 24/7 — no phone calls needed." },
     { icon: "💳", title: "Deposit Collection", desc: "Require a deposit at booking to eliminate no-shows and protect your time and revenue." },
-    { icon: "📱", title: "SMS Reminders", desc: "Automated text reminders sent 24 hours and 1 hour before each appointment." },
+    { icon: "📱", title: "SMS Reminders", desc: "Automated text reminders sent 2 hours before each appointment to reduce no-shows." },
     { icon: "🗓️", title: "Calendar Dashboard", desc: "See all jobs at a glance — whether at your shop or out in the field. Never double-book again." },
     { icon: "🔗", title: "Google Calendar Sync", desc: "Two-way sync with Google Calendar. Your schedule, everywhere you need it." },
     { icon: "🛠️", title: "Service Package Builder", desc: "Create packages for any vehicle type — sedan, SUV, truck, luxury. Let customers choose and book instantly." },

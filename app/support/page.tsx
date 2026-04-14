@@ -83,7 +83,7 @@ const faqs = [
   },
   {
     q: "How do SMS reminders work?",
-    a: "When SMS reminders are enabled (Pro plan), DetailBook automatically sends two text messages to your customer's phone number: one 24 hours before the appointment and one 1 hour before. The messages include the service name, time, and address. You can customize the message text in Settings > Reminders.",
+    a: "When SMS reminders are enabled (Pro plan), DetailBook automatically sends a text message to your customer's phone number 2 hours before the appointment. The message includes the service name, time, and address. You can customize the message text in Dashboard > Messages.",
   },
   {
     q: "Can I offer different pricing for different vehicle sizes?",

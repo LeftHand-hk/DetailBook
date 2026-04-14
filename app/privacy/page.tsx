@@ -37,7 +37,7 @@ We do not sell your personal data to third parties for their marketing purposes.
     title: "3. Data Sharing",
     content: `We may share your information in the following circumstances:
 
-**Service providers:** We share data with vendors and service providers who help us deliver our services, including Stripe (payment processing), Twilio (SMS delivery), Supabase (database hosting), and Vercel (hosting infrastructure). These parties are bound by data processing agreements.
+**Service providers:** We share data with vendors and service providers who help us deliver our services, including Stripe (payment processing), Twilio (SMS delivery), Supabase (database hosting), and Netlify (hosting infrastructure). These parties are bound by data processing agreements.
 
 **Business transfers:** If DetailBook is involved in a merger, acquisition, or sale of all or a portion of its assets, your data may be transferred as part of that transaction.
 

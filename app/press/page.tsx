@@ -28,7 +28,7 @@ The Pro plan, priced at $59/month, adds automated two-way SMS reminders, Google 
 "Our Starter customers told us loud and clear what they needed next: automated reminders and Google Calendar sync," said Alex Rivera, CEO of DetailBook. "The Pro plan is our answer to that feedback."
 
 Key features included in the Pro plan:
-— Automated SMS reminders at 24 hours and 1 hour before each appointment
+— Automated SMS reminders sent 2 hours before each appointment
 — Two-way Google Calendar sync so appointments appear on all your devices
 — Recurring bookings for regular customers
 — Analytics dashboard showing revenue trends, booking sources, and no-show rates
