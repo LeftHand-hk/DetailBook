@@ -92,11 +92,14 @@ export default function BookingsPage() {
     }
   };
 
-  const removeBooking = (id: string) => {
+  const removeBooking = async (id: string) => {
     const updated = bookings.filter((b) => b.id !== id);
     setBookings(updated);
     saveBookings(updated);
     setSelected(null);
+    try {
+      await fetch(`/api/bookings/${id}`, { method: "DELETE" });
+    } catch { /* silent */ }
   };
 
   const toggleDeposit = (id: string) => {
@@ -546,48 +549,45 @@ export default function BookingsPage() {
 
               {/* ── Change Status ── */}
               <div>
-                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">
-                  {selected.status === "completed" ? "Actions" : "Change Status"}
-                </h3>
-                {selected.status === "completed" ? (
-                  <button onClick={() => removeBooking(selected.id)}
-                    className="w-full flex items-center justify-center gap-2 p-4 bg-red-50 text-red-600 border-2 border-red-200 font-bold text-base rounded-xl hover:bg-red-100 transition-colors">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    Remove Booking
-                  </button>
-                ) : (
-                  <div className="grid grid-cols-2 gap-3">
-                    {selected.status !== "confirmed" && (
-                      <button onClick={() => updateStatus(selected.id, "confirmed")}
-                        className="flex items-center justify-center gap-2 p-4 bg-green-50 text-green-700 border-2 border-green-200 font-bold text-base rounded-xl hover:bg-green-100 transition-colors">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                        Confirm
-                      </button>
-                    )}
-                    {selected.status !== "completed" && (
-                      <button onClick={() => updateStatus(selected.id, "completed")}
-                        className="flex items-center justify-center gap-2 p-4 bg-blue-50 text-blue-700 border-2 border-blue-200 font-bold text-base rounded-xl hover:bg-blue-100 transition-colors">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        Complete
-                      </button>
-                    )}
-                    {selected.status !== "pending" && (
-                      <button onClick={() => updateStatus(selected.id, "pending")}
-                        className="flex items-center justify-center gap-2 p-4 bg-yellow-50 text-yellow-700 border-2 border-yellow-200 font-bold text-base rounded-xl hover:bg-yellow-100 transition-colors">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        Pending
-                      </button>
-                    )}
-                    {selected.status !== "cancelled" && (
-                      <button onClick={() => updateStatus(selected.id, "cancelled")}
-                        className="flex items-center justify-center gap-2 p-4 bg-red-50 text-red-700 border-2 border-red-200 font-bold text-base rounded-xl hover:bg-red-100 transition-colors">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        Cancel
-                      </button>
-                    )}
-                  </div>
-                )}
+                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Change Status</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {selected.status !== "confirmed" && (
+                    <button onClick={() => updateStatus(selected.id, "confirmed")}
+                      className="flex items-center justify-center gap-2 p-4 bg-green-50 text-green-700 border-2 border-green-200 font-bold text-base rounded-xl hover:bg-green-100 transition-colors">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                      Confirm
+                    </button>
+                  )}
+                  {selected.status !== "completed" && (
+                    <button onClick={() => updateStatus(selected.id, "completed")}
+                      className="flex items-center justify-center gap-2 p-4 bg-blue-50 text-blue-700 border-2 border-blue-200 font-bold text-base rounded-xl hover:bg-blue-100 transition-colors">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      Complete
+                    </button>
+                  )}
+                  {selected.status !== "pending" && (
+                    <button onClick={() => updateStatus(selected.id, "pending")}
+                      className="flex items-center justify-center gap-2 p-4 bg-yellow-50 text-yellow-700 border-2 border-yellow-200 font-bold text-base rounded-xl hover:bg-yellow-100 transition-colors">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      Pending
+                    </button>
+                  )}
+                  {selected.status !== "cancelled" && (
+                    <button onClick={() => updateStatus(selected.id, "cancelled")}
+                      className="flex items-center justify-center gap-2 p-4 bg-red-50 text-red-700 border-2 border-red-200 font-bold text-base rounded-xl hover:bg-red-100 transition-colors">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      Cancel
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {/* ── Delete ── */}
+              <button onClick={() => removeBooking(selected.id)}
+                className="w-full flex items-center justify-center gap-2 p-3 bg-red-50 text-red-600 border border-red-200 font-semibold text-sm rounded-xl hover:bg-red-100 transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                Delete Booking
+              </button>
 
               {/* Booking ID */}
               <p className="text-xs text-gray-300 text-center font-mono">Booking ID: {selected.id}</p>
