@@ -31,10 +31,31 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setUser(getUser());
-    setBookings(getBookings());
-    setPackages(getPackages());
     setMounted(true);
+
+    // Load packages from API, fallback to localStorage
+    fetch("/api/packages")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: Package[]) => setPackages(data))
+      .catch(() => setPackages(getPackages()));
     setDismissedGuide(localStorage.getItem("detailbook_guide_dismissed") === "true");
+
+    // Load bookings from API (source of truth), fallback to localStorage
+    fetch("/api/bookings")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: any[]) => {
+        const mapped: Booking[] = data.map((b: any) => ({
+          ...b,
+          vehicle: b.vehicle || {
+            make: b.vehicleMake || "",
+            model: b.vehicleModel || "",
+            year: b.vehicleYear || "",
+            color: b.vehicleColor || "",
+          },
+        }));
+        setBookings(mapped);
+      })
+      .catch(() => setBookings(getBookings()));
   }, []);
 
   const dismissGuide = () => {

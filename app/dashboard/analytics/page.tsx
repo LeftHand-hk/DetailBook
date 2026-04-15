@@ -14,8 +14,24 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     setUser(getUser());
-    setBookingsState(getBookings());
     setMounted(true);
+
+    // Load bookings from API (source of truth), fallback to localStorage
+    fetch("/api/bookings")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: any[]) => {
+        const mapped: Booking[] = data.map((b: any) => ({
+          ...b,
+          vehicle: b.vehicle || {
+            make: b.vehicleMake || "",
+            model: b.vehicleModel || "",
+            year: b.vehicleYear || "",
+            color: b.vehicleColor || "",
+          },
+        }));
+        setBookingsState(mapped);
+      })
+      .catch(() => setBookingsState(getBookings()));
   }, []);
 
   if (!mounted) {

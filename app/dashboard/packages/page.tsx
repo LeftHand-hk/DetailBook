@@ -33,8 +33,13 @@ export default function PackagesPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   useEffect(() => {
-    setPackagesState(getPackages());
     setUser(getUser());
+
+    // Load packages from API (source of truth), fallback to localStorage
+    fetch("/api/packages")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: Package[]) => setPackagesState(data))
+      .catch(() => setPackagesState(getPackages()));
   }, []);
 
   const isStarter = user?.plan === "starter";
@@ -61,53 +66,82 @@ export default function PackagesPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    await new Promise((r) => setTimeout(r, 300));
 
     const depositVal = form.deposit ? parseFloat(form.deposit) : undefined;
+    const payload = {
+      name: form.name,
+      description: form.description,
+      price: parseFloat(form.price),
+      duration: parseInt(form.duration),
+      deposit: depositVal ?? 0,
+    };
 
-    const updated: Package[] = editing
-      ? packages.map((p) =>
-          p.id === editing.id
-            ? {
-                ...p,
-                name: form.name,
-                description: form.description,
-                price: parseFloat(form.price),
-                duration: parseInt(form.duration),
-                deposit: depositVal,
-              }
-            : p
-        )
-      : [
-          ...packages,
-          {
-            id: generateId(),
-            name: form.name,
-            description: form.description,
-            price: parseFloat(form.price),
-            duration: parseInt(form.duration),
-            active: true,
-            deposit: depositVal,
-          },
-        ];
+    try {
+      if (editing) {
+        // Update existing package via API
+        const res = await fetch(`/api/packages/${editing.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          const updated = await res.json();
+          const newList = packages.map((p) => (p.id === editing.id ? updated : p));
+          setPackagesState(newList);
+          setPackages(newList);
+        }
+      } else {
+        // Create new package via API
+        const res = await fetch("/api/packages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, active: true }),
+        });
+        if (res.ok) {
+          const created = await res.json();
+          const newList = [...packages, created];
+          setPackagesState(newList);
+          setPackages(newList);
+        }
+      }
+    } catch {
+      // Fallback to localStorage
+      const updated: Package[] = editing
+        ? packages.map((p) =>
+            p.id === editing.id ? { ...p, ...payload, deposit: depositVal } : p
+          )
+        : [...packages, { id: generateId(), ...payload, active: true, deposit: depositVal }];
+      setPackages(updated);
+      setPackagesState(updated);
+    }
 
-    setPackages(updated);
-    setPackagesState(updated);
     setSaving(false);
     setShowModal(false);
   };
 
-  const handleToggle = (id: string) => {
+  const handleToggle = async (id: string) => {
+    const pkg = packages.find((p) => p.id === id);
+    if (!pkg) return;
     const updated = packages.map((p) => (p.id === id ? { ...p, active: !p.active } : p));
-    setPackages(updated);
     setPackagesState(updated);
+    setPackages(updated);
+    try {
+      await fetch(`/api/packages/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: !pkg.active }),
+      });
+    } catch { /* optimistic update already applied */ }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     const updated = packages.filter((p) => p.id !== id);
-    setPackages(updated);
     setPackagesState(updated);
+    setPackages(updated);
     setDeleteConfirm(null);
+    try {
+      await fetch(`/api/packages/${id}`, { method: "DELETE" });
+    } catch { /* optimistic update already applied */ }
   };
 
   const formatDuration = (minutes: number) => {

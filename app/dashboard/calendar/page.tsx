@@ -55,7 +55,22 @@ export default function CalendarPage() {
   const [showDaySheet, setShowDaySheet] = useState(false);
 
   useEffect(() => {
-    setBookings(getBookings());
+    // Load from API (source of truth), fallback to localStorage
+    fetch("/api/bookings")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: any[]) => {
+        const mapped: Booking[] = data.map((b) => ({
+          ...b,
+          vehicle: b.vehicle || {
+            make: b.vehicleMake || "",
+            model: b.vehicleModel || "",
+            year: b.vehicleYear || "",
+            color: b.vehicleColor || "",
+          },
+        }));
+        setBookings(mapped);
+      })
+      .catch(() => setBookings(getBookings()));
     setSelectedDay(new Date().toISOString().split("T")[0]);
   }, []);
 
