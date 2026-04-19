@@ -14,11 +14,11 @@ const posts = [
     category: "Business Tips",
     date: "Mar 18, 2026",
     readTime: "6 min",
-    author: "Alex Rivera",
+    author: "DetailBook Team",
     body: `
 No-shows are the #1 profit killer for mobile auto detailers. You block out three hours, drive across town, and sit in an empty driveway. No text, no call — just wasted time and lost income.
 
-The good news? No-shows are almost entirely preventable. Here are five methods that our community of 500+ detailers uses to virtually eliminate them.
+The good news? No-shows are almost entirely preventable. Here are five proven methods that detailers use to virtually eliminate them.
 
 **1. Require a Deposit at Booking**
 
@@ -55,7 +55,7 @@ Combine all five of these methods and you'll cut your no-show rate to near zero.
     category: "Reviews",
     date: "Mar 15, 2026",
     readTime: "8 min",
-    author: "Alex Rivera",
+    author: "DetailBook Team",
     body: `
 Choosing the right scheduling software is one of the most important decisions you'll make as a mobile detailer. The wrong tool wastes your time. The right one makes your business look professional, reduces no-shows, and helps you grow.
 
@@ -102,7 +102,7 @@ If you're a solo mobile detailer or a small crew, DetailBook is the best choice 
     category: "How-To",
     date: "Mar 12, 2026",
     readTime: "5 min",
-    author: "Alex Rivera",
+    author: "DetailBook Team",
     body: `
 A deposit policy is one of the most important business tools a mobile detailer can have. Done right, it eliminates no-shows, protects your income, and signals to customers that you run a serious, professional operation.
 
@@ -145,7 +145,7 @@ With DetailBook, your deposit policy is automatically shown on the booking page 
     category: "Resources",
     date: "Mar 10, 2026",
     readTime: "4 min",
-    author: "Alex Rivera",
+    author: "DetailBook Team",
     body: `
 One of the most common questions new detailers ask is: how should I price my services? Price too low and you burn out working for less than minimum wage. Price too high and your phone stops ringing.
 
@@ -191,7 +191,7 @@ Don't offer a la carte pricing for everything. Build 2–3 packages (e.g., Basic
     category: "Marketing",
     date: "Mar 7, 2026",
     readTime: "7 min",
-    author: "Alex Rivera",
+    author: "DetailBook Team",
     body: `
 You don't need to cold call anyone to build a full schedule. Here are seven proven, low-cost strategies that mobile detailers use to grow their customer base consistently.
 
@@ -230,7 +230,7 @@ After every appointment, send a short text asking for a Google review. Timing ma
     category: "Getting Started",
     date: "Mar 4, 2026",
     readTime: "12 min",
-    author: "Alex Rivera",
+    author: "DetailBook Team",
     body: `
 Mobile auto detailing is one of the best businesses you can start in 2026. Low startup costs, high margins, immediate demand, and you're your own boss. Here's everything you need to launch.
 
@@ -288,7 +288,7 @@ The first 90 days are the hardest. After that, if you've followed these steps, y
     category: "Business Tips",
     date: "Feb 28, 2026",
     readTime: "6 min",
-    author: "Alex Rivera",
+    author: "DetailBook Team",
     body: `
 Thinking about starting a detailing business — or scaling your existing one? At some point, you'll face the mobile vs. shop question. Both models can be highly profitable. But they're completely different businesses. Here's the full breakdown.
 
@@ -333,7 +333,7 @@ If you're an experienced operator with capital and team management experience, a
     category: "How-To",
     date: "Feb 25, 2026",
     readTime: "5 min",
-    author: "Alex Rivera",
+    author: "DetailBook Team",
     body: `
 Still taking bookings through Instagram DMs and text messages? You're losing customers every day. People expect to book services online, 24/7, without having to talk to anyone. Here's how to set up professional online booking in under 30 minutes.
 
@@ -381,7 +381,7 @@ That's it. You now have a professional booking system that looks great, collects
     category: "Marketing",
     date: "Feb 22, 2026",
     readTime: "4 min",
-    author: "Alex Rivera",
+    author: "DetailBook Team",
     body: `
 Google reviews are the single most powerful form of social proof for a local service business. A detailer with 50 five-star reviews will get 5x more calls than one with 10 reviews — even if the work quality is identical. Here's the exact system to build your review base fast.
 
@@ -521,7 +521,7 @@ export default function BlogPostPage({ params }: { params: { slug: string } }) {
                   Ready to try DetailBook free?
                 </h3>
                 <p className="text-gray-400 mb-6">
-                  Join 500+ detailers. No credit card required. Cancel anytime.
+                  Start your free 15-day trial. No credit card required.
                 </p>
                 <Link
                   href="/signup"

@@ -37,12 +37,6 @@ export default function LandingPage() {
     { icon: "🛠️", title: "Service Package Builder", desc: "Create packages for any vehicle type — sedan, SUV, truck, luxury. Let customers choose and book instantly." },
   ];
 
-  const testimonials = [
-    { name: "Carlos Mendez", business: "Shine Pro Detailing · Miami, FL", avatar: "CM", rating: 5, text: "DetailBook cut my no-shows by 80%. The deposit feature alone paid for itself in the first week. I run a mobile service and I can't imagine managing it without this." },
-    { name: "Tanya Williams", business: "TW Auto Spa · Atlanta, GA", avatar: "TW", rating: 5, text: "We have a shop and also do on-site service. DetailBook handles both perfectly. The booking page is professional and customers love how easy it is to book." },
-    { name: "Jason Kowalski", business: "Premier Detail Studio · Chicago, IL", avatar: "JK", rating: 5, text: "Switched from Square Appointments and never looked back. DetailBook is built specifically for detailers — shop or mobile. The package builder makes upselling effortless." },
-  ];
-
   const faqs = [
     { q: "Do I need a credit card to start?", a: "No! You can start your 15-day free trial without entering any payment info. We'll remind you before the trial ends." },
     { q: "Can my customers pay the deposit online?", a: "Yes! On the Pro plan, customers can pay their deposit directly through your booking page via Stripe. On Starter, you can collect deposits manually." },
@@ -236,7 +230,7 @@ export default function LandingPage() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 glass border border-blue-500/30 text-blue-300 text-sm font-semibold px-4 py-2 rounded-full mb-8 animate-fadeInUp">
             <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
-            Trusted by 500+ auto detailing businesses across the US
+            New — Purpose-built for auto detailers
           </div>
 
           <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black leading-[1.05] mb-6 animate-fadeInUp delay-100">
@@ -337,27 +331,33 @@ export default function LandingPage() {
       ═══════════════════════════════════════════════ */}
       <section className="bg-slate-900 border-y border-white/5 py-6 px-4">
         <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-center gap-x-10 gap-y-4 text-center">
-          <div className="flex items-center gap-3">
-            <div className="flex -space-x-2">
-              {["CM","TW","JK","RM","AB"].map((init, i) => (
-                <div key={i} className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 border-2 border-slate-900 flex items-center justify-center text-white text-xs font-bold">{init}</div>
-              ))}
-            </div>
-            <p className="text-white/80 text-sm font-semibold"><span className="text-blue-400 font-black">500+</span> detailers</p>
+          <div className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            <p className="text-white/80 text-sm font-semibold">Built for detailers</p>
           </div>
           <div className="hidden sm:block w-px h-6 bg-white/10" />
-          <div className="flex items-center gap-1.5">
-            {[1,2,3,4,5].map((i) => (
-              <svg key={i} className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-              </svg>
-            ))}
-            <span className="text-white/80 text-sm ml-1 font-semibold">4.9/5 rating</span>
+          <div className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-white/80 text-sm font-semibold">Set up in 5 minutes</p>
           </div>
           <div className="hidden sm:block w-px h-6 bg-white/10" />
-          <p className="text-white/60 text-sm"><span className="text-green-400 font-black">$2.1M+</span> in bookings processed</p>
+          <div className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
+            <p className="text-white/80 text-sm font-semibold">Collect deposits automatically</p>
+          </div>
           <div className="hidden sm:block w-px h-6 bg-white/10" />
-          <p className="text-white/60 text-sm"><span className="text-white font-black">127</span> 5-star reviews</p>
+          <div className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <p className="text-white/80 text-sm font-semibold">Shop + Mobile scheduling</p>
+          </div>
         </div>
       </section>
 
@@ -370,7 +370,7 @@ export default function LandingPage() {
             Stop Losing Money to No-Shows<br />and Scheduling Chaos
           </h2>
           <p className="text-xl text-gray-500 mb-16">
-            The average detailing business loses <span className="text-red-500 font-black">$800/month</span> to no-shows and disorganized scheduling.
+            No-shows, missed calls, and double bookings kill revenue. There&apos;s a better way.
           </p>
           <div className="grid sm:grid-cols-3 gap-6">
             {[
@@ -546,36 +546,37 @@ export default function LandingPage() {
       </section>
 
       {/* ═══════════════════════════════════════════════
-          TESTIMONIALS
+          ABOUT / WHY WE BUILT THIS
       ═══════════════════════════════════════════════ */}
       <section className="bg-gray-50 py-24 px-4">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">Detailers Love {platformName}</h2>
-            <p className="text-gray-500 text-xl">Real stories from real detailers</p>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">Why I Built {platformName}</h2>
           </div>
-          <div className="grid sm:grid-cols-3 gap-6">
-            {testimonials.map((t, i) => (
-              <div key={i} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                <div className="flex gap-0.5 mb-4">
-                  {Array(t.rating).fill(0).map((_, j) => (
-                    <svg key={j} className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  ))}
-                </div>
-                <p className="text-gray-700 text-sm leading-relaxed mb-6">&ldquo;{t.text}&rdquo;</p>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-black text-sm shadow-md shadow-blue-500/30">
-                    {t.avatar}
-                  </div>
-                  <div>
-                    <p className="text-gray-900 font-bold text-sm">{t.name}</p>
-                    <p className="text-gray-400 text-xs">{t.business}</p>
-                  </div>
-                </div>
+          <div className="bg-white rounded-2xl p-8 sm:p-10 shadow-sm border border-gray-100">
+            <div className="flex items-start gap-5 mb-6">
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-500/20 flex-shrink-0">
+                D
               </div>
-            ))}
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">From a detailer who got tired of losing money</h3>
+                <p className="text-gray-400 text-sm">The story behind {platformName}</p>
+              </div>
+            </div>
+            <div className="space-y-4 text-gray-600 leading-relaxed">
+              <p>
+                I built {platformName} because I saw detailers struggling with no-shows and scheduling chaos. Every week, customers would book and then ghost. No call, no text &mdash; just a wasted morning and lost income.
+              </p>
+              <p>
+                I tried every booking tool out there &mdash; Square, Calendly, Jobber. None of them were built for detailing. They didn&apos;t understand deposits, vehicle types, or the difference between a mobile service and a shop appointment.
+              </p>
+              <p>
+                So I built the tool I wished existed. {platformName} is purpose-built for auto detailing businesses &mdash; whether you&apos;re a solo mobile operator or running a full shop with a team. Deposit collection, SMS reminders, service packages by vehicle type, and a booking page that looks professional.
+              </p>
+              <p className="text-gray-900 font-semibold">
+                This tool is made by someone who understands the industry. Not another generic scheduling app with a fresh coat of paint.
+              </p>
+            </div>
           </div>
         </div>
       </section>
@@ -641,15 +642,15 @@ export default function LandingPage() {
           </h2>
 
           <p className="text-white/50 text-lg max-w-xl mx-auto mb-10 leading-relaxed">
-            Join 500+ detailing businesses using {platformName} to book more jobs, eliminate no-shows, and get paid faster.
+            Start your free trial today. Set up in minutes, start collecting deposits and bookings right away.
           </p>
 
-          {/* Stats row */}
+          {/* Value props */}
           <div className="flex flex-wrap justify-center gap-8 mb-12">
             {[
-              { value: "80%",    label: "Fewer no-shows" },
               { value: "5 min",  label: "Setup time" },
-              { value: "$800",   label: "Avg monthly savings" },
+              { value: "15 days", label: "Free trial" },
+              { value: "$0",     label: "To get started" },
             ].map(({ value, label }) => (
               <div key={label} className="text-center">
                 <p className="text-3xl font-black text-white mb-0.5">{value}</p>
@@ -716,14 +717,11 @@ export default function LandingPage() {
                 { label:"Pricing",   href:"/#pricing"  },
                 { label:"FAQ",       href:"/#faq"       },
                 { label:"Live Demo", href:"/book/mikes-mobile-detailing" },
-                { label:"Changelog", href:"/changelog"  },
               ]},
               { title: "Company", links: [
                 { label:"About",   href:"/about"   },
-                { label:"Blog",    href:"/blog"    },
-                { label:"Careers", href:"/careers" },
                 { label:"Contact", href:"/contact" },
-                { label:"Press",   href:"/press"   },
+                { label:"Support", href:"/support" },
               ]},
               { title: "Account", links: [
                 { label:"Sign Up",   href:"/signup"             },

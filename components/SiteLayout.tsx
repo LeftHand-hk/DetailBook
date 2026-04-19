@@ -148,13 +148,10 @@ export default function SiteLayout({ children }: SiteLayoutProps) {
             {/* Links */}
             <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-gray-400">
               <Link href="/about" className="hover:text-white transition-colors">About</Link>
-              <Link href="/blog" className="hover:text-white transition-colors">Blog</Link>
-              <Link href="/careers" className="hover:text-white transition-colors">Careers</Link>
               <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>
               <Link href="/support" className="hover:text-white transition-colors">Support</Link>
               <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
               <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
-              <Link href="/cookies" className="hover:text-white transition-colors">Cookies</Link>
             </div>
 
             {/* Copyright */}

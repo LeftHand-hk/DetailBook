@@ -33,7 +33,7 @@ const posts = [
     slug: "auto-detailing-price-list",
     title: "Auto Detailing Price List Template (Free Download)",
     category: "Resources",
-    excerpt: "Copy our proven pricing structure used by 500+ mobile detailers.",
+    excerpt: "A proven pricing structure template built for mobile detailers.",
     date: "Mar 10, 2026",
     readTime: "4 min",
   },
