@@ -159,6 +159,8 @@ export async function POST(request: NextRequest) {
                 <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;font-weight:600;color:#111827;">${time}</td></tr>
                 <tr><td style="padding:6px 0;color:#6b7280;">Vehicle</td><td style="padding:6px 0;font-weight:600;color:#111827;">${vYear} ${vMake} ${vModel} (${vColor})</td></tr>
                 <tr><td style="padding:6px 0;color:#6b7280;">Price</td><td style="padding:6px 0;font-weight:600;color:#111827;">$${booking.servicePrice}</td></tr>
+                ${booking.depositRequired > 0 ? `<tr><td style="padding:6px 0;color:#6b7280;">Deposit</td><td style="padding:6px 0;font-weight:600;color:${booking.depositPaid > 0 ? '#059669' : '#dc2626'};">\$${booking.depositRequired} ${booking.depositPaid > 0 ? '✓ Paid' : '⏳ Pending'}</td></tr>` : ""}
+                ${body.paymentMethod ? `<tr><td style="padding:6px 0;color:#6b7280;">Payment</td><td style="padding:6px 0;font-weight:600;color:#111827;">${body.paymentMethod === "stripe" ? "Card (Stripe)" : body.paymentMethod === "paypal" ? "PayPal" : body.paymentMethod === "cashapp" ? "Cash App" : body.paymentMethod === "bankTransfer" ? "Bank Transfer" : body.paymentMethod}</td></tr>` : ""}
                 ${booking.address ? `<tr><td style="padding:6px 0;color:#6b7280;">Address</td><td style="padding:6px 0;font-weight:600;color:#111827;">${booking.address}</td></tr>` : ""}
                 ${notes ? `<tr><td style="padding:6px 0;color:#6b7280;">Notes</td><td style="padding:6px 0;font-weight:600;color:#111827;">${notes}</td></tr>` : ""}
               </table>
@@ -167,6 +169,51 @@ export async function POST(request: NextRequest) {
           </div>
         </div>`;
       sendEmail({ to: user.email, subject: `New Booking: ${customerName} – ${serviceName} on ${formattedDate}`, html: ownerHtml }).catch(() => {});
+    }
+
+    // 2. Confirmation email to customer
+    if (customerEmail) {
+      const depositInfo = booking.depositRequired > 0
+        ? `<tr><td style="padding:6px 0;color:#6b7280;">Deposit</td><td style="padding:6px 0;font-weight:600;color:#111827;">$${booking.depositRequired}${booking.depositPaid > 0 ? " (Paid)" : " (Due)"}</td></tr>`
+        : "";
+      const paymentInfo = body.paymentMethod && body.paymentMethod !== "cash"
+        ? `<tr><td style="padding:6px 0;color:#6b7280;">Payment Method</td><td style="padding:6px 0;font-weight:600;color:#111827;">${
+            body.paymentMethod === "stripe" ? "Card (Stripe)" :
+            body.paymentMethod === "paypal" ? "PayPal" :
+            body.paymentMethod === "cashapp" ? "Cash App" :
+            body.paymentMethod === "bankTransfer" ? "Bank Transfer" :
+            body.paymentMethod
+          }</td></tr>`
+        : "";
+      const customMsg = (user as any).customMessage
+        ? `<p style="font-size:14px;color:#374151;margin-top:16px;padding:12px;background:#f0f9ff;border-radius:8px;border-left:4px solid #2563EB;">${(user as any).customMessage}</p>`
+        : "";
+      const customerHtml = `
+        <div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;">
+          <div style="background:#2563EB;color:white;padding:24px;border-radius:8px 8px 0 0;">
+            <div style="font-size:12px;opacity:0.85;text-transform:uppercase;letter-spacing:1px;">${user.businessName}</div>
+            <h1 style="margin:8px 0 0;font-size:22px;">Booking Confirmed!</h1>
+          </div>
+          <div style="background:#f9fafb;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
+            <p style="font-size:14px;color:#374151;">Hi <strong>${customerName}</strong>, your booking has been received!</p>
+            <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0;">
+              <table style="width:100%;font-size:14px;border-collapse:collapse;">
+                <tr><td style="padding:6px 0;color:#6b7280;width:40%;">Service</td><td style="padding:6px 0;font-weight:600;color:#111827;">${serviceName}</td></tr>
+                <tr><td style="padding:6px 0;color:#6b7280;">Date</td><td style="padding:6px 0;font-weight:600;color:#111827;">${formattedDate}</td></tr>
+                <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;font-weight:600;color:#111827;">${time}</td></tr>
+                <tr><td style="padding:6px 0;color:#6b7280;">Vehicle</td><td style="padding:6px 0;font-weight:600;color:#111827;">${vYear} ${vMake} ${vModel} (${vColor})</td></tr>
+                <tr><td style="padding:6px 0;color:#6b7280;">Total</td><td style="padding:6px 0;font-weight:600;color:#111827;">$${booking.servicePrice}</td></tr>
+                ${depositInfo}
+                ${paymentInfo}
+                ${booking.address ? `<tr><td style="padding:6px 0;color:#6b7280;">Address</td><td style="padding:6px 0;font-weight:600;color:#111827;">${booking.address}</td></tr>` : ""}
+              </table>
+            </div>
+            ${customMsg}
+            <p style="font-size:13px;color:#6b7280;margin-top:16px;">If you need to make changes, contact us at ${user.phone || user.email}.</p>
+            <p style="font-size:12px;color:#9ca3af;margin-top:16px;">Booking ID: #${booking.id}</p>
+          </div>
+        </div>`;
+      sendEmail({ to: customerEmail, subject: `Booking Confirmed – ${serviceName} on ${formattedDate}`, html: customerHtml }).catch(() => {});
     }
 
     return NextResponse.json(booking, { status: 201 });

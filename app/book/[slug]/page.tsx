@@ -680,6 +680,26 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
             );
           })()}
 
+          {selectedPaymentMethod === "cash" && depositAmount > 0 && !stripeDepositPaid && (
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-5 mb-6 text-left">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-lg">💰</span>
+                <p className="text-white text-sm font-bold">Cash Deposit Due</p>
+              </div>
+              <p className="text-white/50 text-xs">
+                Please bring <strong className="text-white">${depositAmount}</strong> in cash to pay your deposit at the time of your appointment.
+              </p>
+              {(() => {
+                const pm = (user as any)?.paymentMethods;
+                return pm?.cash?.instructions ? (
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 mt-3">
+                    <p className="text-amber-300 text-xs">{pm.cash.instructions}</p>
+                  </div>
+                ) : null;
+              })()}
+            </div>
+          )}
+
           {/* Enhancement 6: Pro Enhanced Success Screen */}
           {isPro && (
             <>
