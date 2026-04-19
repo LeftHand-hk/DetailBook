@@ -120,21 +120,30 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   }, [step]);
 
   // Handle Stripe deposit return
+  const [pendingStripeReturn, setPendingStripeReturn] = useState<string | null>(null);
   useEffect(() => {
     const url = new URL(window.location.href);
     const depositStatus = url.searchParams.get("deposit");
     const returnBookingId = url.searchParams.get("bookingId");
     if (depositStatus === "success" && returnBookingId) {
-      setBookingId(returnBookingId);
-      setStripeDepositPaid(true);
-      setSelectedPaymentMethod("stripe");
-      setStep(3);
-      // Clean up URL params
+      setPendingStripeReturn(returnBookingId);
+      // Clean up URL params immediately
       url.searchParams.delete("deposit");
       url.searchParams.delete("bookingId");
       window.history.replaceState({}, "", url.pathname);
     }
   }, []);
+
+  // Once user data is loaded AND we have a pending Stripe return, show success
+  useEffect(() => {
+    if (pendingStripeReturn && user && !loading) {
+      setBookingId(pendingStripeReturn);
+      setStripeDepositPaid(true);
+      setSelectedPaymentMethod("stripe");
+      setStep(3);
+      setPendingStripeReturn(null);
+    }
+  }, [pendingStripeReturn, user, loading]);
 
   const isPro = user?.plan === "pro";
 
@@ -188,7 +197,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   // Build list of enabled payment methods for the UI
   const getEnabledPaymentMethods = (pm: any) => {
     const methods: { key: string; label: string; icon: string; detail: string }[] = [];
-    if (pm?.stripe?.enabled && pm.stripe.publishableKey && pm.stripe.secretKey) {
+    if (pm?.stripe?.enabled && pm.stripe.connected) {
       methods.push({ key: "stripe", label: "Card Payment", icon: "💳", detail: "Pay securely with credit/debit card" });
     }
     if (pm?.paypal?.enabled && (pm.paypal.paypalMeLink || pm.paypal.email)) {
@@ -430,21 +439,21 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
 
           <h1 className="text-2xl font-extrabold text-white mb-2">Booking Confirmed!</h1>
           <p className="text-white/60 mb-8">
-            {user.name} will confirm your appointment shortly. Check your email for details.
+            {user?.name || "The business"} will confirm your appointment shortly. Check your email for details.
           </p>
 
           <div className="bg-white/5 border border-white/10 rounded-2xl p-5 text-left space-y-3 mb-6">
             <p className="text-white/40 text-xs font-semibold uppercase tracking-widest mb-3">Summary</p>
             {[
               { label: "Booking ID", value: `#${bookingId}`, mono: true },
-              { label: "Service",    value: selectedPackage?.name },
-              { label: "Date",       value: selectedDate ? formatDate(selectedDate) : "" },
-              { label: "Time",       value: selectedTime },
-              { label: "Total",      value: `$${selectedPackage?.price}` },
+              ...(selectedPackage ? [{ label: "Service", value: selectedPackage.name }] : []),
+              ...(selectedDate ? [{ label: "Date", value: formatDate(selectedDate) }] : []),
+              ...(selectedTime ? [{ label: "Time", value: selectedTime }] : []),
+              ...(selectedPackage ? [{ label: "Total", value: `$${selectedPackage.price}` }] : []),
               ...(depositAmount > 0 && stripeDepositPaid ? [{ label: "Deposit Paid", value: `$${depositAmount}`, highlight: true }] : []),
               ...(depositAmount > 0 && !stripeDepositPaid ? [{ label: "Deposit Due", value: `$${depositAmount}`, highlight: true }] : []),
               ...(selectedStaff ? [{ label: "Detailer", value: selectedStaff.name }] : []),
-            ].map(({ label, value, mono, highlight }) => (
+            ].filter(item => item.value).map(({ label, value, mono, highlight }) => (
               <div key={label} className="flex justify-between text-sm">
                 <span className="text-white/50">{label}</span>
                 <span className={`font-semibold ${highlight ? "text-blue-400" : "text-white"} ${mono ? "font-mono text-xs" : ""}`}>{value}</span>

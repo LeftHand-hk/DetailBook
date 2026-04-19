@@ -279,6 +279,19 @@ export default function PaymentsPage() {
         )}
       </div>
 
+      {/* Warning when deposit is on but no payment methods enabled */}
+      {requireDeposit && !methods.stripe?.enabled && !methods.paypal?.enabled && !methods.cashapp?.enabled && !methods.bankTransfer?.enabled && !methods.cash?.enabled && (
+        <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-2xl p-4">
+          <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div>
+            <p className="text-sm font-bold text-red-800">No payment methods enabled</p>
+            <p className="text-xs text-red-600 mt-0.5">You have deposits turned on but no payment method is active. Enable at least one method below so customers know how to pay.</p>
+          </div>
+        </div>
+      )}
+
       {/* ── 1. Stripe ── */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <button
