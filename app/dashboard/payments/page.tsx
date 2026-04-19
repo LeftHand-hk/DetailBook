@@ -117,9 +117,9 @@ type PaymentMethods = NonNullable<User["paymentMethods"]>;
 
 const DEFAULT_PAYMENT_METHODS: PaymentMethods = {
   stripe: { enabled: false, publishableKey: "", secretKey: "", connected: false },
-  paypal: { enabled: false, email: "", paypalMeLink: "" },
-  cashapp: { enabled: false, cashtag: "" },
-  bankTransfer: { enabled: false, bankName: "", accountName: "", iban: "", sortCode: "", accountNumber: "", instructions: "" },
+  paypal: { enabled: false, email: "", paypalMeLink: "", requireProof: true },
+  cashapp: { enabled: false, cashtag: "", requireProof: true },
+  bankTransfer: { enabled: false, bankName: "", accountName: "", iban: "", sortCode: "", accountNumber: "", instructions: "", requireProof: true },
   cash: { enabled: false, instructions: "" },
 };
 
@@ -130,31 +130,63 @@ export default function PaymentsPage() {
   const [saved, setSaved] = useState(false);
   const [methods, setMethods] = useState<PaymentMethods>(DEFAULT_PAYMENT_METHODS);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [requireDeposit, setRequireDeposit] = useState(false);
+  const [depositPercentage, setDepositPercentage] = useState(20);
 
   useEffect(() => {
-    const u = getUser();
-    if (u) {
-      setUserState(u);
-      setMethods({
-        stripe: { ...DEFAULT_PAYMENT_METHODS.stripe!, ...u.paymentMethods?.stripe },
-        paypal: { ...DEFAULT_PAYMENT_METHODS.paypal!, ...u.paymentMethods?.paypal },
-        cashapp: { ...DEFAULT_PAYMENT_METHODS.cashapp!, ...u.paymentMethods?.cashapp },
-        bankTransfer: { ...DEFAULT_PAYMENT_METHODS.bankTransfer!, ...u.paymentMethods?.bankTransfer },
-        cash: { ...DEFAULT_PAYMENT_METHODS.cash!, ...u.paymentMethods?.cash },
-      });
+    // Load from localStorage for instant render, then fetch fresh from API
+    const local = getUser();
+    if (local) {
+      setUserState(local);
+      applyMethods(local.paymentMethods);
+      setRequireDeposit(local.requireDeposit ?? false);
+      setDepositPercentage(local.depositPercentage ?? 20);
     }
+    fetch("/api/user")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.user) {
+          setUserState(data.user);
+          setUser(data.user);
+          applyMethods(data.user.paymentMethods);
+          setRequireDeposit(data.user.requireDeposit ?? false);
+          setDepositPercentage(data.user.depositPercentage ?? 20);
+        }
+      })
+      .catch(() => {});
   }, []);
 
-  const handleSave = () => {
+  const applyMethods = (pm: any) => {
+    setMethods({
+      stripe: { ...DEFAULT_PAYMENT_METHODS.stripe!, ...pm?.stripe },
+      paypal: { ...DEFAULT_PAYMENT_METHODS.paypal!, ...pm?.paypal },
+      cashapp: { ...DEFAULT_PAYMENT_METHODS.cashapp!, ...pm?.cashapp },
+      bankTransfer: { ...DEFAULT_PAYMENT_METHODS.bankTransfer!, ...pm?.bankTransfer },
+      cash: { ...DEFAULT_PAYMENT_METHODS.cash!, ...pm?.cash },
+    });
+  };
+
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
     if (!user) return;
-    const updated: User = {
-      ...user,
-      paymentMethods: methods,
-    };
-    setUser(updated);
-    setUserState(updated);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    setSaving(true);
+    try {
+      const res = await fetch("/api/user", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentMethods: methods, requireDeposit, depositPercentage }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const updated = data.user || { ...user, paymentMethods: methods };
+        setUser(updated);
+        setUserState(updated);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2500);
+      }
+    } catch {}
+    setSaving(false);
   };
 
   const toggleExpand = (key: string) => {
@@ -204,6 +236,47 @@ export default function PaymentsPage() {
       <div>
         <h1 className="text-2xl font-extrabold text-gray-900">Payments</h1>
         <p className="text-sm text-gray-500 mt-1">Configure how you collect deposits from customers</p>
+      </div>
+
+      {/* ── Deposit Settings ── */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-6 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-gray-900">Require Deposit</p>
+              <p className="text-xs text-gray-400 mt-0.5">Customers must pay a deposit when booking</p>
+            </div>
+          </div>
+          <Toggle
+            value={requireDeposit}
+            onChange={(v) => setRequireDeposit(v)}
+          />
+        </div>
+        {requireDeposit && (
+          <div className="px-6 pb-5 border-t border-gray-100 pt-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Deposit Percentage</label>
+            <div className="flex items-center gap-4">
+              <input
+                type="range"
+                min="5"
+                max="100"
+                step="5"
+                value={depositPercentage}
+                onChange={(e) => setDepositPercentage(Number(e.target.value))}
+                className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+              />
+              <span className="text-lg font-extrabold text-blue-600 w-14 text-right">{depositPercentage}%</span>
+            </div>
+            <p className="text-xs text-gray-400 mt-2">
+              Example: On a $200 service, the customer will pay a <strong className="text-gray-600">${Math.round(200 * depositPercentage / 100)}</strong> deposit upfront.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ── 1. Stripe ── */}
@@ -355,6 +428,16 @@ export default function PaymentsPage() {
                 />
               </div>
             </div>
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+              <div>
+                <p className="text-sm font-semibold text-gray-700">Require Proof of Payment</p>
+                <p className="text-xs text-gray-400 mt-0.5">Customer must upload a screenshot after paying</p>
+              </div>
+              <Toggle
+                value={methods.paypal?.requireProof ?? true}
+                onChange={(v) => setMethods({ ...methods, paypal: { ...methods.paypal!, requireProof: v } })}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -418,6 +501,16 @@ export default function PaymentsPage() {
                   className="flex-1 px-4 py-3 text-sm text-gray-900 focus:outline-none placeholder-gray-300"
                 />
               </div>
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+              <div>
+                <p className="text-sm font-semibold text-gray-700">Require Proof of Payment</p>
+                <p className="text-xs text-gray-400 mt-0.5">Customer must upload a screenshot after paying</p>
+              </div>
+              <Toggle
+                value={methods.cashapp?.requireProof ?? true}
+                onChange={(v) => setMethods({ ...methods, cashapp: { ...methods.cashapp!, requireProof: v } })}
+              />
             </div>
           </div>
         )}
@@ -532,6 +625,16 @@ export default function PaymentsPage() {
                 className={INPUT_CLASS + " resize-none"}
               />
             </div>
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+              <div>
+                <p className="text-sm font-semibold text-gray-700">Require Proof of Payment</p>
+                <p className="text-xs text-gray-400 mt-0.5">Customer must upload a screenshot after paying</p>
+              </div>
+              <Toggle
+                value={methods.bankTransfer?.requireProof ?? true}
+                onChange={(v) => setMethods({ ...methods, bankTransfer: { ...methods.bankTransfer!, requireProof: v } })}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -615,9 +718,10 @@ export default function PaymentsPage() {
         <button
           type="button"
           onClick={handleSave}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-8 py-3 rounded-xl transition-colors shadow-sm"
+          disabled={saving}
+          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold text-sm px-8 py-3 rounded-xl transition-colors shadow-sm"
         >
-          Save Changes
+          {saving ? "Saving..." : "Save Changes"}
         </button>
         {saved && <SavedBadge />}
       </div>

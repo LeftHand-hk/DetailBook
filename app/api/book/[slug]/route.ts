@@ -92,6 +92,37 @@ export async function GET(
       packages: user.packages,
       staff: (user as any).staff ?? [],
       bookedSlots,
+      // Expose payment methods (strip secret keys for security)
+      paymentMethods: (() => {
+        const pm = user.paymentMethods as any;
+        if (!pm) return undefined;
+        const safe: any = {};
+        if (pm.stripe?.enabled) {
+          safe.stripe = { enabled: true, connected: !!(pm.stripe.publishableKey && pm.stripe.secretKey), publishableKey: pm.stripe.publishableKey || "" };
+        }
+        if (pm.paypal?.enabled) {
+          safe.paypal = { enabled: true, email: pm.paypal.email || "", paypalMeLink: pm.paypal.paypalMeLink || "", requireProof: pm.paypal.requireProof !== false };
+        }
+        if (pm.cashapp?.enabled) {
+          safe.cashapp = { enabled: true, cashtag: pm.cashapp.cashtag || "", requireProof: pm.cashapp.requireProof !== false };
+        }
+        if (pm.bankTransfer?.enabled) {
+          safe.bankTransfer = {
+            enabled: true,
+            bankName: pm.bankTransfer.bankName || "",
+            accountName: pm.bankTransfer.accountName || "",
+            iban: pm.bankTransfer.iban || "",
+            sortCode: pm.bankTransfer.sortCode || "",
+            accountNumber: pm.bankTransfer.accountNumber || "",
+            instructions: pm.bankTransfer.instructions || "",
+            requireProof: pm.bankTransfer.requireProof !== false,
+          };
+        }
+        if (pm.cash?.enabled) {
+          safe.cash = { enabled: true, instructions: pm.cash.instructions || "" };
+        }
+        return Object.keys(safe).length > 0 ? safe : undefined;
+      })(),
     };
 
     return NextResponse.json(profile);

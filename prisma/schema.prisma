@@ -185,6 +185,8 @@ model Booking {
   depositRequired Float  @default(0)
   notes           String? @db.Text
   address         String?
+  paymentMethod   String  @default("")
+  paymentProof    String? @db.Text
 
   reminderSentAt DateTime?
 

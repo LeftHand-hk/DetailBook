@@ -112,7 +112,7 @@ export default function BookingsPage() {
     } catch { /* silent */ }
   };
 
-  const toggleDeposit = (id: string) => {
+  const toggleDeposit = async (id: string) => {
     const booking = bookings.find((b) => b.id === id);
     if (!booking) return;
     const newDepositPaid = booking.depositPaid > 0 ? 0 : (booking.depositRequired || booking.depositPaid || 50);
@@ -124,6 +124,13 @@ export default function BookingsPage() {
     if (selected && selected.id === id) {
       setSelected({ ...selected, depositPaid: newDepositPaid });
     }
+    try {
+      await fetch(`/api/bookings/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ depositPaid: newDepositPaid }),
+      });
+    } catch { /* silent — optimistic update already applied */ }
   };
 
   const today = new Date().toISOString().split("T")[0];
@@ -546,6 +553,46 @@ export default function BookingsPage() {
                   </div>
                 </div>
               </div>
+
+              {/* ── Payment Method & Proof ── */}
+              {((selected as any).paymentMethod || (selected as any).paymentProof) && (
+                <div>
+                  <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Payment Details</h3>
+                  <div className="bg-white border-2 border-gray-200 rounded-xl p-5 space-y-3">
+                    {(selected as any).paymentMethod && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg">
+                          {(selected as any).paymentMethod === "stripe" ? "💳" :
+                           (selected as any).paymentMethod === "paypal" ? "🅿️" :
+                           (selected as any).paymentMethod === "cashapp" ? "💵" :
+                           (selected as any).paymentMethod === "bankTransfer" ? "🏦" : "💰"}
+                        </span>
+                        <div>
+                          <p className="text-xs text-gray-500">Payment Method</p>
+                          <p className="text-sm font-bold text-gray-900 capitalize">
+                            {(selected as any).paymentMethod === "bankTransfer" ? "Bank Transfer" :
+                             (selected as any).paymentMethod === "cashapp" ? "Cash App" :
+                             (selected as any).paymentMethod === "stripe" ? "Card (Stripe)" :
+                             (selected as any).paymentMethod}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {(selected as any).paymentProof && (
+                      <div>
+                        <p className="text-xs text-gray-500 mb-2">Proof of Payment</p>
+                        <a href={(selected as any).paymentProof} target="_blank" rel="noopener noreferrer">
+                          <img
+                            src={(selected as any).paymentProof}
+                            alt="Payment proof"
+                            className="w-full max-w-sm rounded-xl border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
+                          />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* ── Notes ── */}
               {selected.notes && (

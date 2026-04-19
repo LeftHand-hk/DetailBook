@@ -88,6 +88,10 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   const [customerAddress, setCustomerAddress] = useState("");
   const [selectedServiceMode, setSelectedServiceMode] = useState<"mobile" | "shop" | null>(null);
   const [bookedSlots, setBookedSlots] = useState<{ date: string; time: string; staffId: string | null }[]>([]);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
+  const [proofUploading, setProofUploading] = useState(false);
+  const [proofUploaded, setProofUploaded] = useState(false);
+  const [stripeDepositPaid, setStripeDepositPaid] = useState(false);
 
   useEffect(() => {
     // Fetch public business data (staff + serviceType) from API
@@ -114,6 +118,23 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [step]);
+
+  // Handle Stripe deposit return
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const depositStatus = url.searchParams.get("deposit");
+    const returnBookingId = url.searchParams.get("bookingId");
+    if (depositStatus === "success" && returnBookingId) {
+      setBookingId(returnBookingId);
+      setStripeDepositPaid(true);
+      setSelectedPaymentMethod("stripe");
+      setStep(3);
+      // Clean up URL params
+      url.searchParams.delete("deposit");
+      url.searchParams.delete("bookingId");
+      window.history.replaceState({}, "", url.pathname);
+    }
+  }, []);
 
   const isPro = user?.plan === "pro";
 
@@ -164,6 +185,27 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       weekday: "long", month: "long", day: "numeric", year: "numeric",
     });
 
+  // Build list of enabled payment methods for the UI
+  const getEnabledPaymentMethods = (pm: any) => {
+    const methods: { key: string; label: string; icon: string; detail: string }[] = [];
+    if (pm?.stripe?.enabled && pm.stripe.publishableKey && pm.stripe.secretKey) {
+      methods.push({ key: "stripe", label: "Card Payment", icon: "💳", detail: "Pay securely with credit/debit card" });
+    }
+    if (pm?.paypal?.enabled && (pm.paypal.paypalMeLink || pm.paypal.email)) {
+      methods.push({ key: "paypal", label: "PayPal", icon: "🅿️", detail: pm.paypal.email || `paypal.me/${pm.paypal.paypalMeLink}` });
+    }
+    if (pm?.cashapp?.enabled && pm.cashapp.cashtag) {
+      methods.push({ key: "cashapp", label: "Cash App", icon: "💵", detail: `$${pm.cashapp.cashtag}` });
+    }
+    if (pm?.bankTransfer?.enabled && pm.bankTransfer.bankName) {
+      methods.push({ key: "bankTransfer", label: "Bank Transfer", icon: "🏦", detail: `${pm.bankTransfer.bankName}` });
+    }
+    if (pm?.cash?.enabled) {
+      methods.push({ key: "cash", label: "Cash on Arrival", icon: "💰", detail: pm.cash.instructions || "Pay in person" });
+    }
+    return methods;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPackage || !selectedDate || !selectedTime) return;
@@ -181,6 +223,17 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     const assignedStaffId = selectedStaff?.id || autoAssignStaff();
     const assignedStaffName = selectedStaff?.name || staffList.find((s) => s.id === assignedStaffId)?.name;
     const bookingAddress = (serviceType === "both" && selectedServiceMode === "shop") ? `SHOP: ${user?.address || ""}` : customerAddress.trim() || undefined;
+
+    // Determine payment method — if deposit required and methods available, must select one
+    const pm = (user as any)?.paymentMethods;
+    const enabledMethods = getEnabledPaymentMethods(pm);
+    const paymentMethod = depositAmount > 0 && enabledMethods.length > 0 ? (selectedPaymentMethod || "") : (selectedPaymentMethod || "cash");
+
+    if (depositAmount > 0 && enabledMethods.length > 0 && !selectedPaymentMethod) {
+      setBookingError("Please select a payment method for your deposit.");
+      setSubmitting(false);
+      return;
+    }
 
     const bookingData = {
       userId: (user as any)?.id,
@@ -200,6 +253,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       address: bookingAddress,
       staffId: assignedStaffId,
       staffName: assignedStaffName,
+      paymentMethod,
     };
 
     try {
@@ -211,6 +265,35 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       if (res.ok) {
         const created = await res.json();
         setBookingId(created.id);
+
+        // For Stripe, redirect to Stripe Checkout
+        if (paymentMethod === "stripe" && depositAmount > 0) {
+          try {
+            const stripeRes = await fetch("/api/stripe/deposit", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userId: (user as any)?.id,
+                bookingId: created.id,
+                amount: depositAmount,
+                customerEmail: form.customerEmail,
+                serviceName: selectedPackage.name,
+              }),
+            });
+            if (stripeRes.ok) {
+              const { url } = await stripeRes.json();
+              if (url) {
+                window.location.href = url;
+                return;
+              }
+            }
+            // If Stripe session creation fails, still show success with instructions
+            setBookingError(null);
+          } catch {
+            // Stripe redirect failed, continue to success screen
+          }
+        }
+
         setSubmitting(false);
         setStep(3);
       } else {
@@ -358,7 +441,8 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
               { label: "Date",       value: selectedDate ? formatDate(selectedDate) : "" },
               { label: "Time",       value: selectedTime },
               { label: "Total",      value: `$${selectedPackage?.price}` },
-              ...(depositAmount > 0 ? [{ label: "Deposit Due", value: `$${depositAmount}`, highlight: true }] : []),
+              ...(depositAmount > 0 && stripeDepositPaid ? [{ label: "Deposit Paid", value: `$${depositAmount}`, highlight: true }] : []),
+              ...(depositAmount > 0 && !stripeDepositPaid ? [{ label: "Deposit Due", value: `$${depositAmount}`, highlight: true }] : []),
               ...(selectedStaff ? [{ label: "Detailer", value: selectedStaff.name }] : []),
             ].map(({ label, value, mono, highlight }) => (
               <div key={label} className="flex justify-between text-sm">
@@ -368,7 +452,224 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
             ))}
           </div>
 
+          {/* ── Payment-specific success content ── */}
+          {stripeDepositPaid && (
+            <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-4 mb-6 flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <p className="text-green-400 text-sm font-bold">Deposit Paid Successfully</p>
+                <p className="text-white/50 text-xs">Your ${depositAmount} deposit has been processed via card payment.</p>
+              </div>
+            </div>
+          )}
 
+          {selectedPaymentMethod === "paypal" && depositAmount > 0 && !stripeDepositPaid && (() => {
+            const pm = (user as any)?.paymentMethods;
+            const link = pm?.paypal?.paypalMeLink ? `https://paypal.me/${pm.paypal.paypalMeLink}/${depositAmount}` : null;
+            const showProof = pm?.paypal?.requireProof !== false;
+            return (
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-5 mb-6 text-left">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-lg">🅿️</span>
+                  <p className="text-white text-sm font-bold">Pay Deposit via PayPal</p>
+                </div>
+                <p className="text-white/50 text-xs mb-3">Please send <strong className="text-white">${depositAmount}</strong> to complete your deposit.</p>
+                {pm?.paypal?.email && (
+                  <p className="text-white/50 text-xs mb-2">PayPal email: <span className="text-white font-mono text-xs">{pm.paypal.email}</span></p>
+                )}
+                {link && (
+                  <a href={link} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 bg-blue-600 text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors mt-1 mb-4">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    Pay ${depositAmount} with PayPal
+                  </a>
+                )}
+                {showProof && (
+                  <div className="border-t border-white/10 pt-4 mt-3">
+                    {proofUploaded ? (
+                      <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-xl p-3">
+                        <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <p className="text-green-400 text-sm font-semibold">Proof of payment uploaded!</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-white/50 text-xs mb-2 font-semibold">Upload Proof of Payment</p>
+                        <label className={`flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white text-sm font-bold px-5 py-3 rounded-xl cursor-pointer transition-colors border border-white/10 ${proofUploading ? "opacity-60 pointer-events-none" : ""}`}>
+                          {proofUploading ? (
+                            <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Uploading...</>
+                          ) : (
+                            <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>Upload Screenshot / Receipt</>
+                          )}
+                          <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file || !bookingId) return;
+                            setProofUploading(true);
+                            try {
+                              const reader = new FileReader();
+                              reader.onload = async () => {
+                                const base64 = reader.result as string;
+                                const res = await fetch(`/api/bookings/${bookingId}/upload-proof`, {
+                                  method: "POST", headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ proof: base64 }),
+                                });
+                                if (res.ok) setProofUploaded(true);
+                                setProofUploading(false);
+                              };
+                              reader.readAsDataURL(file);
+                            } catch { setProofUploading(false); }
+                          }} />
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {selectedPaymentMethod === "cashapp" && depositAmount > 0 && !stripeDepositPaid && (() => {
+            const pm = (user as any)?.paymentMethods;
+            const showProof = pm?.cashapp?.requireProof !== false;
+            return (
+              <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-5 mb-6 text-left">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-lg">💵</span>
+                  <p className="text-white text-sm font-bold">Pay Deposit via Cash App</p>
+                </div>
+                <p className="text-white/50 text-xs mb-3">Please send <strong className="text-white">${depositAmount}</strong> to the following Cash App tag:</p>
+                <div className="bg-white/10 rounded-xl p-3 flex items-center justify-between">
+                  <span className="text-white font-bold text-lg">${pm?.cashapp?.cashtag}</span>
+                  <button
+                    type="button"
+                    onClick={() => { navigator.clipboard.writeText(`$${pm?.cashapp?.cashtag}`); }}
+                    className="text-xs text-blue-400 hover:text-blue-300 font-semibold"
+                  >
+                    Copy
+                  </button>
+                </div>
+                <p className="text-white/40 text-xs mt-2 mb-4">Use your Booking ID <span className="font-mono">#{bookingId}</span> as the note.</p>
+                {showProof && (
+                  <div className="border-t border-white/10 pt-4">
+                    {proofUploaded ? (
+                      <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-xl p-3">
+                        <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <p className="text-green-400 text-sm font-semibold">Proof of payment uploaded!</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-white/50 text-xs mb-2 font-semibold">Upload Proof of Payment</p>
+                        <label className={`flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white text-sm font-bold px-5 py-3 rounded-xl cursor-pointer transition-colors border border-white/10 ${proofUploading ? "opacity-60 pointer-events-none" : ""}`}>
+                          {proofUploading ? (
+                            <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Uploading...</>
+                          ) : (
+                            <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>Upload Screenshot / Receipt</>
+                          )}
+                          <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file || !bookingId) return;
+                            setProofUploading(true);
+                            try {
+                              const reader = new FileReader();
+                              reader.onload = async () => {
+                                const base64 = reader.result as string;
+                                const res = await fetch(`/api/bookings/${bookingId}/upload-proof`, {
+                                  method: "POST", headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ proof: base64 }),
+                                });
+                                if (res.ok) setProofUploaded(true);
+                                setProofUploading(false);
+                              };
+                              reader.readAsDataURL(file);
+                            } catch { setProofUploading(false); }
+                          }} />
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {selectedPaymentMethod === "bankTransfer" && depositAmount > 0 && !stripeDepositPaid && (() => {
+            const pm = (user as any)?.paymentMethods;
+            const bt = pm?.bankTransfer;
+            const showProof = bt?.requireProof !== false;
+            return (
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-5 mb-6 text-left">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-lg">🏦</span>
+                  <p className="text-white text-sm font-bold">Bank Transfer Details</p>
+                </div>
+                <p className="text-white/50 text-xs mb-3">Please transfer <strong className="text-white">${depositAmount}</strong> to the following bank account:</p>
+                <div className="bg-white/5 rounded-xl p-4 space-y-2 mb-4">
+                  {bt?.bankName && <div className="flex justify-between text-xs"><span className="text-white/40">Bank</span><span className="text-white font-semibold">{bt.bankName}</span></div>}
+                  {bt?.accountName && <div className="flex justify-between text-xs"><span className="text-white/40">Account Name</span><span className="text-white font-semibold">{bt.accountName}</span></div>}
+                  {bt?.iban && <div className="flex justify-between text-xs"><span className="text-white/40">IBAN / Account #</span><span className="text-white font-mono font-semibold">{bt.iban}</span></div>}
+                  {bt?.sortCode && <div className="flex justify-between text-xs"><span className="text-white/40">Sort Code</span><span className="text-white font-mono font-semibold">{bt.sortCode}</span></div>}
+                  {bt?.accountNumber && <div className="flex justify-between text-xs"><span className="text-white/40">Account Number</span><span className="text-white font-mono font-semibold">{bt.accountNumber}</span></div>}
+                </div>
+                {bt?.instructions && (
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 mb-4">
+                    <p className="text-amber-300 text-xs">{bt.instructions}</p>
+                  </div>
+                )}
+                <p className="text-white/40 text-xs mb-4">Use your Booking ID <span className="font-mono">#{bookingId}</span> as the payment reference.</p>
+
+                {showProof && (
+                  <>
+                    {proofUploaded ? (
+                      <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-xl p-3">
+                        <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <p className="text-green-400 text-sm font-semibold">Proof of payment uploaded!</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-white/50 text-xs mb-2 font-semibold">Upload Proof of Payment</p>
+                        <label className={`flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-5 py-3 rounded-xl cursor-pointer transition-colors ${proofUploading ? "opacity-60 pointer-events-none" : ""}`}>
+                          {proofUploading ? (
+                            <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Uploading...</>
+                          ) : (
+                            <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>Upload Screenshot / Receipt</>
+                          )}
+                          <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file || !bookingId) return;
+                            setProofUploading(true);
+                            try {
+                              const reader = new FileReader();
+                              reader.onload = async () => {
+                                const base64 = reader.result as string;
+                                const res = await fetch(`/api/bookings/${bookingId}/upload-proof`, {
+                                  method: "POST", headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ proof: base64 }),
+                                });
+                                if (res.ok) setProofUploaded(true);
+                                setProofUploading(false);
+                              };
+                              reader.readAsDataURL(file);
+                            } catch { setProofUploading(false); }
+                          }} />
+                        </label>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Enhancement 6: Pro Enhanced Success Screen */}
           {isPro && (
@@ -455,7 +756,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
           )}
 
           <button
-            onClick={() => { setStep(0); setSelectedPackage(null); setSelectedDate(null); setSelectedTime(null); setForm(EMPTY_FORM); setBookingId(null); setBookingError(null); setCustomerAddress(""); setSelectedStaff(null); setSelectedServiceMode(null); }}
+            onClick={() => { setStep(0); setSelectedPackage(null); setSelectedDate(null); setSelectedTime(null); setForm(EMPTY_FORM); setBookingId(null); setBookingError(null); setCustomerAddress(""); setSelectedStaff(null); setSelectedServiceMode(null); setSelectedPaymentMethod(null); setProofUploaded(false); setStripeDepositPaid(false); }}
             className="w-full glass border border-white/20 text-white font-semibold py-3.5 rounded-2xl hover:bg-white/10 transition-all"
           >
             Book Another Appointment
@@ -1355,40 +1656,37 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                   </div>
                 )}
 
-                {/* Payment Methods */}
+                {/* Payment Method Selection */}
                 {(() => {
-                  const pm = user.paymentMethods;
-                  const methods: { label: string; detail: string; link?: string }[] = [];
-                  if (pm?.paypal?.enabled && (pm.paypal.paypalMeLink || pm.paypal.email)) {
-                    methods.push({ label: "PayPal", detail: pm.paypal.email || "", link: pm.paypal.paypalMeLink ? `https://paypal.me/${pm.paypal.paypalMeLink}/${depositAmount}` : undefined });
-                  }
-                  if (pm?.cashapp?.enabled && pm.cashapp.cashtag) {
-                    methods.push({ label: "Cash App", detail: `$${pm.cashapp.cashtag}` });
-                  }
-                  if (pm?.bankTransfer?.enabled && pm.bankTransfer.bankName) {
-                    methods.push({ label: "Bank Transfer", detail: `${pm.bankTransfer.bankName}${pm.bankTransfer.iban ? ` · ${pm.bankTransfer.iban}` : ""}` });
-                  }
-                  if (pm?.cash?.enabled) {
-                    methods.push({ label: "Cash on Arrival", detail: pm.cash.instructions || "Pay when the detailer arrives" });
-                  }
-                  if (methods.length > 0) {
+                  const pm = (user as any).paymentMethods;
+                  const methods = getEnabledPaymentMethods(pm);
+                  if (methods.length > 0 && depositAmount > 0) {
                     return (
                       <div className="mb-4">
-                        <p className="text-white/40 text-xs font-bold uppercase tracking-widest mb-2">Pay via</p>
+                        <p className="text-white/40 text-xs font-bold uppercase tracking-widest mb-2">Select Payment Method</p>
                         <div className="space-y-2">
                           {methods.map((m) => (
-                            <div key={m.label} className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl p-3">
-                              <div>
+                            <button
+                              key={m.key}
+                              type="button"
+                              onClick={() => setSelectedPaymentMethod(m.key)}
+                              className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
+                                selectedPaymentMethod === m.key
+                                  ? "border-blue-400 bg-blue-500/20"
+                                  : "border-white/10 bg-white/5 hover:bg-white/10"
+                              }`}
+                            >
+                              <span className="text-lg flex-shrink-0">{m.icon}</span>
+                              <div className="flex-1 min-w-0">
                                 <p className="text-white text-sm font-semibold">{m.label}</p>
-                                <p className="text-white/50 text-xs">{m.detail}</p>
+                                <p className="text-white/50 text-xs truncate">{m.detail}</p>
                               </div>
-                              {m.link && (
-                                <a href={m.link} target="_blank" rel="noopener noreferrer"
-                                  className="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors">
-                                  Pay Now
-                                </a>
+                              {selectedPaymentMethod === m.key && (
+                                <svg className="w-5 h-5 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
                               )}
-                            </div>
+                            </button>
                           ))}
                         </div>
                       </div>
@@ -1424,7 +1722,11 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    {depositAmount > 0 ? `Confirm Booking · $${depositAmount} Deposit` : "Confirm Booking"}
+                    {depositAmount > 0 && selectedPaymentMethod === "stripe"
+                      ? `Pay $${depositAmount} Deposit & Confirm`
+                      : depositAmount > 0
+                      ? `Confirm Booking · $${depositAmount} Deposit`
+                      : "Confirm Booking"}
                   </>
                 )}
               </button>

@@ -127,6 +127,7 @@ export async function POST(request: NextRequest) {
         address: address || null,
         status: status || "pending",
         staffId: body.staffId || null,
+        paymentMethod: body.paymentMethod || "",
       },
     });
 

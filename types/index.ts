@@ -60,9 +60,9 @@ export interface User {
   // Payment methods
   paymentMethods?: {
     stripe?: { enabled: boolean; publishableKey?: string; secretKey?: string; connected?: boolean };
-    paypal?: { enabled: boolean; email?: string; paypalMeLink?: string };
-    cashapp?: { enabled: boolean; cashtag?: string };
-    bankTransfer?: { enabled: boolean; bankName?: string; accountName?: string; iban?: string; sortCode?: string; accountNumber?: string; instructions?: string };
+    paypal?: { enabled: boolean; email?: string; paypalMeLink?: string; requireProof?: boolean };
+    cashapp?: { enabled: boolean; cashtag?: string; requireProof?: boolean };
+    bankTransfer?: { enabled: boolean; bankName?: string; accountName?: string; iban?: string; sortCode?: string; accountNumber?: string; instructions?: string; requireProof?: boolean };
     cash?: { enabled: boolean; instructions?: string };
   };
   // SMS & Email templates
