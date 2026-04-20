@@ -169,9 +169,13 @@ export default function PackagesPage() {
               <div className="bg-amber-50 border border-amber-200 text-amber-700 text-sm px-3 py-2 rounded-xl font-medium">
                 5/5 limit reached
               </div>
-              <a href="/dashboard/billing" className="bg-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors">
-                Upgrade to Pro
-              </a>
+              <button
+                type="button"
+                disabled
+                className="bg-blue-600/40 text-white text-sm font-semibold px-4 py-2 rounded-xl cursor-not-allowed"
+              >
+                Pro — Coming Soon
+              </button>
             </div>
           ) : (
             <button
@@ -194,9 +198,13 @@ export default function PackagesPage() {
             <p className="font-bold mb-1">You&apos;ve reached the Starter plan limit (5 packages)</p>
             <p className="text-blue-100 text-sm">Upgrade to Pro for unlimited service packages, SMS reminders, and more.</p>
           </div>
-          <a href="/dashboard/billing" className="flex-shrink-0 bg-white text-blue-600 font-bold px-5 py-2.5 rounded-xl hover:bg-blue-50 transition-colors text-sm whitespace-nowrap">
-            Upgrade to Pro — $50/mo
-          </a>
+          <button
+            type="button"
+            disabled
+            className="flex-shrink-0 bg-white/40 text-blue-900/60 font-bold px-5 py-2.5 rounded-xl text-sm whitespace-nowrap cursor-not-allowed"
+          >
+            Pro — Coming Soon
+          </button>
         </div>
       )}
 

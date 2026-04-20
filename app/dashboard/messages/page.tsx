@@ -370,15 +370,16 @@ export default function MessagesPage() {
                     <p className="text-blue-100 text-sm mb-6 max-w-md mx-auto">
                       Upgrade to Pro to customize {currentTemplate.label.toLowerCase()} templates and automate your customer communications.
                     </p>
-                    <a
-                      href="/dashboard/billing"
-                      className="inline-flex items-center gap-2 bg-white text-blue-700 font-bold text-sm px-6 py-3 rounded-xl hover:bg-blue-50 transition-all shadow-lg shadow-black/10"
+                    <button
+                      type="button"
+                      disabled
+                      className="inline-flex items-center gap-2 bg-white/40 text-blue-900/60 font-bold text-sm px-6 py-3 rounded-xl cursor-not-allowed"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
-                      Upgrade to Pro -- $50/mo
-                    </a>
+                      Pro — Coming Soon
+                    </button>
                   </div>
                 </div>
               </div>

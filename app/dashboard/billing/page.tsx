@@ -282,23 +282,20 @@ export default function BillingPage() {
                 <div className={`w-full text-center font-bold py-3 rounded-xl text-sm ${plan.id === "pro" ? "bg-white/10 text-white/60" : "bg-gray-100 text-gray-400"}`}>
                   ✓ Subscribed
                 </div>
+              ) : plan.id === "pro" ? (
+                <button
+                  type="button"
+                  disabled
+                  className="w-full bg-white/40 text-blue-900/60 font-bold py-3 rounded-xl text-sm cursor-not-allowed"
+                >
+                  Coming Soon
+                </button>
               ) : isCurrent && !isSubscribed ? (
                 <button
                   onClick={() => openCheckout(plan.id)}
-                  className={`w-full font-bold py-3 rounded-xl text-sm transition-colors ${
-                    plan.id === "pro"
-                      ? "bg-white text-blue-700 hover:bg-blue-50 shadow-lg"
-                      : "bg-gray-900 text-white hover:bg-gray-800"
-                  }`}
+                  className="w-full bg-gray-900 text-white hover:bg-gray-800 font-bold py-3 rounded-xl text-sm transition-colors"
                 >
                   {`Subscribe to ${plan.name} — $${plan.price}/mo`}
-                </button>
-              ) : !isCurrent && plan.id === "pro" ? (
-                <button
-                  onClick={() => openCheckout("pro")}
-                  className="w-full bg-white text-blue-700 font-bold py-3 rounded-xl hover:bg-blue-50 transition-colors text-sm shadow-lg"
-                >
-                  Upgrade to Pro →
                 </button>
               ) : (
                 <div className="w-full text-center text-gray-400 text-sm py-3">

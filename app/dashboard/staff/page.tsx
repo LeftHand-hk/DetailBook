@@ -134,9 +134,13 @@ export default function StaffPage() {
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Staff Management</h2>
           <p className="text-gray-500 text-sm mb-6">Add your team, give them their own login, and track their performance — Pro only.</p>
-          <a href="/dashboard/billing" className="inline-flex items-center gap-2 bg-gray-800 text-white font-bold px-6 py-3 rounded-xl hover:bg-gray-700 transition-all">
-            Upgrade to Pro — $50/mo
-          </a>
+          <button
+            type="button"
+            disabled
+            className="inline-flex items-center gap-2 bg-gray-400 text-white font-bold px-6 py-3 rounded-xl cursor-not-allowed"
+          >
+            Pro — Coming Soon
+          </button>
         </div>
       </div>
     );

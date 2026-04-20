@@ -519,7 +519,7 @@ export default function LandingPage() {
                 <p className="text-blue-200 text-sm">For serious detailers ready to scale.</p>
               </div>
               <div className="mb-6">
-                <span className="text-5xl font-black text-white">$49</span>
+                <span className="text-5xl font-black text-white">$50</span>
                 <span className="text-blue-200 ml-1">/month</span>
               </div>
               <ul className="space-y-3 mb-8 flex-1">
@@ -532,10 +532,13 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link href="/signup"
-                className="block w-full text-center bg-white hover:bg-blue-50 text-blue-700 font-black py-3.5 rounded-xl transition-all duration-200 hover:-translate-y-0.5 shadow-lg shadow-blue-900/30">
-                Start Free Trial
-              </Link>
+              <button
+                type="button"
+                disabled
+                className="block w-full text-center bg-white/40 text-blue-900/60 font-black py-3.5 rounded-xl cursor-not-allowed"
+              >
+                Coming Soon
+              </button>
             </div>
           </div>
 

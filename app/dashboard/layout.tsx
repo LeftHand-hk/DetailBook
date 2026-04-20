@@ -270,10 +270,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <p className="text-slate-500 text-[11px] leading-relaxed mb-3">
               Unlock analytics, reviews, SMS & more
             </p>
-            <Link href="/dashboard/billing" onClick={() => setSidebarOpen(false)}
-              className="block w-full text-center bg-white text-gray-900 text-xs font-bold py-2 rounded-lg hover:bg-gray-100 transition-all">
-              Upgrade — $50/mo
-            </Link>
+            <button
+              type="button"
+              disabled
+              className="block w-full text-center bg-white/40 text-gray-600 text-xs font-bold py-2 rounded-lg cursor-not-allowed"
+            >
+              Coming Soon
+            </button>
           </div>
         </div>
       )}
