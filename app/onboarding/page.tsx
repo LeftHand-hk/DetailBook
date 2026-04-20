@@ -272,6 +272,22 @@ export default function OnboardingPage() {
     ? Math.round((parseFloat(pkgForm.price) * parseInt(pkgForm.depositPercent)) / 100)
     : 0;
 
+  // Compute the actual trial length (promo codes can extend it beyond 15 days)
+  const trialDays = (() => {
+    if (!user?.trialEndsAt) return 15;
+    const diff = new Date(user.trialEndsAt).getTime() - Date.now();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return days > 0 ? days : 15;
+  })();
+  const trialLabel = trialDays >= 28 && trialDays <= 31
+    ? "1-month"
+    : trialDays >= 58 && trialDays <= 62
+    ? "2-month"
+    : trialDays >= 88 && trialDays <= 93
+    ? "3-month"
+    : `${trialDays}-day`;
+  const trialLabelCapitalized = trialLabel.charAt(0).toUpperCase() + trialLabel.slice(1);
+
   return (
     <div className="min-h-screen bg-[#f8f9fc] flex flex-col">
       {/* Header */}
@@ -678,7 +694,7 @@ export default function OnboardingPage() {
                   <div className="w-10 h-10 bg-purple-50 rounded-2xl flex items-center justify-center text-xl">💎</div>
                   <div>
                     <h1 className="text-xl font-black text-gray-900">Choose Your Plan</h1>
-                    <p className="text-gray-400 text-sm">Your 15-day free trial includes all features. Pick the plan you want after.</p>
+                    <p className="text-gray-400 text-sm">Your {trialLabel} free trial includes all features. Pick the plan you want after.</p>
                   </div>
                 </div>
               </div>
@@ -735,16 +751,12 @@ export default function OnboardingPage() {
                   {/* Pro */}
                   <button
                     type="button"
-                    onClick={() => setSelectedPlan("pro")}
-                    className={`text-left rounded-2xl border-2 p-5 transition-all relative ${
-                      selectedPlan === "pro"
-                        ? "border-blue-600 bg-gradient-to-b from-blue-600 to-indigo-700 shadow-2xl shadow-blue-300"
-                        : "border-blue-300 bg-gradient-to-b from-blue-500 to-indigo-600 hover:shadow-xl hover:shadow-blue-200"
-                    }`}
+                    disabled
+                    className="text-left rounded-2xl border-2 p-5 relative border-blue-300 bg-gradient-to-b from-blue-500 to-indigo-600 opacity-60 cursor-not-allowed"
                   >
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                       <span className="bg-gradient-to-r from-amber-400 to-orange-500 text-slate-900 text-[10px] font-black px-3 py-1 rounded-full shadow-md">
-                        MOST POPULAR
+                        COMING SOON
                       </span>
                     </div>
                     <div className="flex items-center justify-between mb-3">
@@ -791,7 +803,7 @@ export default function OnboardingPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <p className="text-gray-500 text-xs leading-relaxed">
-                    Your <strong className="text-gray-700">15-day free trial</strong> starts on the Starter plan. You won&apos;t be charged until your trial ends and you choose to continue. Cancel anytime.
+                    Your <strong className="text-gray-700">{trialLabel} free trial</strong> starts on the Starter plan. You won&apos;t be charged until your trial ends and you choose to continue. Cancel anytime.
                   </p>
                 </div>
 
@@ -824,7 +836,7 @@ export default function OnboardingPage() {
                       disabled={!selectedPlan || saving}
                       className="w-full bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 font-semibold py-3 rounded-xl transition-all text-sm"
                     >
-                      {!selectedPlan ? "Select a plan first" : "Start 15-Day Free Trial →"}
+                      {!selectedPlan ? "Select a plan first" : `Start ${trialLabelCapitalized} Free Trial →`}
                     </button>
                   </div>
                 </div>
@@ -856,7 +868,7 @@ export default function OnboardingPage() {
                       ? "bg-blue-100 text-blue-700"
                       : "bg-gray-100 text-gray-600"
                   }`}>
-                    {selectedPlan === "pro" ? "💎 Pro Plan" : "⚡ Starter Plan"} · 15-day free trial active
+                    {selectedPlan === "pro" ? "💎 Pro Plan" : "⚡ Starter Plan"} · {trialLabel} free trial active
                   </span>
                 )}
               </div>
@@ -885,7 +897,7 @@ export default function OnboardingPage() {
                   {[
                     { icon: "✅", label: "Booking page live" },
                     { icon: "📦", label: "First package created" },
-                    { icon: "🎯", label: "Trial active (15 days)" },
+                    { icon: "🎯", label: `Trial active (${trialDays} days)` },
                   ].map(({ icon, label }) => (
                     <div key={label} className="bg-green-50 border border-green-100 rounded-xl px-3 py-2.5 flex items-center gap-2">
                       <span className="text-lg">{icon}</span>
