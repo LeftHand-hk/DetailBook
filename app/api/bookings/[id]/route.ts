@@ -68,9 +68,6 @@ export async function PUT(
 
       // Confirmation email to customer
       if (updated.customerEmail && user?.emailConfirmations !== false) {
-        const depositNote = updated.depositRequired > 0
-          ? `<p style="font-size:14px;color:#374151;">A deposit of <strong>$${updated.depositRequired}</strong> is due at the time of service.</p>`
-          : "";
         const customerHtml = `
           <div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;">
             <div style="background:#2563EB;color:white;padding:24px;border-radius:8px 8px 0 0;">
@@ -89,12 +86,11 @@ export async function PUT(
                   ${updated.address ? `<tr><td style="padding:6px 0;color:#6b7280;">Address</td><td style="padding:6px 0;font-weight:600;color:#111827;">${updated.address}</td></tr>` : ""}
                 </table>
               </div>
-              ${depositNote}
               ${user.phone ? `<p style="font-size:13px;color:#6b7280;">Questions? Contact us at <strong>${user.phone}</strong></p>` : ""}
               <p style="font-size:13px;color:#6b7280;">— ${user.businessName}</p>
             </div>
           </div>`;
-        const customerText = `Booking Confirmed!\n\nHi ${updated.customerName},\n\nService: ${updated.serviceName}\nDate: ${formattedDate}\nTime: ${updated.time}\nPrice: $${updated.servicePrice}${updated.address ? `\nAddress: ${updated.address}` : ""}${updated.depositRequired > 0 ? `\nDeposit due: $${updated.depositRequired}` : ""}\n\n— ${user.businessName}`;
+        const customerText = `Booking Confirmed!\n\nHi ${updated.customerName},\n\nService: ${updated.serviceName}\nDate: ${formattedDate}\nTime: ${updated.time}\nPrice: $${updated.servicePrice}${updated.address ? `\nAddress: ${updated.address}` : ""}\n\n— ${user.businessName}`;
         const emailResult = await sendEmail({ to: updated.customerEmail, subject: `Booking Confirmed – ${updated.serviceName} on ${formattedDate}`, html: customerHtml, text: customerText });
         console.log("[CONFIRM EMAIL] Result:", emailResult);
       }
@@ -106,7 +102,6 @@ export async function PUT(
           `Booking confirmed with ${user.businessName}!\n` +
           `Service: ${updated.serviceName}\n` +
           `Date: ${formattedDate2} at ${updated.time}\n` +
-          (updated.depositRequired > 0 ? `Deposit due: $${updated.depositRequired}\n` : "") +
           (user.phone ? `Questions? Call ${user.phone}` : "");
         await sendSms(updated.customerPhone, smsBody).catch(() => {});
       }

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { adminLogin as localAdminLogin } from "@/lib/admin";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -24,7 +23,7 @@ export default function AdminLoginPage() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/auth", {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -32,13 +31,12 @@ export default function AdminLoginPage() {
 
       const data = await res.json();
 
-      if (!res.ok) {
+      if (!res.ok || !data.isAdmin) {
         setError(data.error || "Invalid admin credentials.");
         setLoading(false);
         return;
       }
 
-      // Store admin session in localStorage for client-side checks
       localStorage.setItem(
         "detailbook_admin",
         JSON.stringify({ email: data.admin?.email || email, loggedIn: true, loginAt: new Date().toISOString() })
@@ -47,15 +45,8 @@ export default function AdminLoginPage() {
       setLoading(false);
       router.push("/admin");
     } catch {
-      // Fallback to local admin login
-      const success = localAdminLogin(email, password);
+      setError("Network error. Please try again.");
       setLoading(false);
-
-      if (success) {
-        router.push("/admin");
-      } else {
-        setError("Invalid admin credentials.");
-      }
     }
   };
 

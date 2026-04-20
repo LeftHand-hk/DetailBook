@@ -243,7 +243,7 @@ export default function DashboardPage() {
             style={{ animationDelay: `${i * 80}ms`, animationFillMode: "both" }}>
             <div className="flex items-center justify-between mb-4">
               <div className="w-9 h-9 bg-gray-50 rounded-xl flex items-center justify-center">
-                <svg className="w-4.5 h-4.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">{stat.icon}</svg>
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">{stat.icon}</svg>
               </div>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{stat.label}</p>
             </div>

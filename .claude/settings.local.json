@@ -33,7 +33,8 @@
       "Bash(npx next:*)",
       "Bash(npx tsx:*)",
       "Bash(node -e ':*)",
-      "Bash(curl -s -X POST \"https://detailbookapp.netlify.app/api/admin/auth\" -H \"Content-Type: application/json\" -d \"{\\\\\"email\\\\\":\\\\\"admin@detailbookapp.com\\\\\",\\\\\"password\\\\\":\\\\\"Obelisk123!@#\\\\\"}\")"
+      "Bash(curl -s -X POST \"https://detailbookapp.netlify.app/api/admin/auth\" -H \"Content-Type: application/json\" -d \"{\\\\\"email\\\\\":\\\\\"admin@detailbookapp.com\\\\\",\\\\\"password\\\\\":\\\\\"Obelisk123!@#\\\\\"}\")",
+      "Bash(xargs grep:*)"
     ]
   }
 }

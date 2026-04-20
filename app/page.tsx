@@ -39,7 +39,7 @@ export default function LandingPage() {
 
   const faqs = [
     { q: "Do I need a credit card to start?", a: "No! You can start your 15-day free trial without entering any payment info. We'll remind you before the trial ends." },
-    { q: "Can my customers pay the deposit online?", a: "Yes! On the Pro plan, customers can pay their deposit directly through your booking page via Stripe. On Starter, you can collect deposits manually." },
+    { q: "Can my customers pay the deposit online?", a: "Yes! On both Starter and Pro, you can enable deposits and customers pay them automatically through your booking page via Stripe when they book." },
     { q: "What happens if I exceed 5 packages on Starter?", a: "You'll be prompted to upgrade to Pro. All your existing packages stay active — you just can't add more until you upgrade." },
     { q: "Can I cancel anytime?", a: "Absolutely. No long-term contracts. Cancel any time from your Settings page. You keep access until the end of your billing period." },
     { q: "Does DetailBook work on mobile?", a: "Yes! Both your dashboard and your customer-facing booking page are fully optimized for mobile devices." },
@@ -542,42 +542,6 @@ export default function LandingPage() {
           <p className="text-center text-gray-500 mt-8 text-sm">
             Both plans include a 15-day free trial. Cancel anytime. No setup fees.
           </p>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════════
-          ABOUT / WHY WE BUILT THIS
-      ═══════════════════════════════════════════════ */}
-      <section className="bg-gray-50 py-24 px-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">Why I Built {platformName}</h2>
-          </div>
-          <div className="bg-white rounded-2xl p-8 sm:p-10 shadow-sm border border-gray-100">
-            <div className="flex items-start gap-5 mb-6">
-              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-500/20 flex-shrink-0">
-                D
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">From a detailer who got tired of losing money</h3>
-                <p className="text-gray-400 text-sm">The story behind {platformName}</p>
-              </div>
-            </div>
-            <div className="space-y-4 text-gray-600 leading-relaxed">
-              <p>
-                I built {platformName} because I saw detailers struggling with no-shows and scheduling chaos. Every week, customers would book and then ghost. No call, no text &mdash; just a wasted morning and lost income.
-              </p>
-              <p>
-                I tried every booking tool out there &mdash; Square, Calendly, Jobber. None of them were built for detailing. They didn&apos;t understand deposits, vehicle types, or the difference between a mobile service and a shop appointment.
-              </p>
-              <p>
-                So I built the tool I wished existed. {platformName} is purpose-built for auto detailing businesses &mdash; whether you&apos;re a solo mobile operator or running a full shop with a team. Deposit collection, SMS reminders, service packages by vehicle type, and a booking page that looks professional.
-              </p>
-              <p className="text-gray-900 font-semibold">
-                This tool is made by someone who understands the industry. Not another generic scheduling app with a fresh coat of paint.
-              </p>
-            </div>
-          </div>
         </div>
       </section>
 

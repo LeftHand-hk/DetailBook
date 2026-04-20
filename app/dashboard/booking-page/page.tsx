@@ -64,8 +64,6 @@ export default function BookingPagePage() {
   const [showServiceAreas, setShowServiceAreas] = useState(true);
   const [showBusinessHours, setShowBusinessHours] = useState(true);
   const [showTrustBadges, setShowTrustBadges] = useState(true);
-  const [requireDeposit, setRequireDeposit] = useState(false);
-  const [depositPercentage, setDepositPercentage] = useState(20);
   const [thankYouMessage, setThankYouMessage] = useState("");
   const [termsText, setTermsText] = useState("");
   const [instagram, setInstagram] = useState("");
@@ -104,8 +102,6 @@ export default function BookingPagePage() {
       setShowServiceAreas(u.showServiceAreas !== false);
       setShowBusinessHours(u.showBusinessHours !== false);
       setShowTrustBadges(u.showTrustBadges !== false);
-      setRequireDeposit(u.requireDeposit || false);
-      setDepositPercentage(u.depositPercentage || 20);
       setThankYouMessage(u.thankYouMessage || "");
       setTermsText(u.termsText || "");
       setInstagram(u.instagram || "");
@@ -146,8 +142,6 @@ export default function BookingPagePage() {
         showServiceAreas,
         showBusinessHours,
         showTrustBadges,
-        requireDeposit,
-        depositPercentage,
         thankYouMessage,
         termsText,
         instagram,
@@ -173,7 +167,7 @@ export default function BookingPagePage() {
     }, 600);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug, customMessage, advanceBookingDays, bookingPageTheme, accentColor, bookingPageTitle, bookingPageSubtitle, showRating, showSocialLinks, showServiceAreas, showBusinessHours, showTrustBadges, requireDeposit, depositPercentage, thankYouMessage, termsText, instagram, facebook, website, phone, bannerImage, bannerOverlayOpacity, serviceLayout, businessName, ownerName, bio, address, yearsInBusiness, logo, serviceAreasText]);
+  }, [slug, customMessage, advanceBookingDays, bookingPageTheme, accentColor, bookingPageTitle, bookingPageSubtitle, showRating, showSocialLinks, showServiceAreas, showBusinessHours, showTrustBadges, thankYouMessage, termsText, instagram, facebook, website, phone, bannerImage, bannerOverlayOpacity, serviceLayout, businessName, ownerName, bio, address, yearsInBusiness, logo, serviceAreasText]);
 
   const isPro = user?.plan === "pro";
 
@@ -751,33 +745,6 @@ export default function BookingPagePage() {
           <h2 className="text-white font-bold text-base">Booking Rules</h2>
         </div>
         <div className="p-6 space-y-5">
-          {/* Require Deposit */}
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Require Deposit</span>
-            <Toggle value={requireDeposit} onChange={setRequireDeposit} />
-          </div>
-
-          {/* Deposit Percentage (conditional) */}
-          {requireDeposit && (
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Deposit Percentage</label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="number"
-                  min={5}
-                  max={50}
-                  value={depositPercentage}
-                  onChange={(e) => {
-                    const v = Math.min(50, Math.max(5, Number(e.target.value)));
-                    setDepositPercentage(v);
-                  }}
-                  className={INPUT_CLASS + " max-w-[120px]"}
-                />
-                <span className="text-sm text-gray-500 font-medium">% of service price (5-50%)</span>
-              </div>
-            </div>
-          )}
-
           {/* Advance Booking Window */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Advance Booking Window</label>

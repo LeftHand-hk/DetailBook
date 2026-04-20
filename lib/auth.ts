@@ -2,7 +2,10 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 
-const JWT_SECRET = process.env.JWT_SECRET || "detailbook-secret";
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 16) {
+  throw new Error("JWT_SECRET environment variable must be set (at least 16 characters)");
+}
+const JWT_SECRET: string = process.env.JWT_SECRET;
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 12);
@@ -61,6 +64,12 @@ export function signStaffToken(payload: {
   userId: string; // owner's userId
 }): string {
   return jwt.sign({ ...payload, role: "staff" }, JWT_SECRET, { expiresIn: "30d" });
+}
+
+export function isTrialExpired(user: { trialEndsAt?: string; subscriptionStatus?: string | null }): boolean {
+  if (user.subscriptionStatus === "active") return false;
+  if (!user.trialEndsAt) return false;
+  return new Date(user.trialEndsAt) < new Date();
 }
 
 export async function getStaffSession(): Promise<{

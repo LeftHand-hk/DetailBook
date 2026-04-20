@@ -333,8 +333,17 @@ export default function BookingsPage() {
                       ) : null;
                     })()}
 
-                    {/* Status */}
+                    {/* Status + inline confirm */}
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      {booking.status === "pending" && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); updateStatus(booking.id, "confirmed"); }}
+                          className="flex items-center gap-1 px-2.5 py-1 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 transition-colors"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                          Confirm
+                        </button>
+                      )}
                       <div className={`w-2 h-2 rounded-full ${statusDots[booking.status]}`} />
                       <span className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-bold capitalize ${statusColors[booking.status]}`}>{booking.status}</span>
                       <svg className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -608,13 +617,6 @@ export default function BookingsPage() {
               <div>
                 <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Change Status</h3>
                 <div className="grid grid-cols-2 gap-3">
-                  {selected.status !== "confirmed" && (
-                    <button onClick={() => updateStatus(selected.id, "confirmed")}
-                      className="flex items-center justify-center gap-2 p-4 bg-green-50 text-green-700 border-2 border-green-200 font-bold text-base rounded-xl hover:bg-green-100 transition-colors">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                      Confirm
-                    </button>
-                  )}
                   {selected.status !== "completed" && (
                     <button onClick={() => updateStatus(selected.id, "completed")}
                       className="flex items-center justify-center gap-2 p-4 bg-blue-50 text-blue-700 border-2 border-blue-200 font-bold text-base rounded-xl hover:bg-blue-100 transition-colors">

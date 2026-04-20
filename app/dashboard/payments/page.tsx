@@ -131,7 +131,6 @@ export default function PaymentsPage() {
   const [methods, setMethods] = useState<PaymentMethods>(DEFAULT_PAYMENT_METHODS);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [requireDeposit, setRequireDeposit] = useState(false);
-  const [depositPercentage, setDepositPercentage] = useState(20);
 
   useEffect(() => {
     // Load from localStorage for instant render, then fetch fresh from API
@@ -140,7 +139,6 @@ export default function PaymentsPage() {
       setUserState(local);
       applyMethods(local.paymentMethods);
       setRequireDeposit(local.requireDeposit ?? false);
-      setDepositPercentage(local.depositPercentage ?? 20);
     }
     fetch("/api/user")
       .then((r) => r.ok ? r.json() : null)
@@ -150,7 +148,6 @@ export default function PaymentsPage() {
           setUser(data.user);
           applyMethods(data.user.paymentMethods);
           setRequireDeposit(data.user.requireDeposit ?? false);
-          setDepositPercentage(data.user.depositPercentage ?? 20);
         }
       })
       .catch(() => {});
@@ -175,7 +172,7 @@ export default function PaymentsPage() {
       const res = await fetch("/api/user", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentMethods: methods, requireDeposit, depositPercentage }),
+        body: JSON.stringify({ paymentMethods: methods, requireDeposit }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -259,21 +256,8 @@ export default function PaymentsPage() {
         </div>
         {requireDeposit && (
           <div className="px-6 pb-5 border-t border-gray-100 pt-4">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Deposit Percentage</label>
-            <div className="flex items-center gap-4">
-              <input
-                type="range"
-                min="5"
-                max="100"
-                step="5"
-                value={depositPercentage}
-                onChange={(e) => setDepositPercentage(Number(e.target.value))}
-                className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-              />
-              <span className="text-lg font-extrabold text-blue-600 w-14 text-right">{depositPercentage}%</span>
-            </div>
-            <p className="text-xs text-gray-400 mt-2">
-              Example: On a $200 service, the customer will pay a <strong className="text-gray-600">${Math.round(200 * depositPercentage / 100)}</strong> deposit upfront.
+            <p className="text-xs text-gray-500">
+              Set the deposit amount for each service in your <a href="/dashboard/packages" className="text-blue-600 font-semibold hover:underline">Packages</a> page.
             </p>
           </div>
         )}

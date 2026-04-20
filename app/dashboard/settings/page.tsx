@@ -97,6 +97,12 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
+  // Change password
+  const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwError, setPwError] = useState("");
+  const [pwSuccess, setPwSuccess] = useState(false);
+
   // Business Hours
   const [hours, setHours] = useState<Record<string, BusinessHours>>(DEFAULT_HOURS);
 
@@ -206,6 +212,44 @@ export default function SettingsPage() {
 
   const handleDeleteAccount = () => {
     localStorage.clear(); logout(); router.push("/");
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwError("");
+    setPwSuccess(false);
+    if (pwForm.newPassword.length < 8) {
+      setPwError("New password must be at least 8 characters.");
+      return;
+    }
+    if (pwForm.newPassword !== pwForm.confirmPassword) {
+      setPwError("New passwords do not match.");
+      return;
+    }
+    setPwLoading(true);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: pwForm.currentPassword,
+          newPassword: pwForm.newPassword,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPwError(data.error || "Failed to change password.");
+        setPwLoading(false);
+        return;
+      }
+      setPwSuccess(true);
+      setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setTimeout(() => setPwSuccess(false), 3000);
+    } catch {
+      setPwError("Network error. Please try again.");
+    } finally {
+      setPwLoading(false);
+    }
   };
 
   const inputCls = "w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm placeholder-gray-300 bg-white";
@@ -485,6 +529,55 @@ export default function SettingsPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </a>
+
+                {/* Change password */}
+                <div className="pt-2 border-t border-gray-100">
+                  <div className="p-4 rounded-xl border border-gray-200">
+                    <div className="mb-4">
+                      <p className="text-sm font-bold text-gray-900">Change Password</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Update the password you use to sign in.</p>
+                    </div>
+                    {pwError && (
+                      <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg mb-3">{pwError}</div>
+                    )}
+                    {pwSuccess && (
+                      <div className="bg-green-50 border border-green-200 text-green-700 text-xs px-3 py-2 rounded-lg mb-3">Password changed successfully.</div>
+                    )}
+                    <form onSubmit={handleChangePassword} className="space-y-3">
+                      <input
+                        type="password"
+                        placeholder="Current password"
+                        value={pwForm.currentPassword}
+                        onChange={(e) => setPwForm({ ...pwForm, currentPassword: e.target.value })}
+                        className={inputCls}
+                        required
+                      />
+                      <input
+                        type="password"
+                        placeholder="New password (min 8 chars)"
+                        value={pwForm.newPassword}
+                        onChange={(e) => setPwForm({ ...pwForm, newPassword: e.target.value })}
+                        className={inputCls}
+                        required
+                      />
+                      <input
+                        type="password"
+                        placeholder="Confirm new password"
+                        value={pwForm.confirmPassword}
+                        onChange={(e) => setPwForm({ ...pwForm, confirmPassword: e.target.value })}
+                        className={inputCls}
+                        required
+                      />
+                      <button
+                        type="submit"
+                        disabled={pwLoading}
+                        className="bg-blue-600 text-white font-bold px-5 py-2 rounded-xl hover:bg-blue-700 disabled:bg-blue-400 transition-colors text-sm"
+                      >
+                        {pwLoading ? "Updating..." : "Update Password"}
+                      </button>
+                    </form>
+                  </div>
+                </div>
 
                 {/* Delete account */}
                 <div className="pt-2 border-t border-gray-100">

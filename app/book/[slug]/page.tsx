@@ -67,6 +67,80 @@ function MiniStarRating({ rating }: { rating: number }) {
   );
 }
 
+function ProofSection({
+  paymentCompleted,
+  setPaymentCompleted,
+  proofUploaded,
+  proofUploading,
+  proofError,
+  onUpload,
+}: {
+  paymentCompleted: boolean;
+  setPaymentCompleted: (v: boolean) => void;
+  proofUploaded: boolean;
+  proofUploading: boolean;
+  proofError: string | null;
+  onUpload: (file: File) => void | Promise<void>;
+}) {
+  if (proofUploaded) {
+    return (
+      <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-xl p-3">
+        <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+        </svg>
+        <p className="text-green-400 text-sm font-semibold">Proof of payment uploaded! Your booking is now confirmed.</p>
+      </div>
+    );
+  }
+
+  if (!paymentCompleted) {
+    return (
+      <button
+        type="button"
+        onClick={() => setPaymentCompleted(true)}
+        className="w-full flex items-center justify-center gap-2 bg-white text-gray-900 text-sm font-bold px-5 py-3 rounded-xl hover:bg-white/90 transition-colors"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+        </svg>
+        I&apos;ve Completed the Payment
+      </button>
+    );
+  }
+
+  return (
+    <div>
+      <p className="text-white/50 text-xs mb-2 font-semibold">Upload Proof of Payment</p>
+      <label className={`flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-5 py-3 rounded-xl cursor-pointer transition-colors ${proofUploading ? "opacity-60 pointer-events-none" : ""}`}>
+        {proofUploading ? (
+          <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Uploading...</>
+        ) : (
+          <>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Upload Screenshot / Receipt
+          </>
+        )}
+        <input
+          type="file"
+          accept="image/*"
+          className="hidden"
+          disabled={proofUploading}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) onUpload(file);
+            e.target.value = "";
+          }}
+        />
+      </label>
+      {proofError && (
+        <p className="text-red-400 text-xs mt-2">{proofError}</p>
+      )}
+    </div>
+  );
+}
+
 export default function BookingPage({ params }: { params: { slug: string } }) {
   const { slug } = params;
   const platformName = usePlatformName();
@@ -91,6 +165,8 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
   const [proofUploading, setProofUploading] = useState(false);
   const [proofUploaded, setProofUploaded] = useState(false);
+  const [proofError, setProofError] = useState<string | null>(null);
+  const [paymentCompleted, setPaymentCompleted] = useState(false);
   const [stripeDepositPaid, setStripeDepositPaid] = useState(false);
 
   useEffect(() => {
@@ -182,11 +258,10 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     return dayCounts[0].id;
   };
 
-  // Use business owner's deposit settings, not hardcoded 25%
+  // Deposit comes from per-package setting, gated by global requireDeposit toggle
   const requireDeposit = (user as any)?.requireDeposit ?? false;
-  const depositPercentage = (user as any)?.depositPercentage ?? 20;
   const depositAmount = (selectedPackage && requireDeposit)
-    ? Math.round(selectedPackage.price * (depositPercentage / 100))
+    ? Number((selectedPackage as any).deposit || 0)
     : 0;
 
   const formatDate = (dateStr: string) =>
@@ -416,6 +491,45 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     );
   }
 
+  // Robust proof upload handler with error handling
+  const handleUploadProof = async (file: File) => {
+    if (!file || !bookingId) return;
+    setProofError(null);
+    // Client-side size guard (limit 4MB for raw file so base64 stays <~5MB)
+    if (file.size > 4 * 1024 * 1024) {
+      setProofError("Image too large. Max 4MB. Try a smaller photo or screenshot.");
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setProofError("Only image files are allowed (JPG, PNG, etc).");
+      return;
+    }
+    setProofUploading(true);
+    try {
+      const base64: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("Could not read file"));
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch(`/api/bookings/${bookingId}/upload-proof`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ proof: base64 }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Upload failed");
+      }
+      setProofUploaded(true);
+      // Server-side auto-confirms the booking when proof is accepted.
+    } catch (e) {
+      setProofError(e instanceof Error ? e.message : "Failed to upload proof");
+    } finally {
+      setProofUploading(false);
+    }
+  };
+
   // ── Success Screen ──────────────────────────────────
   if (step === 3) {
     return (
@@ -500,45 +614,14 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                   </a>
                 )}
                 {showProof && (
-                  <div className="border-t border-white/10 pt-4 mt-3">
-                    {proofUploaded ? (
-                      <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-xl p-3">
-                        <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                        </svg>
-                        <p className="text-green-400 text-sm font-semibold">Proof of payment uploaded!</p>
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="text-white/50 text-xs mb-2 font-semibold">Upload Proof of Payment</p>
-                        <label className={`flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white text-sm font-bold px-5 py-3 rounded-xl cursor-pointer transition-colors border border-white/10 ${proofUploading ? "opacity-60 pointer-events-none" : ""}`}>
-                          {proofUploading ? (
-                            <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Uploading...</>
-                          ) : (
-                            <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>Upload Screenshot / Receipt</>
-                          )}
-                          <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (!file || !bookingId) return;
-                            setProofUploading(true);
-                            try {
-                              const reader = new FileReader();
-                              reader.onload = async () => {
-                                const base64 = reader.result as string;
-                                const res = await fetch(`/api/bookings/${bookingId}/upload-proof`, {
-                                  method: "POST", headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ proof: base64 }),
-                                });
-                                if (res.ok) setProofUploaded(true);
-                                setProofUploading(false);
-                              };
-                              reader.readAsDataURL(file);
-                            } catch { setProofUploading(false); }
-                          }} />
-                        </label>
-                      </div>
-                    )}
-                  </div>
+                  <ProofSection
+                    paymentCompleted={paymentCompleted}
+                    setPaymentCompleted={setPaymentCompleted}
+                    proofUploaded={proofUploaded}
+                    proofUploading={proofUploading}
+                    proofError={proofError}
+                    onUpload={handleUploadProof}
+                  />
                 )}
               </div>
             );
@@ -566,45 +649,14 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                 </div>
                 <p className="text-white/40 text-xs mt-2 mb-4">Use your Booking ID <span className="font-mono">#{bookingId}</span> as the note.</p>
                 {showProof && (
-                  <div className="border-t border-white/10 pt-4">
-                    {proofUploaded ? (
-                      <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-xl p-3">
-                        <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                        </svg>
-                        <p className="text-green-400 text-sm font-semibold">Proof of payment uploaded!</p>
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="text-white/50 text-xs mb-2 font-semibold">Upload Proof of Payment</p>
-                        <label className={`flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white text-sm font-bold px-5 py-3 rounded-xl cursor-pointer transition-colors border border-white/10 ${proofUploading ? "opacity-60 pointer-events-none" : ""}`}>
-                          {proofUploading ? (
-                            <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Uploading...</>
-                          ) : (
-                            <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>Upload Screenshot / Receipt</>
-                          )}
-                          <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (!file || !bookingId) return;
-                            setProofUploading(true);
-                            try {
-                              const reader = new FileReader();
-                              reader.onload = async () => {
-                                const base64 = reader.result as string;
-                                const res = await fetch(`/api/bookings/${bookingId}/upload-proof`, {
-                                  method: "POST", headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ proof: base64 }),
-                                });
-                                if (res.ok) setProofUploaded(true);
-                                setProofUploading(false);
-                              };
-                              reader.readAsDataURL(file);
-                            } catch { setProofUploading(false); }
-                          }} />
-                        </label>
-                      </div>
-                    )}
-                  </div>
+                  <ProofSection
+                    paymentCompleted={paymentCompleted}
+                    setPaymentCompleted={setPaymentCompleted}
+                    proofUploaded={proofUploaded}
+                    proofUploading={proofUploading}
+                    proofError={proofError}
+                    onUpload={handleUploadProof}
+                  />
                 )}
               </div>
             );
@@ -636,45 +688,14 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                 <p className="text-white/40 text-xs mb-4">Use your Booking ID <span className="font-mono">#{bookingId}</span> as the payment reference.</p>
 
                 {showProof && (
-                  <>
-                    {proofUploaded ? (
-                      <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-xl p-3">
-                        <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                        </svg>
-                        <p className="text-green-400 text-sm font-semibold">Proof of payment uploaded!</p>
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="text-white/50 text-xs mb-2 font-semibold">Upload Proof of Payment</p>
-                        <label className={`flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-5 py-3 rounded-xl cursor-pointer transition-colors ${proofUploading ? "opacity-60 pointer-events-none" : ""}`}>
-                          {proofUploading ? (
-                            <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Uploading...</>
-                          ) : (
-                            <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>Upload Screenshot / Receipt</>
-                          )}
-                          <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (!file || !bookingId) return;
-                            setProofUploading(true);
-                            try {
-                              const reader = new FileReader();
-                              reader.onload = async () => {
-                                const base64 = reader.result as string;
-                                const res = await fetch(`/api/bookings/${bookingId}/upload-proof`, {
-                                  method: "POST", headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ proof: base64 }),
-                                });
-                                if (res.ok) setProofUploaded(true);
-                                setProofUploading(false);
-                              };
-                              reader.readAsDataURL(file);
-                            } catch { setProofUploading(false); }
-                          }} />
-                        </label>
-                      </div>
-                    )}
-                  </>
+                  <ProofSection
+                    paymentCompleted={paymentCompleted}
+                    setPaymentCompleted={setPaymentCompleted}
+                    proofUploaded={proofUploaded}
+                    proofUploading={proofUploading}
+                    proofError={proofError}
+                    onUpload={handleUploadProof}
+                  />
                 )}
               </div>
             );
@@ -785,7 +806,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
           )}
 
           <button
-            onClick={() => { setStep(0); setSelectedPackage(null); setSelectedDate(null); setSelectedTime(null); setForm(EMPTY_FORM); setBookingId(null); setBookingError(null); setCustomerAddress(""); setSelectedStaff(null); setSelectedServiceMode(null); setSelectedPaymentMethod(null); setProofUploaded(false); setStripeDepositPaid(false); }}
+            onClick={() => { setStep(0); setSelectedPackage(null); setSelectedDate(null); setSelectedTime(null); setForm(EMPTY_FORM); setBookingId(null); setBookingError(null); setCustomerAddress(""); setSelectedStaff(null); setSelectedServiceMode(null); setSelectedPaymentMethod(null); setProofUploaded(false); setPaymentCompleted(false); setProofError(null); setStripeDepositPaid(false); }}
             className="w-full glass border border-white/20 text-white font-semibold py-3.5 rounded-2xl hover:bg-white/10 transition-all"
           >
             Book Another Appointment
@@ -1678,7 +1699,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                     <div className="flex justify-between items-center">
                       <div>
                         <p className="text-blue-300 text-xs font-bold uppercase tracking-widest">Deposit Required</p>
-                        <p className="text-white/50 text-xs mt-0.5">{depositPercentage}% · Secures your booking</p>
+                        <p className="text-white/50 text-xs mt-0.5">Secures your booking</p>
                       </div>
                       <p className="text-3xl font-extrabold text-white">${depositAmount}</p>
                     </div>

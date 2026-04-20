@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { hashPassword, signToken } from "@/lib/auth";
+import { isValidEmail, validatePassword } from "@/lib/validation";
 
 function generateSlug(businessName: string): string {
   return businessName
@@ -23,6 +24,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!isValidEmail(email)) {
+      return NextResponse.json({ error: "Please enter a valid email address" }, { status: 400 });
+    }
+
+    const pwCheck = validatePassword(password);
+    if (!pwCheck.valid) {
+      return NextResponse.json({ error: pwCheck.error }, { status: 400 });
+    }
+
     // Validate promo code if provided
     let promoData: { code: string; discountValue: number; discountType: string } | null = null;
     if (promoCode) {
@@ -43,7 +53,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const normalizedEmail = email.toLowerCase().trim();
+    const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existingUser) {
       return NextResponse.json(
         { error: "A user with this email already exists" },
@@ -64,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.create({
       data: {
-        email,
+        email: normalizedEmail,
         password: hashedPassword,
         businessName,
         name,

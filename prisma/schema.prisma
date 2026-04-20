@@ -89,6 +89,10 @@ model User {
   bookings Booking[]
   staff    Staff[]
   supportTickets SupportTicket[]
+
+  @@index([email])
+  @@index([slug])
+  @@index([createdAt])
 }
 
 model SupportTicket {
@@ -145,6 +149,8 @@ model Package {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Staff {
@@ -164,6 +170,8 @@ model Staff {
   bookings  Booking[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Booking {
@@ -196,6 +204,21 @@ model Booking {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([date])
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([email])
 }
 
 model PlatformSettings {

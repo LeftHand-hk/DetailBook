@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { isTrialExpired } from "@/lib/auth";
 
 export async function GET(
   request: NextRequest,
@@ -27,7 +28,7 @@ export async function GET(
       return NextResponse.json({ error: "Business not found" }, { status: 404 });
     }
 
-    if (user.suspended) {
+    if (user.suspended || isTrialExpired(user)) {
       return NextResponse.json(
         { error: "This business page is currently unavailable" },
         { status: 403 }
@@ -85,7 +86,6 @@ export async function GET(
       showBusinessHours: user.showBusinessHours,
       showTrustBadges: user.showTrustBadges,
       requireDeposit: user.requireDeposit,
-      depositPercentage: user.depositPercentage,
       thankYouMessage: user.thankYouMessage,
       termsText: user.termsText,
       serviceType: (user as any).serviceType ?? "mobile",
