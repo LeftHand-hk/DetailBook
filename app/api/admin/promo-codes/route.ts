@@ -22,12 +22,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Code and discount value are required" }, { status: 400 });
     }
 
+    const type = discountType || "percent";
+    if (!["percent", "fixed", "free_months"].includes(type)) {
+      return NextResponse.json({ error: "Invalid discount type" }, { status: 400 });
+    }
+
+    const value = parseFloat(discountValue);
+    if (type === "free_months" && ![1, 2, 3].includes(Math.round(value))) {
+      return NextResponse.json({ error: "Free months must be 1, 2, or 3" }, { status: 400 });
+    }
+
     const promo = await prisma.promoCode.create({
       data: {
         code: code.toUpperCase().trim(),
         description: description || null,
-        discountType: discountType || "percent",
-        discountValue: parseFloat(discountValue),
+        discountType: type,
+        discountValue: type === "free_months" ? Math.round(value) : value,
         appliesTo: appliesTo || "both",
         maxUses: maxUses ? parseInt(maxUses) : null,
         expiresAt: expiresAt ? new Date(expiresAt) : null,

@@ -33,11 +33,19 @@ export default function SignupPage() {
       });
       const data = await res.json();
       if (res.ok && data.valid) {
-        const label = data.discountType === "percent"
-          ? `${data.discountValue}% off`
-          : `$${data.discountValue} off`;
         const plan = data.appliesTo === "both" ? "Starter & Pro" : data.appliesTo === "starter" ? "Starter" : "Pro";
-        setPromoStatus({ valid: true, message: `${label} on ${plan} plan`, discountType: data.discountType, discountValue: data.discountValue, appliesTo: data.appliesTo });
+        let message: string;
+        if (data.discountType === "free_months") {
+          const n = Math.round(data.discountValue);
+          const planLabel = data.appliesTo === "both" ? "your plan" : `${plan} plan`;
+          message = `${n} ${n === 1 ? "month" : "months"} free on ${planLabel}`;
+        } else {
+          const label = data.discountType === "percent"
+            ? `${data.discountValue}% off`
+            : `$${data.discountValue} off`;
+          message = `${label} on ${plan} plan`;
+        }
+        setPromoStatus({ valid: true, message, discountType: data.discountType, discountValue: data.discountValue, appliesTo: data.appliesTo });
       } else {
         setPromoStatus({ valid: false, message: data.error || "Invalid promo code" });
       }

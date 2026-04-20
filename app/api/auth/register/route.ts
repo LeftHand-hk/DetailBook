@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate promo code if provided
-    let promoData: { code: string; discountValue: number; discountType: string } | null = null;
+    let promoData: { code: string; discountValue: number; discountType: string; appliesTo: string } | null = null;
     if (promoCode) {
       const promo = await prisma.promoCode.findUnique({
         where: { code: promoCode.toUpperCase().trim() },
@@ -45,7 +45,12 @@ export async function POST(request: NextRequest) {
         (!promo.expiresAt || new Date(promo.expiresAt) > new Date()) &&
         (promo.maxUses === null || promo.usedCount < promo.maxUses)
       ) {
-        promoData = { code: promo.code, discountValue: promo.discountValue, discountType: promo.discountType };
+        promoData = {
+          code: promo.code,
+          discountValue: promo.discountValue,
+          discountType: promo.discountType,
+          appliesTo: promo.appliesTo,
+        };
         await prisma.promoCode.update({
           where: { id: promo.id },
           data: { usedCount: { increment: 1 } },
@@ -70,8 +75,19 @@ export async function POST(request: NextRequest) {
 
     const hashedPassword = await hashPassword(password);
 
+    // Default 15-day trial; promo codes of type "free_months" extend this.
     const trialEndsAt = new Date();
-    trialEndsAt.setDate(trialEndsAt.getDate() + 15);
+    if (promoData?.discountType === "free_months") {
+      const months = Math.max(1, Math.min(3, Math.round(promoData.discountValue)));
+      trialEndsAt.setMonth(trialEndsAt.getMonth() + months);
+    } else {
+      trialEndsAt.setDate(trialEndsAt.getDate() + 15);
+    }
+
+    // If the free_months promo applies to a specific plan, grant that plan for the trial.
+    const plan = promoData?.discountType === "free_months" && (promoData.appliesTo === "starter" || promoData.appliesTo === "pro")
+      ? promoData.appliesTo
+      : "starter";
 
     const user = await prisma.user.create({
       data: {
@@ -82,7 +98,7 @@ export async function POST(request: NextRequest) {
         phone: phone || "",
         city: city || "",
         slug,
-        plan: "starter",
+        plan,
         trialEndsAt: trialEndsAt.toISOString(),
         promoCodeUsed: promoData?.code || null,
         promoDiscount: promoData?.discountValue || null,

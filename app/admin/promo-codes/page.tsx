@@ -91,8 +91,13 @@ export default function AdminPromoCodesPage() {
     }
   };
 
-  const formatDiscount = (c: PromoCode) =>
-    c.discountType === "percent" ? `${c.discountValue}%` : `$${c.discountValue}`;
+  const formatDiscount = (c: PromoCode) => {
+    if (c.discountType === "free_months") {
+      const n = Math.round(c.discountValue);
+      return `${n} ${n === 1 ? "month" : "months"} free`;
+    }
+    return c.discountType === "percent" ? `${c.discountValue}%` : `$${c.discountValue}`;
+  };
 
   const formatAppliesTo = (v: string) =>
     v === "both" ? "Starter & Pro" : v === "starter" ? "Starter" : "Pro";
@@ -164,7 +169,9 @@ export default function AdminPromoCodesPage() {
                     </td>
                     <td className="px-5 py-3.5">
                       <span className="font-semibold text-gray-900">{formatDiscount(c)}</span>
-                      <span className="text-gray-400 ml-1 text-xs">{c.discountType === "percent" ? "off" : "off"}</span>
+                      {c.discountType !== "free_months" && (
+                        <span className="text-gray-400 ml-1 text-xs">off</span>
+                      )}
                     </td>
                     <td className="px-5 py-3.5 text-gray-600">{formatAppliesTo(c.appliesTo)}</td>
                     <td className="px-5 py-3.5 text-gray-600">
@@ -248,28 +255,45 @@ export default function AdminPromoCodesPage() {
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Discount Type</label>
                   <select
                     value={form.discountType}
-                    onChange={(e) => setForm({ ...form, discountType: e.target.value })}
+                    onChange={(e) => setForm({ ...form, discountType: e.target.value, discountValue: "" })}
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 text-gray-900"
                   >
                     <option value="percent">Percent (%)</option>
                     <option value="fixed">Fixed ($)</option>
+                    <option value="free_months">Free Months</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Value {form.discountType === "percent" ? "(%)" : "($)"} *
+                    {form.discountType === "free_months"
+                      ? "Months *"
+                      : `Value ${form.discountType === "percent" ? "(%)" : "($)"} *`}
                   </label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    max={form.discountType === "percent" ? "100" : undefined}
-                    step="0.01"
-                    value={form.discountValue}
-                    onChange={(e) => setForm({ ...form, discountValue: e.target.value })}
-                    placeholder={form.discountType === "percent" ? "50" : "10"}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 text-gray-900"
-                  />
+                  {form.discountType === "free_months" ? (
+                    <select
+                      required
+                      value={form.discountValue}
+                      onChange={(e) => setForm({ ...form, discountValue: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 text-gray-900"
+                    >
+                      <option value="">Select...</option>
+                      <option value="1">1 month</option>
+                      <option value="2">2 months</option>
+                      <option value="3">3 months</option>
+                    </select>
+                  ) : (
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      max={form.discountType === "percent" ? "100" : undefined}
+                      step="0.01"
+                      value={form.discountValue}
+                      onChange={(e) => setForm({ ...form, discountValue: e.target.value })}
+                      placeholder={form.discountType === "percent" ? "50" : "10"}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 text-gray-900"
+                    />
+                  )}
                 </div>
               </div>
 
