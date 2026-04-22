@@ -15,7 +15,7 @@ function generateSlug(businessName: string): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, businessName, name, phone, city, promoCode } = body;
+    const { email, password, businessName, name, phone, city, promoCode, timezone } = body;
 
     if (!email || !password || !businessName || !name) {
       return NextResponse.json(
@@ -89,6 +89,17 @@ export async function POST(request: NextRequest) {
       ? promoData.appliesTo
       : "starter";
 
+    // Validate the browser-reported IANA timezone; fall back to America/New_York.
+    const safeTimezone = (() => {
+      if (!timezone || typeof timezone !== "string") return undefined;
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: timezone });
+        return timezone;
+      } catch {
+        return undefined;
+      }
+    })();
+
     const user = await prisma.user.create({
       data: {
         email: normalizedEmail,
@@ -102,6 +113,7 @@ export async function POST(request: NextRequest) {
         trialEndsAt: trialEndsAt.toISOString(),
         promoCodeUsed: promoData?.code || null,
         promoDiscount: promoData?.discountValue || null,
+        ...(safeTimezone ? { timezone: safeTimezone } : {}),
       },
     });
 

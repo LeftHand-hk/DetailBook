@@ -65,6 +65,10 @@ model User {
 
   serviceType  String   @default("mobile")
 
+  // IANA timezone of the business (e.g. "America/Los_Angeles"). Used for
+  // formatting emails/SMS, calendar availability, and booking time slots.
+  timezone     String   @default("America/New_York")
+
   suspended            Boolean  @default(false)
   promoCodeUsed        String?
   promoDiscount        Float?

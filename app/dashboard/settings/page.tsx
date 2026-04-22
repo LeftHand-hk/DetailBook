@@ -124,6 +124,7 @@ export default function SettingsPage() {
   });
 
   const [serviceType, setServiceType] = useState<"mobile" | "shop" | "both">("mobile");
+  const [timezone, setTimezone] = useState<string>("America/New_York");
 
   // Notifications
   const [notifications, setNotifications] = useState({
@@ -148,6 +149,7 @@ export default function SettingsPage() {
         setUser(u);
         setHours(u.businessHours ? { ...DEFAULT_HOURS, ...u.businessHours } : DEFAULT_HOURS);
         setServiceType(u.serviceType || "mobile");
+        setTimezone(u.timezone || "America/New_York");
         setBookingSettings({
           advanceBookingDays: u.advanceBookingDays || 30,
           customMessage: u.customMessage || "",
@@ -184,11 +186,18 @@ export default function SettingsPage() {
     setUser(updated); setUserState(updated); flash("hours");
   };
 
-  const handleSaveBooking = (e: React.FormEvent) => {
+  const handleSaveBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    const updated: User = { ...user, ...bookingSettings, serviceType } as any;
+    const updated: User = { ...user, ...bookingSettings, serviceType, timezone } as any;
     setUser(updated); setUserState(updated); flash("booking");
+    try {
+      await fetch("/api/user", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...bookingSettings, serviceType, timezone }),
+      });
+    } catch {}
   };
 
   const handleSaveNotifications = async () => {
@@ -354,6 +363,104 @@ export default function SettingsPage() {
                         <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
                       </button>
                     ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Timezone */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="font-bold text-gray-900">Business Timezone</h2>
+                    <p className="text-sm text-gray-500 mt-0.5">Used for bookings, emails, and calendar display.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try {
+                        const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                        if (detected) setTimezone(detected);
+                      } catch {}
+                    }}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-700 whitespace-nowrap"
+                  >
+                    Use my device
+                  </button>
+                </div>
+                <div className="p-5 space-y-3">
+                  <select
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
+                    className={inputCls}
+                  >
+                    <optgroup label="United States">
+                      <option value="America/New_York">Eastern Time — New York</option>
+                      <option value="America/Detroit">Eastern Time — Detroit</option>
+                      <option value="America/Indiana/Indianapolis">Eastern Time — Indianapolis</option>
+                      <option value="America/Chicago">Central Time — Chicago</option>
+                      <option value="America/Denver">Mountain Time — Denver</option>
+                      <option value="America/Phoenix">Mountain Time — Phoenix (no DST)</option>
+                      <option value="America/Los_Angeles">Pacific Time — Los Angeles</option>
+                      <option value="America/Anchorage">Alaska Time — Anchorage</option>
+                      <option value="Pacific/Honolulu">Hawaii Time — Honolulu</option>
+                    </optgroup>
+                    <optgroup label="Canada">
+                      <option value="America/Toronto">Eastern — Toronto</option>
+                      <option value="America/Winnipeg">Central — Winnipeg</option>
+                      <option value="America/Edmonton">Mountain — Edmonton</option>
+                      <option value="America/Vancouver">Pacific — Vancouver</option>
+                    </optgroup>
+                    <optgroup label="Europe">
+                      <option value="Europe/London">London (GMT/BST)</option>
+                      <option value="Europe/Dublin">Dublin</option>
+                      <option value="Europe/Paris">Paris</option>
+                      <option value="Europe/Berlin">Berlin</option>
+                      <option value="Europe/Madrid">Madrid</option>
+                      <option value="Europe/Rome">Rome</option>
+                      <option value="Europe/Amsterdam">Amsterdam</option>
+                      <option value="Europe/Tirane">Tirana</option>
+                      <option value="Europe/Athens">Athens</option>
+                    </optgroup>
+                    <optgroup label="Other">
+                      <option value="UTC">UTC</option>
+                      <option value="Australia/Sydney">Sydney</option>
+                      <option value="Asia/Dubai">Dubai</option>
+                      <option value="Asia/Tokyo">Tokyo</option>
+                    </optgroup>
+                    {/* If stored zone isn't in the list, include it so it remains selectable */}
+                    {timezone && ![
+                      "America/New_York","America/Detroit","America/Indiana/Indianapolis",
+                      "America/Chicago","America/Denver","America/Phoenix","America/Los_Angeles",
+                      "America/Anchorage","Pacific/Honolulu","America/Toronto","America/Winnipeg",
+                      "America/Edmonton","America/Vancouver","Europe/London","Europe/Dublin",
+                      "Europe/Paris","Europe/Berlin","Europe/Madrid","Europe/Rome","Europe/Amsterdam",
+                      "Europe/Tirane","Europe/Athens","UTC","Australia/Sydney","Asia/Dubai","Asia/Tokyo",
+                    ].includes(timezone) && (
+                      <option value={timezone}>{timezone}</option>
+                    )}
+                  </select>
+                  <div className="flex items-center gap-2 text-xs text-gray-500 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                    <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>
+                      Current time here:{" "}
+                      <strong className="text-gray-800">
+                        {(() => {
+                          try {
+                            return new Date().toLocaleString("en-US", {
+                              timeZone: timezone,
+                              weekday: "short",
+                              hour: "numeric",
+                              minute: "2-digit",
+                              hour12: true,
+                            });
+                          } catch {
+                            return "—";
+                          }
+                        })()}
+                      </strong>
+                    </span>
                   </div>
                 </div>
               </div>

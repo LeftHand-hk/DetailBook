@@ -392,11 +392,36 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     }
   };
 
+  // Business timezone (IANA). Falls back to the customer's browser tz, then UTC.
+  const bizTz: string = (user as any)?.timezone || (() => {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return "UTC"; }
+  })();
+
+  // Build a Y-M-D string for a given Date using its local components (no UTC shift).
+  const toLocalYMD = (d: Date): string => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
+  // "Today" as Y-M-D in the business's timezone — guarantees customers can't book
+  // yesterday or any earlier date regardless of their browser tz.
+  const todayInBizTz: string = (() => {
+    try {
+      const fmt = new Intl.DateTimeFormat("en-CA", {
+        timeZone: bizTz, year: "numeric", month: "2-digit", day: "2-digit",
+      });
+      return fmt.format(new Date()); // en-CA gives YYYY-MM-DD
+    } catch {
+      return toLocalYMD(new Date());
+    }
+  })();
+
   const year = calendarDate.getFullYear();
   const month = calendarDate.getMonth();
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const today = new Date(); today.setHours(0,0,0,0);
   const calendarDays: (Date | null)[] = [];
   for (let i = 0; i < firstDay; i++) calendarDays.push(null);
   for (let d = 1; d <= daysInMonth; d++) calendarDays.push(new Date(year, month, d));
@@ -428,13 +453,33 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     return slotMin < openMin || slotMin >= closeMin;
   };
 
+  // When the customer picks today, disable time slots earlier than the current
+  // time in the business's timezone.
+  const isTimeInPast = (time: string): boolean => {
+    if (!selectedDate || selectedDate !== todayInBizTz) return false;
+    try {
+      const parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: bizTz, hour: "2-digit", minute: "2-digit", hour12: false,
+      }).formatToParts(new Date());
+      const hh = parseInt(parts.find(p => p.type === "hour")?.value || "0", 10);
+      const mm = parseInt(parts.find(p => p.type === "minute")?.value || "0", 10);
+      const nowMin = hh * 60 + mm;
+      return timeToMinutes(time) <= nowMin;
+    } catch {
+      return false;
+    }
+  };
+
   const isDateDisabled = (date: Date) => {
-    if (date < today) return true;
+    // Compare as Y-M-D strings so we're not at the mercy of time-of-day or UTC conversion.
+    const dateYMD = toLocalYMD(date);
+    if (dateYMD < todayInBizTz) return true;
     // Enforce advance booking window
     const advanceDays = (user as any)?.advanceBookingDays ?? 30;
-    const maxDate = new Date(today);
+    const [ty, tm, td] = todayInBizTz.split("-").map(Number);
+    const maxDate = new Date(ty, tm - 1, td);
     maxDate.setDate(maxDate.getDate() + advanceDays);
-    if (date > maxDate) return true;
+    if (toLocalYMD(date) > toLocalYMD(maxDate)) return true;
     // Disable days the business is closed
     if (user?.businessHours) {
       const dayName = DAY_NAMES[date.getDay()];
@@ -1432,10 +1477,10 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                 <div className="grid grid-cols-7 gap-1">
                   {calendarDays.map((date, i) => {
                     if (!date) return <div key={i} />;
-                    const dateStr = date.toISOString().split("T")[0];
+                    const dateStr = toLocalYMD(date);
                     const disabled = isDateDisabled(date);
                     const isSelected = dateStr === selectedDate;
-                    const isTodayDate = dateStr === new Date().toISOString().split("T")[0];
+                    const isTodayDate = dateStr === todayInBizTz;
                     return (
                       <button key={i} onClick={() => { if (!disabled) { setSelectedDate(dateStr); setSelectedTime(null); setSelectedStaff(null); } }} disabled={disabled}
                         className={`aspect-square w-full rounded-xl text-sm font-medium transition-all duration-200 ${
@@ -1463,7 +1508,8 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                   {TIMES.map((time) => {
                     const booked = isTimeBooked(time);
                     const outsideHours = isTimeOutsideBusinessHours(time);
-                    const disabled = booked || outsideHours;
+                    const past = isTimeInPast(time);
+                    const disabled = booked || outsideHours || past;
                     return (
                       <button key={time} onClick={() => !disabled && setSelectedTime(time)} disabled={disabled}
                         className={`py-3 rounded-xl text-sm font-semibold transition-all duration-200 border-2 ${
@@ -1473,7 +1519,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                               ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/30 scale-105"
                               : "border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
                         }`}>
-                        {booked ? "Booked" : outsideHours ? "Closed" : time}
+                        {booked ? "Booked" : outsideHours ? "Closed" : past ? "Past" : time}
                       </button>
                     );
                   })}

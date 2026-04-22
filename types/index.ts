@@ -15,6 +15,7 @@ export interface User {
   plan: "starter" | "pro";
   trialEndsAt: string;
   serviceType?: "mobile" | "shop" | "both";
+  timezone?: string;
   bio?: string;
   address?: string;
   emailReminders?: boolean;

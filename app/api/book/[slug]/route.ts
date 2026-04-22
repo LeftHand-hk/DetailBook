@@ -89,6 +89,7 @@ export async function GET(
       thankYouMessage: user.thankYouMessage,
       termsText: user.termsText,
       serviceType: (user as any).serviceType ?? "mobile",
+      timezone: (user as any).timezone ?? "America/New_York",
       packages: user.packages,
       staff: (user as any).staff ?? [],
       bookedSlots,

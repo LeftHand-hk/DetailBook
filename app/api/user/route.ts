@@ -51,7 +51,7 @@ export async function PUT(request: NextRequest) {
     // Whitelist only valid User model fields
     const ALLOWED_FIELDS = [
       "businessName", "name", "phone", "city", "slug", "plan", "trialEndsAt",
-      "serviceType", "bio", "address", "logo", "coverImage", "instagram", "facebook", "website",
+      "serviceType", "timezone", "bio", "address", "logo", "coverImage", "instagram", "facebook", "website",
       "rating", "reviewCount", "yearsInBusiness", "serviceAreas", "businessHours",
       "emailReminders", "customMessage", "advanceBookingDays",
       "bannerImage", "bannerOverlayOpacity", "serviceLayout",
@@ -67,6 +67,15 @@ export async function PUT(request: NextRequest) {
     for (const key of ALLOWED_FIELDS) {
       if (body[key] !== undefined) {
         updateData[key] = body[key];
+      }
+    }
+
+    // Validate timezone if being updated — must be a valid IANA zone
+    if (typeof updateData.timezone === "string") {
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: updateData.timezone as string });
+      } catch {
+        return NextResponse.json({ error: "Invalid timezone" }, { status: 400 });
       }
     }
 

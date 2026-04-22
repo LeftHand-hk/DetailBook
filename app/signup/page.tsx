@@ -71,6 +71,13 @@ export default function SignupPage() {
 
     setLoading(true);
     try {
+      const detectedTimezone = (() => {
+        try {
+          return Intl.DateTimeFormat().resolvedOptions().timeZone;
+        } catch {
+          return undefined;
+        }
+      })();
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -80,6 +87,7 @@ export default function SignupPage() {
           email: form.email,
           password: form.password,
           promoCode: form.promoCode.trim() || undefined,
+          timezone: detectedTimezone,
         }),
       });
       const data = await res.json();
