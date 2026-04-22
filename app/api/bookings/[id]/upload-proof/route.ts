@@ -31,9 +31,10 @@ export async function POST(
       );
     }
 
-    if (proof.length > 5 * 1024 * 1024) {
+    // base64 data URL inflates raw bytes ~33%; allow ~28MB string = ~20MB file
+    if (proof.length > 28 * 1024 * 1024) {
       return NextResponse.json(
-        { error: "Image too large. Maximum size is 5MB." },
+        { error: "Image too large. Maximum size is 20MB." },
         { status: 400 }
       );
     }
