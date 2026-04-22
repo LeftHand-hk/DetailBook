@@ -1761,15 +1761,15 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                 </div>
               )}
 
-              <label className="flex items-start gap-3 bg-white/5 border border-white/10 rounded-xl p-3 cursor-pointer">
+              <label className="flex items-start gap-3 bg-gray-50 border border-gray-200 rounded-xl p-3 cursor-pointer hover:bg-gray-100 transition-colors">
                 <input
                   type="checkbox"
                   checked={smsConsent}
                   onChange={(e) => setSmsConsent(e.target.checked)}
                   className="mt-0.5 w-4 h-4 flex-shrink-0 accent-blue-600 cursor-pointer"
                 />
-                <span className="text-white/70 text-xs leading-relaxed">
-                  I agree to receive SMS appointment reminders from this business. Message frequency varies. Message and data rates may apply. Reply STOP to opt out at any time. Reply HELP for help. <span className="text-white/40">(optional)</span>
+                <span className="text-gray-700 text-xs leading-relaxed">
+                  I agree to receive SMS appointment reminders from this business. Message frequency varies. Message and data rates may apply. Reply STOP to opt out at any time. Reply HELP for help. <span className="text-gray-400">(optional)</span>
                 </span>
               </label>
 
