@@ -4,6 +4,36 @@ import { getSessionUser } from "@/lib/auth";
 import { sendEmail } from "@/lib/email";
 import { sendSms } from "@/lib/twilio";
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getSessionUser();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+
+    const booking = await prisma.booking.findUnique({ where: { id } });
+    if (!booking) {
+      return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+    }
+    if (booking.userId !== session.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    return NextResponse.json(booking);
+  } catch (error) {
+    console.error("GET /api/bookings/[id] error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch booking" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

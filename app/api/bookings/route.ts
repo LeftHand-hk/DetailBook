@@ -24,9 +24,36 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // List view: exclude heavy paymentProof base64 (can be up to ~28MB per row).
+    // Detail panel loads it on demand via GET /api/bookings/[id].
     const bookings = await prisma.booking.findMany({
       where: { userId: targetUserId },
       orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        userId: true,
+        customerName: true,
+        customerEmail: true,
+        customerPhone: true,
+        vehicleMake: true,
+        vehicleModel: true,
+        vehicleYear: true,
+        vehicleColor: true,
+        serviceId: true,
+        serviceName: true,
+        servicePrice: true,
+        date: true,
+        time: true,
+        depositPaid: true,
+        depositRequired: true,
+        notes: true,
+        address: true,
+        status: true,
+        staffId: true,
+        paymentMethod: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
 
     return NextResponse.json(bookings);

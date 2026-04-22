@@ -63,6 +63,17 @@ export default function BookingsPage() {
     fetch("/api/staff").then((r) => r.ok ? r.json() : []).then(setStaffList).catch(() => {});
   }, []);
 
+  const openBooking = async (booking: Booking) => {
+    // Show the panel immediately with list data; lazy-fetch paymentProof.
+    setSelected(booking);
+    try {
+      const res = await fetch(`/api/bookings/${booking.id}`);
+      if (!res.ok) return;
+      const full = await res.json();
+      setSelected((cur) => (cur && cur.id === booking.id ? { ...cur, ...full, vehicle: cur.vehicle } : cur));
+    } catch { /* silent — panel already usable without proof */ }
+  };
+
   const updateStatus = async (id: string, newStatus: string) => {
     // Optimistic update
     const updated = bookings.map((b) =>
@@ -267,7 +278,7 @@ export default function BookingsPage() {
             const depositComplete = depositPaid >= depositRequired && depositRequired > 0;
 
             return (
-              <div key={booking.id} onClick={() => setSelected(booking)}
+              <div key={booking.id} onClick={() => openBooking(booking)}
                 className={`bg-white rounded-2xl border shadow-sm hover:shadow-md transition-all cursor-pointer group ${
                   booking.status === "cancelled" ? "border-gray-100 opacity-60" : "border-gray-100 hover:border-blue-200"
                 }`}>
