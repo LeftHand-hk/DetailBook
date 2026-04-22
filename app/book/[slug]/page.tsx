@@ -533,28 +533,53 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
 
   // ── Success Screen ──────────────────────────────────
   if (step === 3) {
+    const awaitingOfflinePayment =
+      depositAmount > 0 &&
+      !stripeDepositPaid &&
+      !proofUploaded &&
+      (selectedPaymentMethod === "paypal" ||
+        selectedPaymentMethod === "cashapp" ||
+        selectedPaymentMethod === "bankTransfer");
+
     return (
       <div className="min-h-screen bg-mesh flex items-center justify-center p-4">
         {/* Animated circles */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-green-500/10 rounded-full blur-3xl animate-blobFloat" />
+          <div className={`absolute top-1/4 left-1/4 w-96 h-96 ${awaitingOfflinePayment ? "bg-amber-500/10" : "bg-green-500/10"} rounded-full blur-3xl animate-blobFloat`} />
           <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl animate-blobFloat delay-300" />
         </div>
 
         <div className="glass rounded-3xl max-w-md w-full p-8 text-center relative animate-scaleIn">
-          {/* Checkmark */}
+          {/* Icon */}
           <div className="relative w-24 h-24 mx-auto mb-6">
-            <div className="absolute inset-0 bg-green-500/20 rounded-full animate-ping" />
-            <div className="relative w-24 h-24 bg-gradient-to-br from-green-400 to-emerald-600 rounded-full flex items-center justify-center shadow-lg glow-green">
-              <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
+            {awaitingOfflinePayment ? (
+              <>
+                <div className="absolute inset-0 bg-amber-500/20 rounded-full animate-ping" />
+                <div className="relative w-24 h-24 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg">
+                  <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="absolute inset-0 bg-green-500/20 rounded-full animate-ping" />
+                <div className="relative w-24 h-24 bg-gradient-to-br from-green-400 to-emerald-600 rounded-full flex items-center justify-center shadow-lg glow-green">
+                  <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              </>
+            )}
           </div>
 
-          <h1 className="text-2xl font-extrabold text-white mb-2">Booking Confirmed!</h1>
+          <h1 className="text-2xl font-extrabold text-white mb-2">
+            {awaitingOfflinePayment ? "Complete Your Deposit" : "Booking Confirmed!"}
+          </h1>
           <p className="text-white/60 mb-8">
-            {user?.name || "The business"} will confirm your appointment shortly. Check your email for details.
+            {awaitingOfflinePayment
+              ? `Your slot is held. Pay the $${depositAmount} deposit and upload your proof below to confirm.`
+              : `${user?.name || "The business"} will confirm your appointment shortly. Check your email for details.`}
           </p>
 
           <div className="bg-white/5 border border-white/10 rounded-2xl p-5 text-left space-y-3 mb-6">
@@ -565,8 +590,8 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
               ...(selectedDate ? [{ label: "Date", value: formatDate(selectedDate) }] : []),
               ...(selectedTime ? [{ label: "Time", value: selectedTime }] : []),
               ...(selectedPackage ? [{ label: "Total", value: `$${selectedPackage.price}` }] : []),
-              ...(depositAmount > 0 && stripeDepositPaid ? [{ label: "Deposit Paid", value: `$${depositAmount}`, highlight: true }] : []),
-              ...(depositAmount > 0 && !stripeDepositPaid ? [{ label: "Deposit Due", value: `$${depositAmount}`, highlight: true }] : []),
+              ...(depositAmount > 0 && (stripeDepositPaid || proofUploaded) ? [{ label: "Deposit Paid", value: `$${depositAmount}`, highlight: true }] : []),
+              ...(depositAmount > 0 && !stripeDepositPaid && !proofUploaded ? [{ label: "Deposit Due", value: `$${depositAmount}`, highlight: true }] : []),
               ...(selectedStaff ? [{ label: "Detailer", value: selectedStaff.name }] : []),
             ].filter(item => item.value).map(({ label, value, mono, highlight }) => (
               <div key={label} className="flex justify-between text-sm">
@@ -723,7 +748,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
           )}
 
           {/* Enhancement 6: Pro Enhanced Success Screen */}
-          {isPro && (
+          {isPro && !awaitingOfflinePayment && (
             <>
               {/* Add to Calendar button */}
               <a
