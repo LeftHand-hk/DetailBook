@@ -540,47 +540,117 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       (selectedPaymentMethod === "paypal" ||
         selectedPaymentMethod === "cashapp" ||
         selectedPaymentMethod === "bankTransfer");
+    const proofAwaitingReview =
+      depositAmount > 0 && !stripeDepositPaid && proofUploaded;
+    const fullyConfirmed = stripeDepositPaid;
+
+    const screenTitle = awaitingOfflinePayment
+      ? "Complete Your Deposit"
+      : proofAwaitingReview
+      ? "Payment Proof Received"
+      : fullyConfirmed
+      ? "Booking Confirmed!"
+      : "Booking Request Sent";
+    const screenSubtitle = awaitingOfflinePayment
+      ? `Your slot is held. Pay the $${depositAmount} deposit and upload your proof below to confirm.`
+      : proofAwaitingReview
+      ? `${user?.name || "The business"} will review your payment and confirm shortly. You'll get an email once it's approved.`
+      : fullyConfirmed
+      ? `${user?.name || "The business"} will confirm your appointment shortly. Check your email for details.`
+      : `${user?.name || "The business"} will review and confirm your request. You'll get an email once it's approved.`;
+
+    const useAmberIcon = awaitingOfflinePayment;
+    const useBlueIcon = proofAwaitingReview || (!fullyConfirmed && !awaitingOfflinePayment);
+    const useGreenIcon = fullyConfirmed;
 
     return (
       <div className="min-h-screen bg-mesh flex items-center justify-center p-4">
         {/* Animated circles */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className={`absolute top-1/4 left-1/4 w-96 h-96 ${awaitingOfflinePayment ? "bg-amber-500/10" : "bg-green-500/10"} rounded-full blur-3xl animate-blobFloat`} />
+          <div className={`absolute top-1/4 left-1/4 w-96 h-96 ${useAmberIcon ? "bg-amber-500/10" : useGreenIcon ? "bg-green-500/10" : "bg-blue-500/10"} rounded-full blur-3xl animate-blobFloat`} />
           <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl animate-blobFloat delay-300" />
         </div>
 
-        <div className="glass rounded-3xl max-w-md w-full p-8 text-center relative animate-scaleIn">
-          {/* Icon */}
-          <div className="relative w-24 h-24 mx-auto mb-6">
-            {awaitingOfflinePayment ? (
-              <>
-                <div className="absolute inset-0 bg-amber-500/20 rounded-full animate-ping" />
-                <div className="relative w-24 h-24 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg">
-                  <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+        <div className="glass rounded-3xl max-w-md w-full overflow-hidden relative animate-scaleIn">
+          {/* ── Brand header ── */}
+          <div className={`relative px-8 pt-8 pb-6 text-center border-b border-white/10 overflow-hidden ${
+            useAmberIcon ? "bg-gradient-to-br from-amber-500/15 via-orange-500/10 to-transparent"
+            : useGreenIcon ? "bg-gradient-to-br from-emerald-500/15 via-green-500/10 to-transparent"
+            : "bg-gradient-to-br from-blue-500/15 via-indigo-500/10 to-transparent"
+          }`}>
+            <div className="absolute -top-16 -right-16 w-40 h-40 bg-white/5 rounded-full blur-2xl pointer-events-none" />
+            <div className="absolute -bottom-20 -left-12 w-48 h-48 bg-white/5 rounded-full blur-2xl pointer-events-none" />
+
+            {/* Business logo / initial */}
+            <div className="relative flex items-center justify-center gap-3 mb-6">
+              {user?.logo ? (
+                <img
+                  src={user.logo}
+                  alt={user.businessName || "Business"}
+                  className="w-12 h-12 rounded-xl object-cover ring-2 ring-white/20 shadow-lg"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-extrabold text-lg shadow-lg ring-2 ring-white/20">
+                  {(user?.businessName || "B").charAt(0).toUpperCase()}
                 </div>
-              </>
-            ) : (
-              <>
-                <div className="absolute inset-0 bg-green-500/20 rounded-full animate-ping" />
-                <div className="relative w-24 h-24 bg-gradient-to-br from-green-400 to-emerald-600 rounded-full flex items-center justify-center shadow-lg glow-green">
-                  <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-              </>
-            )}
+              )}
+              <div className="text-left">
+                <p className="text-white text-sm font-bold leading-tight">{user?.businessName || "Booking"}</p>
+                <p className="text-white/50 text-xs">Booking receipt</p>
+              </div>
+            </div>
+
+            {/* Animated status icon */}
+            <div className="relative w-20 h-20 mx-auto mb-5">
+              {useAmberIcon ? (
+                <>
+                  <div className="absolute inset-0 bg-amber-500/25 rounded-full animate-ping" />
+                  <div className="relative w-20 h-20 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center shadow-xl shadow-amber-500/40">
+                    <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </>
+              ) : useGreenIcon ? (
+                <>
+                  <div className="absolute inset-0 bg-green-500/25 rounded-full animate-ping" />
+                  <div className="relative w-20 h-20 bg-gradient-to-br from-green-400 to-emerald-600 rounded-full flex items-center justify-center shadow-xl shadow-emerald-500/40">
+                    <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="absolute inset-0 bg-blue-500/25 rounded-full animate-ping" />
+                  <div className="relative w-20 h-20 bg-gradient-to-br from-blue-400 to-indigo-600 rounded-full flex items-center justify-center shadow-xl shadow-blue-500/40">
+                    <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Status pill */}
+            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-3 ${
+              useAmberIcon ? "bg-amber-500/20 text-amber-300 border border-amber-400/30"
+              : useGreenIcon ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/30"
+              : "bg-blue-500/20 text-blue-300 border border-blue-400/30"
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${
+                useAmberIcon ? "bg-amber-400 animate-pulse"
+                : useGreenIcon ? "bg-emerald-400"
+                : "bg-blue-400 animate-pulse"
+              }`} />
+              {useAmberIcon ? "Action Required" : useGreenIcon ? "Confirmed" : "Pending Review"}
+            </div>
+
+            <h1 className="text-2xl font-extrabold text-white mb-2 leading-tight">{screenTitle}</h1>
+            <p className="text-white/60 text-sm leading-relaxed max-w-xs mx-auto">{screenSubtitle}</p>
           </div>
 
-          <h1 className="text-2xl font-extrabold text-white mb-2">
-            {awaitingOfflinePayment ? "Complete Your Deposit" : "Booking Confirmed!"}
-          </h1>
-          <p className="text-white/60 mb-8">
-            {awaitingOfflinePayment
-              ? `Your slot is held. Pay the $${depositAmount} deposit and upload your proof below to confirm.`
-              : `${user?.name || "The business"} will confirm your appointment shortly. Check your email for details.`}
-          </p>
+          <div className="p-6 sm:p-8 text-center">
 
           <div className="bg-white/5 border border-white/10 rounded-2xl p-5 text-left space-y-3 mb-6">
             <p className="text-white/40 text-xs font-semibold uppercase tracking-widest mb-3">Summary</p>
@@ -748,7 +818,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
           )}
 
           {/* Enhancement 6: Pro Enhanced Success Screen */}
-          {isPro && !awaitingOfflinePayment && (
+          {isPro && fullyConfirmed && (
             <>
               {/* Add to Calendar button */}
               <a
@@ -837,6 +907,12 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
           >
             Book Another Appointment
           </button>
+
+          {/* Footer brand line */}
+          <p className="text-white/30 text-[11px] text-center mt-6">
+            Powered by <span className="text-white/50 font-semibold">DetailBook</span>
+          </p>
+          </div>
         </div>
       </div>
     );
