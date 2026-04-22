@@ -168,6 +168,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   const [proofError, setProofError] = useState<string | null>(null);
   const [paymentCompleted, setPaymentCompleted] = useState(false);
   const [stripeDepositPaid, setStripeDepositPaid] = useState(false);
+  const [smsConsent, setSmsConsent] = useState(false);
 
   useEffect(() => {
     // Fetch public business data (staff + serviceType) from API
@@ -806,7 +807,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
           )}
 
           <button
-            onClick={() => { setStep(0); setSelectedPackage(null); setSelectedDate(null); setSelectedTime(null); setForm(EMPTY_FORM); setBookingId(null); setBookingError(null); setCustomerAddress(""); setSelectedStaff(null); setSelectedServiceMode(null); setSelectedPaymentMethod(null); setProofUploaded(false); setPaymentCompleted(false); setProofError(null); setStripeDepositPaid(false); }}
+            onClick={() => { setStep(0); setSelectedPackage(null); setSelectedDate(null); setSelectedTime(null); setForm(EMPTY_FORM); setBookingId(null); setBookingError(null); setCustomerAddress(""); setSelectedStaff(null); setSelectedServiceMode(null); setSelectedPaymentMethod(null); setProofUploaded(false); setPaymentCompleted(false); setProofError(null); setStripeDepositPaid(false); setSmsConsent(false); }}
             className="w-full glass border border-white/20 text-white font-semibold py-3.5 rounded-2xl hover:bg-white/10 transition-all"
           >
             Book Another Appointment
@@ -1760,8 +1761,20 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                 </div>
               )}
 
+              <label className="flex items-start gap-3 bg-white/5 border border-white/10 rounded-xl p-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={smsConsent}
+                  onChange={(e) => setSmsConsent(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 flex-shrink-0 accent-blue-600 cursor-pointer"
+                />
+                <span className="text-white/70 text-xs leading-relaxed">
+                  I agree to receive SMS appointment reminders from this business. Message frequency varies. Message and data rates may apply. Reply STOP to opt out at any time. Reply HELP for help. <span className="text-white/40">(optional)</span>
+                </span>
+              </label>
+
               <button type="submit" disabled={submitting}
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 text-white font-extrabold text-base py-4 rounded-2xl transition-all duration-300 shadow-lg shadow-blue-600/30 hover:-translate-y-0.5 flex items-center justify-center gap-3">
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-extrabold text-base py-4 rounded-2xl transition-all duration-300 shadow-lg shadow-blue-600/30 hover:-translate-y-0.5 flex items-center justify-center gap-3">
                 {submitting ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
