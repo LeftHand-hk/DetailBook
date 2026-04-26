@@ -126,6 +126,26 @@ export default function AdminUsersPage() {
     if (ok) setEditingEmail(null);
   };
 
+  const handleImpersonate = async (userId: string) => {
+    setSaving(userId);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/users/impersonate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to start impersonation");
+      // Open in a new tab so the admin keeps the original tab on the admin app.
+      window.open("/dashboard", "_blank", "noopener");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to start impersonation");
+    } finally {
+      setSaving(null);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteConfirm) return;
     setSaving(deleteConfirm.id);
@@ -300,6 +320,14 @@ export default function AdminUsersPage() {
                                 onChange={() => handleSuspendToggle(user.id, user.suspended)}
                               />
                             </div>
+                            <button
+                              onClick={() => handleImpersonate(user.id)}
+                              disabled={isSaving}
+                              title="Open this client's dashboard as if you were them (new tab)"
+                              className="px-2 py-1 text-xs text-purple-600 hover:bg-purple-50 rounded-md disabled:opacity-50"
+                            >
+                              View as
+                            </button>
                             <button
                               onClick={() => setEditingEmail({ id: user.id, email: user.email })}
                               disabled={isSaving}
