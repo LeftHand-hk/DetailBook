@@ -137,6 +137,12 @@ export default function AdminUsersPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to start impersonation");
+      // Dashboard layout's isLoggedIn() reads localStorage, not the cookie.
+      // Set the flag and clear any stale cached user so syncFromServer fills it in.
+      try {
+        localStorage.setItem("detailbook_logged_in", "true");
+        localStorage.removeItem("detailbook_user");
+      } catch { /* localStorage may be unavailable */ }
       // Open in a new tab so the admin keeps the original tab on the admin app.
       window.open("/dashboard", "_blank", "noopener");
     } catch (e) {

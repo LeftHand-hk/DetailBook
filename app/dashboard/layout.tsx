@@ -110,6 +110,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     try {
       await fetch("/api/admin/users/impersonate", { method: "DELETE" });
     } catch { /* ignore */ }
+    try {
+      localStorage.setItem("detailbook_logged_in", "false");
+      localStorage.removeItem("detailbook_user");
+    } catch { /* ignore */ }
     window.location.href = "/admin/users";
   };
 
