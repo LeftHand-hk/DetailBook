@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { getPackages, setPackages, getUser, generateId } from "@/lib/storage";
 import type { Package, User } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
@@ -169,13 +170,12 @@ export default function PackagesPage() {
               <div className="bg-amber-50 border border-amber-200 text-amber-700 text-sm px-3 py-2 rounded-xl font-medium">
                 5/5 limit reached
               </div>
-              <button
-                type="button"
-                disabled
-                className="bg-blue-600/40 text-white text-sm font-semibold px-4 py-2 rounded-xl cursor-not-allowed"
+              <Link
+                href="/dashboard/billing"
+                className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
               >
-                Pro — Coming Soon
-              </button>
+                Upgrade to Pro
+              </Link>
             </div>
           ) : (
             <button
@@ -198,13 +198,12 @@ export default function PackagesPage() {
             <p className="font-bold mb-1">You&apos;ve reached the Starter plan limit (5 packages)</p>
             <p className="text-blue-100 text-sm">Upgrade to Pro for unlimited service packages, SMS reminders, and more.</p>
           </div>
-          <button
-            type="button"
-            disabled
-            className="flex-shrink-0 bg-white/40 text-blue-900/60 font-bold px-5 py-2.5 rounded-xl text-sm whitespace-nowrap cursor-not-allowed"
+          <Link
+            href="/dashboard/billing"
+            className="flex-shrink-0 bg-white text-blue-700 hover:bg-blue-50 font-bold px-5 py-2.5 rounded-xl text-sm whitespace-nowrap transition-colors"
           >
-            Pro — Coming Soon
-          </button>
+            Upgrade to Pro
+          </Link>
         </div>
       )}
 

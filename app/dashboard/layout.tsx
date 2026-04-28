@@ -288,13 +288,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <p className="text-slate-500 text-[11px] leading-relaxed mb-3">
               Unlock analytics, reviews, SMS & more
             </p>
-            <button
-              type="button"
-              disabled
-              className="block w-full text-center bg-white/40 text-gray-600 text-xs font-bold py-2 rounded-lg cursor-not-allowed"
+            <Link
+              href="/dashboard/billing"
+              className="block w-full text-center bg-white text-blue-700 hover:bg-blue-50 text-xs font-bold py-2 rounded-lg transition-colors"
             >
-              Coming Soon
-            </button>
+              Upgrade to Pro
+            </Link>
           </div>
         </div>
       )}

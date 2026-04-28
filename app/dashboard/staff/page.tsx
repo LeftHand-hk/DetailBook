@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { getUser } from "@/lib/storage";
 
 interface StaffMember {
@@ -134,13 +135,12 @@ export default function StaffPage() {
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Staff Management</h2>
           <p className="text-gray-500 text-sm mb-6">Add your team, give them their own login, and track their performance — Pro only.</p>
-          <button
-            type="button"
-            disabled
-            className="inline-flex items-center gap-2 bg-gray-400 text-white font-bold px-6 py-3 rounded-xl cursor-not-allowed"
+          <Link
+            href="/dashboard/billing"
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl transition-colors"
           >
-            Pro — Coming Soon
-          </button>
+            Upgrade to Pro
+          </Link>
         </div>
       </div>
     );

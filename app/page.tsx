@@ -532,13 +532,10 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <button
-                type="button"
-                disabled
-                className="block w-full text-center bg-white/40 text-blue-900/60 font-black py-3.5 rounded-xl cursor-not-allowed"
-              >
-                Coming Soon
-              </button>
+              <Link href="/signup"
+                className="block w-full text-center bg-white text-blue-700 hover:bg-blue-50 font-black py-3.5 rounded-xl transition-all duration-200 hover:-translate-y-0.5">
+                Start Free Trial
+              </Link>
             </div>
           </div>
 

@@ -53,6 +53,8 @@ export default function AdminUsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [editingEmail, setEditingEmail] = useState<{ id: string; email: string } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<AdminUser | null>(null);
+  const [trialUser, setTrialUser] = useState<AdminUser | null>(null);
+  const [trialDateInput, setTrialDateInput] = useState("");
   const [saving, setSaving] = useState<string | null>(null);
 
   const load = async () => {
@@ -118,6 +120,51 @@ export default function AdminUsersPage() {
 
   const handleSuspendToggle = (userId: string, current: boolean) => {
     updateUser(userId, { suspended: !current });
+  };
+
+  const adjustTrial = async (user: AdminUser, days: number) => {
+    const base = user.trialEndsAt && new Date(user.trialEndsAt) > new Date()
+      ? new Date(user.trialEndsAt)
+      : new Date();
+    base.setDate(base.getDate() + days);
+    await updateUser(user.id, {
+      subscriptionStatus: "trial",
+      trialEndsAt: base.toISOString(),
+      suspended: false,
+    });
+  };
+
+  const endTrial = async (user: AdminUser) => {
+    await updateUser(user.id, {
+      subscriptionStatus: "expired",
+      trialEndsAt: new Date(Date.now() - 86400000).toISOString(),
+    });
+  };
+
+  const setTrialCustomDate = async (user: AdminUser, isoDate: string) => {
+    const date = new Date(isoDate);
+    if (isNaN(date.getTime())) return;
+    await updateUser(user.id, {
+      subscriptionStatus: "trial",
+      trialEndsAt: date.toISOString(),
+      suspended: false,
+    });
+  };
+
+  const openTrialModal = (user: AdminUser) => {
+    setTrialUser(user);
+    if (user.trialEndsAt) {
+      const d = new Date(user.trialEndsAt);
+      if (!isNaN(d.getTime())) {
+        const tzOffset = d.getTimezoneOffset() * 60000;
+        setTrialDateInput(new Date(d.getTime() - tzOffset).toISOString().slice(0, 16));
+        return;
+      }
+    }
+    const future = new Date();
+    future.setDate(future.getDate() + 15);
+    const tzOffset = future.getTimezoneOffset() * 60000;
+    setTrialDateInput(new Date(future.getTime() - tzOffset).toISOString().slice(0, 16));
   };
 
   const handleSaveEmail = async () => {
@@ -335,6 +382,14 @@ export default function AdminUsersPage() {
                               View as
                             </button>
                             <button
+                              onClick={() => openTrialModal(user)}
+                              disabled={isSaving}
+                              title="Extend, shorten, or end this user's trial"
+                              className="px-2 py-1 text-xs text-amber-700 hover:bg-amber-50 rounded-md disabled:opacity-50"
+                            >
+                              Trial
+                            </button>
+                            <button
                               onClick={() => setEditingEmail({ id: user.id, email: user.email })}
                               disabled={isSaving}
                               className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded-md disabled:opacity-50"
@@ -389,6 +444,102 @@ export default function AdminUsersPage() {
                 className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
                 {saving === editingEmail.id ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Trial Modal */}
+      {trialUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full">
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">Manage Trial</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              {trialUser.businessName || trialUser.name} · {trialUser.email}
+            </p>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 text-sm">
+              <div className="text-gray-500 text-xs mb-1">Current trial ends</div>
+              <div className="font-medium text-gray-900">
+                {trialUser.trialEndsAt
+                  ? new Date(trialUser.trialEndsAt).toLocaleString()
+                  : "No trial set"}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <div className="text-xs font-medium text-gray-700 mb-2">Quick adjustments</div>
+              <div className="flex flex-wrap gap-2">
+                {[1, 7, 14, 30].map((d) => (
+                  <button
+                    key={d}
+                    onClick={async () => {
+                      await adjustTrial(trialUser, d);
+                      const updated = users.find((u) => u.id === trialUser.id);
+                      if (updated) setTrialUser(updated);
+                    }}
+                    disabled={saving === trialUser.id}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-700 disabled:opacity-50"
+                  >
+                    +{d}d
+                  </button>
+                ))}
+                {[7, 30].map((d) => (
+                  <button
+                    key={`minus-${d}`}
+                    onClick={async () => {
+                      await adjustTrial(trialUser, -d);
+                      const updated = users.find((u) => u.id === trialUser.id);
+                      if (updated) setTrialUser(updated);
+                    }}
+                    disabled={saving === trialUser.id}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-700 disabled:opacity-50"
+                  >
+                    −{d}d
+                  </button>
+                ))}
+                <button
+                  onClick={async () => {
+                    await endTrial(trialUser);
+                    setTrialUser(null);
+                  }}
+                  disabled={saving === trialUser.id}
+                  className="px-3 py-1.5 text-sm border border-red-200 rounded-lg bg-white hover:bg-red-50 text-red-600 disabled:opacity-50"
+                >
+                  End trial now
+                </button>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Set exact end date/time</label>
+              <input
+                type="datetime-local"
+                value={trialDateInput}
+                onChange={(e) => setTrialDateInput(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              />
+              <button
+                onClick={async () => {
+                  if (!trialDateInput) return;
+                  await setTrialCustomDate(trialUser, trialDateInput);
+                  const updated = users.find((u) => u.id === trialUser.id);
+                  if (updated) setTrialUser(updated);
+                }}
+                disabled={saving === trialUser.id || !trialDateInput}
+                className="mt-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving === trialUser.id ? "Saving..." : "Apply custom date"}
+              </button>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+              <button
+                onClick={() => setTrialUser(null)}
+                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Done
               </button>
             </div>
           </div>

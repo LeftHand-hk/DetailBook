@@ -70,16 +70,15 @@ export default function ReviewsPage() {
                 ))}
               </div>
 
-              <button
-                type="button"
-                disabled
-                className="inline-flex items-center gap-2 bg-white/40 text-blue-900/60 font-bold text-sm px-6 py-3 rounded-xl cursor-not-allowed"
+              <Link
+                href="/dashboard/billing"
+                className="inline-flex items-center gap-2 bg-white text-blue-700 hover:bg-blue-50 font-bold text-sm px-6 py-3 rounded-xl transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
-                Pro — Coming Soon
-              </button>
+                Upgrade to Pro
+              </Link>
             </div>
           </div>
         </div>

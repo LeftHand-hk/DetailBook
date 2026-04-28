@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { getUser, setUser } from "@/lib/storage";
 import type { User } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
@@ -370,16 +371,15 @@ export default function MessagesPage() {
                     <p className="text-blue-100 text-sm mb-6 max-w-md mx-auto">
                       Upgrade to Pro to customize {currentTemplate.label.toLowerCase()} templates and automate your customer communications.
                     </p>
-                    <button
-                      type="button"
-                      disabled
-                      className="inline-flex items-center gap-2 bg-white/40 text-blue-900/60 font-bold text-sm px-6 py-3 rounded-xl cursor-not-allowed"
+                    <Link
+                      href="/dashboard/billing"
+                      className="inline-flex items-center gap-2 bg-white text-blue-700 hover:bg-blue-50 font-bold text-sm px-6 py-3 rounded-xl transition-colors"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
-                      Pro — Coming Soon
-                    </button>
+                      Upgrade to Pro
+                    </Link>
                   </div>
                 </div>
               </div>

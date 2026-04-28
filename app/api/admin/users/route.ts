@@ -150,15 +150,21 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Cascades defined in schema will remove packages, bookings, staff, tickets
-    await prisma.user.delete({ where: { id: userId } });
+    // Delete children explicitly first to avoid race between
+    // user→booking Cascade and staff→booking SetNull triggers.
+    await prisma.$transaction([
+      prisma.ticketMessage.deleteMany({ where: { ticket: { userId } } }),
+      prisma.supportTicket.deleteMany({ where: { userId } }),
+      prisma.booking.deleteMany({ where: { userId } }),
+      prisma.staff.deleteMany({ where: { userId } }),
+      prisma.package.deleteMany({ where: { userId } }),
+      prisma.user.delete({ where: { id: userId } }),
+    ]);
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/admin/users error:", error);
-    return NextResponse.json(
-      { error: "Failed to delete user" },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : "Failed to delete user";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -11,6 +11,13 @@ interface UserData {
   trialEndsAt?: string;
 }
 
+interface CardInfo {
+  brand: string | null;
+  last4: string | null;
+  expMonth: number | null;
+  expYear: number | null;
+}
+
 export default function BillingPage() {
   const [user, setUser] = useState<UserData | null>(null);
   const [userLoading, setUserLoading] = useState(true);
@@ -22,7 +29,12 @@ export default function BillingPage() {
   const [activating, setActivating] = useState(false);
   const [activateError, setActivateError] = useState("");
   const [activateSuccess, setActivateSuccess] = useState(false);
+  const [card, setCard] = useState<CardInfo | null>(null);
+  const [nextBilledAt, setNextBilledAt] = useState<string | null>(null);
+  const [updatingCard, setUpdatingCard] = useState(false);
+  const [updateCardError, setUpdateCardError] = useState("");
   const pendingPlanRef = useRef<"starter" | "pro">("starter");
+  const checkoutIntentRef = useRef<"subscribe" | "update-card">("subscribe");
 
   // Fetch user directly from API — not localStorage
   const fetchUser = async () => {
@@ -39,6 +51,41 @@ export default function BillingPage() {
     }
   };
 
+  const fetchCard = async () => {
+    try {
+      const res = await fetch("/api/subscription/payment-method");
+      if (!res.ok) return;
+      const data = await res.json();
+      setCard(data.card || null);
+      setNextBilledAt(data.nextBilledAt || null);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleUpdateCard = async () => {
+    setUpdatingCard(true);
+    setUpdateCardError("");
+    try {
+      const res = await fetch("/api/subscription/payment-method", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.transactionId) {
+        setUpdateCardError(data.error || "Could not start card update.");
+        return;
+      }
+      if (!paddle) {
+        setUpdateCardError("Payment system loading, try again.");
+        return;
+      }
+      checkoutIntentRef.current = "update-card";
+      paddle.Checkout.open({ transactionId: data.transactionId });
+    } catch {
+      setUpdateCardError("Network error. Try again.");
+    } finally {
+      setUpdatingCard(false);
+    }
+  };
+
   useEffect(() => {
     fetchUser();
 
@@ -50,7 +97,11 @@ export default function BillingPage() {
         token,
         async eventCallback(event) {
           if (event.name === "checkout.completed") {
-            await activatePlan(pendingPlanRef.current);
+            if (checkoutIntentRef.current === "update-card") {
+              await fetchCard();
+            } else {
+              await activatePlan(pendingPlanRef.current);
+            }
           }
         },
       }).then((instance) => {
@@ -58,6 +109,10 @@ export default function BillingPage() {
       });
     });
   }, []);
+
+  useEffect(() => {
+    if (user?.subscriptionStatus === "active") fetchCard();
+  }, [user?.subscriptionStatus]);
 
   const activatePlan = async (plan: "starter" | "pro") => {
     setActivating(true);
@@ -114,6 +169,7 @@ export default function BillingPage() {
       return;
     }
     pendingPlanRef.current = plan;
+    checkoutIntentRef.current = "subscribe";
     setCheckoutOpened(true);
     setActivateError("");
     setActivateSuccess(false);
@@ -137,7 +193,7 @@ export default function BillingPage() {
     {
       id: "starter" as const,
       name: "Starter",
-      price: 25,
+      price: 29,
       features: [
         "Online booking page",
         "Payment & deposit collection",
@@ -238,6 +294,43 @@ export default function BillingPage() {
         </div>
       </div>
 
+      {/* Payment Method (active subscribers only) */}
+      {isSubscribed && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="font-bold text-gray-900 mb-1">Payment Method</h3>
+              {card ? (
+                <p className="text-sm text-gray-600">
+                  <span className="capitalize">{card.brand || "Card"}</span>
+                  {card.last4 && <> ending in <strong>{card.last4}</strong></>}
+                  {card.expMonth && card.expYear && (
+                    <> · expires {String(card.expMonth).padStart(2, "0")}/{String(card.expYear).slice(-2)}</>
+                  )}
+                </p>
+              ) : (
+                <p className="text-sm text-gray-500">No card on file yet.</p>
+              )}
+              {nextBilledAt && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Next charge on {new Date(nextBilledAt).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={handleUpdateCard}
+              disabled={updatingCard}
+              className="px-4 py-2.5 text-sm font-semibold bg-gray-900 text-white rounded-xl hover:bg-gray-800 disabled:opacity-50 transition-colors"
+            >
+              {updatingCard ? "Loading..." : card ? "Update card" : "Add card"}
+            </button>
+          </div>
+          {updateCardError && (
+            <p className="mt-3 text-sm text-red-600">{updateCardError}</p>
+          )}
+        </div>
+      )}
+
       {/* Plan Cards */}
       <div className="grid sm:grid-cols-2 gap-4 mb-6">
         {plans.map((plan) => {
@@ -282,25 +375,21 @@ export default function BillingPage() {
                 <div className={`w-full text-center font-bold py-3 rounded-xl text-sm ${plan.id === "pro" ? "bg-white/10 text-white/60" : "bg-gray-100 text-gray-400"}`}>
                   ✓ Subscribed
                 </div>
-              ) : plan.id === "pro" ? (
-                <button
-                  type="button"
-                  disabled
-                  className="w-full bg-white/40 text-blue-900/60 font-bold py-3 rounded-xl text-sm cursor-not-allowed"
-                >
-                  Coming Soon
-                </button>
-              ) : isCurrent && !isSubscribed ? (
-                <button
-                  onClick={() => openCheckout(plan.id)}
-                  className="w-full bg-gray-900 text-white hover:bg-gray-800 font-bold py-3 rounded-xl text-sm transition-colors"
-                >
-                  {`Subscribe to ${plan.name} — $${plan.price}/mo`}
-                </button>
-              ) : (
+              ) : user?.plan === "pro" && plan.id === "starter" ? (
                 <div className="w-full text-center text-gray-400 text-sm py-3">
                   Downgrade not available
                 </div>
+              ) : (
+                <button
+                  onClick={() => openCheckout(plan.id)}
+                  className={`w-full font-bold py-3 rounded-xl text-sm transition-colors ${
+                    plan.id === "pro"
+                      ? "bg-white text-blue-700 hover:bg-blue-50"
+                      : "bg-gray-900 text-white hover:bg-gray-800"
+                  }`}
+                >
+                  {`Subscribe to ${plan.name} — $${plan.price}/mo`}
+                </button>
               )}
             </div>
           );

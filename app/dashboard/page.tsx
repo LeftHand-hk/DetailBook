@@ -534,13 +534,12 @@ export default function DashboardPage() {
                   </div>
                 ))}
               </div>
-              <button
-                type="button"
-                disabled
-                className="block w-full text-center bg-white/40 text-gray-600 text-sm font-bold py-3 rounded-xl cursor-not-allowed"
+              <Link
+                href="/dashboard/billing"
+                className="block w-full text-center bg-white text-blue-700 hover:bg-blue-50 text-sm font-bold py-3 rounded-xl transition-colors"
               >
-                Pro — Coming Soon
-              </button>
+                Upgrade to Pro
+              </Link>
               <p className="text-[10px] text-slate-500 text-center mt-2">Currently on Starter ($29/mo)</p>
             </div>
           </div>
