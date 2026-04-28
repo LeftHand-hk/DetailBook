@@ -724,7 +724,7 @@ export default function OnboardingPage() {
                       </div>
                     </div>
                     <div className="mb-3">
-                      <span className="text-3xl font-black text-gray-900">$25</span>
+                      <span className="text-3xl font-black text-gray-900">$29</span>
                       <span className="text-gray-400 text-sm">/month</span>
                     </div>
                     <p className="text-gray-500 text-xs mb-4">Perfect for solo detailers just getting started.</p>
@@ -827,7 +827,7 @@ export default function OnboardingPage() {
                       ) : !selectedPlan ? (
                         "Select a plan to continue"
                       ) : (
-                        <>💳 Pay Now — ${selectedPlan === "starter" ? "25" : "50"}/mo</>
+                        <>💳 Pay Now — ${selectedPlan === "starter" ? "29" : "50"}/mo</>
                       )}
                     </button>
                     <button

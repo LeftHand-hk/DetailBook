@@ -25,7 +25,7 @@ export default function AdminOverview() {
   const activeSubscriptions = users.filter((u) => u.plan === "starter" || u.plan === "pro").length;
   const monthlyRevenue = users.reduce((sum, u) => {
     if (u.plan === "pro") return sum + (settings?.proPrice || 49);
-    if (u.plan === "starter") return sum + (settings?.starterPrice || 25);
+    if (u.plan === "starter") return sum + (settings?.starterPrice || 29);
     return sum;
   }, 0);
   const totalBookings = bookings.length;

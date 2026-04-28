@@ -28,7 +28,7 @@ async function main() {
       platformName: "DetailBook",
       supportEmail: "support@detailbook.com",
       defaultDomain: "detailbook.app",
-      starterPrice: 25,
+      starterPrice: 29,
       proPrice: 49,
       trialDays: 30,
     },

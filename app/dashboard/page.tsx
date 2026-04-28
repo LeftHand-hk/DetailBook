@@ -541,7 +541,7 @@ export default function DashboardPage() {
               >
                 Pro — Coming Soon
               </button>
-              <p className="text-[10px] text-slate-500 text-center mt-2">Currently on Starter ($25/mo)</p>
+              <p className="text-[10px] text-slate-500 text-center mt-2">Currently on Starter ($29/mo)</p>
             </div>
           </div>
         )}

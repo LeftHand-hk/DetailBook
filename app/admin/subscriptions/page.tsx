@@ -27,7 +27,7 @@ export default function AdminSubscriptionsPage() {
     if (!settings) return;
     const updated: PlatformSettings = {
       ...settings,
-      starterPrice: Number(starterPrice) || 25,
+      starterPrice: Number(starterPrice) || 29,
       proPrice: Number(proPrice) || 49,
       trialDays: Number(trialDays) || 30,
     };

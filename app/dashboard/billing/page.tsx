@@ -232,7 +232,7 @@ export default function BillingPage() {
             </span>
           </div>
           <p className={`text-sm ${isPro ? "text-blue-200" : "text-gray-500"}`}>
-            {isPro ? "$50/month" : "$25/month"}
+            {isPro ? "$50/month" : "$29/month"}
             {trialDaysLeft !== null && !isSubscribed && ` · Free trial ends in ${trialDaysLeft} day${trialDaysLeft !== 1 ? "s" : ""}`}
           </p>
         </div>

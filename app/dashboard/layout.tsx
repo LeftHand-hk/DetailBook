@@ -243,7 +243,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   ) : (
                     <span className="text-[10px] font-bold bg-slate-700 text-slate-400 px-2 py-0.5 rounded-full uppercase tracking-wider">Starter</span>
                   )}
-                  <span className="text-[11px] text-slate-500">${isPro ? "50" : "25"}/mo</span>
+                  <span className="text-[11px] text-slate-500">${isPro ? "50" : "29"}/mo</span>
                 </div>
               </div>
             </div>

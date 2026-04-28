@@ -175,7 +175,7 @@ export default function SignupPage() {
           </div>
           <div className="flex gap-4">
             <div className="flex-1 bg-white/5 rounded-xl p-3 text-center">
-              <p className="text-2xl font-black text-white">$25</p>
+              <p className="text-2xl font-black text-white">$29</p>
               <p className="text-white/40 text-xs mt-0.5">Starter / mo</p>
             </div>
             <div className="flex-1 bg-blue-600/20 border border-blue-500/30 rounded-xl p-3 text-center">

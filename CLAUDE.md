@@ -14,7 +14,7 @@ B2B SaaS platform targeting auto detailing businesses in the USA. Niche-focused 
 - Before/after photo upload
 
 ## Pricing
-- **Starter:** $25/month
+- **Starter:** $29/month
   - Core booking & scheduling
   - Payment processing
   - Analytics

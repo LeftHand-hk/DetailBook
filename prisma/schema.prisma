@@ -231,7 +231,7 @@ model PlatformSettings {
   supportEmail         String  @default("support@detailbook.com")
   defaultDomain        String  @default("detailbook.app")
   customDomainsEnabled Boolean @default(true)
-  starterPrice         Float   @default(25)
+  starterPrice         Float   @default(29)
   proPrice             Float   @default(49)
   trialDays            Int     @default(30)
   maintenanceMode      Boolean @default(false)

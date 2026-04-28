@@ -40,7 +40,7 @@ export interface PlatformSettings {
 }
 
 const DEFAULT_PLATFORM: PlatformSettings = {
-  starterPrice: 25,
+  starterPrice: 29,
   proPrice: 49,
   trialDays: 30,
   defaultDomain: "detailbook.app",
