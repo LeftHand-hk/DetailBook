@@ -36,6 +36,34 @@ export default function AdminSettingsPage() {
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
 
+  // SMS test
+  const [smsTo, setSmsTo] = useState("");
+  const [smsMessage, setSmsMessage] = useState("DetailBook test SMS — if you got this, Twilio is working.");
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsResult, setSmsResult] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const handleSendTestSms = async () => {
+    setSmsSending(true);
+    setSmsResult(null);
+    try {
+      const res = await fetch("/api/admin/sms-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: smsTo, message: smsMessage }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSmsResult({ ok: false, text: data.error || `Failed (HTTP ${res.status})` });
+      } else {
+        setSmsResult({ ok: true, text: `Sent. Twilio Message SID: ${data.sid || "(none)"}` });
+      }
+    } catch (e) {
+      setSmsResult({ ok: false, text: e instanceof Error ? e.message : "Network error" });
+    } finally {
+      setSmsSending(false);
+    }
+  };
+
   useEffect(() => {
     const s = getPlatformSettings();
     setSettings(s);
@@ -125,6 +153,54 @@ export default function AdminSettingsPage() {
               onChange={(e) => setDefaultDomain(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
             />
+          </div>
+        </div>
+
+        {/* SMS Test */}
+        <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Send Test SMS</h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Sends a real SMS through your Twilio account. Use it to verify deliverability after toll-free verification or messaging service changes.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Phone number</label>
+            <input
+              type="tel"
+              value={smsTo}
+              onChange={(e) => setSmsTo(e.target.value)}
+              placeholder="+15551234567"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+            />
+            <p className="text-xs text-gray-400 mt-1">Include country code (e.g. +1 for US).</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+            <textarea
+              value={smsMessage}
+              onChange={(e) => setSmsMessage(e.target.value)}
+              rows={2}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleSendTestSms}
+              disabled={smsSending || !smsTo.trim()}
+              className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {smsSending ? "Sending…" : "Send test SMS"}
+            </button>
+            {smsResult && (
+              <span className={`text-sm ${smsResult.ok ? "text-green-700" : "text-red-700"}`}>
+                {smsResult.ok ? "✓ " : "✗ "}{smsResult.text}
+              </span>
+            )}
           </div>
         </div>
 
