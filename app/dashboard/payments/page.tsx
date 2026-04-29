@@ -49,6 +49,24 @@ function StripeIcon() {
   );
 }
 
+function PaddleIcon() {
+  return (
+    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 4h6a4 4 0 010 8H4z M4 12v8" />
+      <circle cx="16" cy="16" r="4" strokeWidth={1.8} />
+    </svg>
+  );
+}
+
+function SquareIcon() {
+  return (
+    <svg className="w-5 h-5 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <rect x="4" y="4" width="16" height="16" rx="3" strokeWidth={1.8} />
+      <rect x="9" y="9" width="6" height="6" strokeWidth={1.8} />
+    </svg>
+  );
+}
+
 function PayPalIcon() {
   return (
     <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,6 +135,8 @@ type PaymentMethods = NonNullable<User["paymentMethods"]>;
 
 const DEFAULT_PAYMENT_METHODS: PaymentMethods = {
   stripe: { enabled: false, publishableKey: "", secretKey: "", connected: false },
+  paddle: { enabled: false, apiKey: "", productId: "", sandbox: false },
+  square: { enabled: false, accessToken: "", locationId: "", sandbox: false },
   paypal: { enabled: false, email: "", paypalMeLink: "", requireProof: true },
   cashapp: { enabled: false, cashtag: "", requireProof: true },
   bankTransfer: { enabled: false, bankName: "", accountName: "", iban: "", sortCode: "", accountNumber: "", instructions: "", requireProof: true },
@@ -156,6 +176,8 @@ export default function PaymentsPage() {
   const applyMethods = (pm: any) => {
     setMethods({
       stripe: { ...DEFAULT_PAYMENT_METHODS.stripe!, ...pm?.stripe },
+      paddle: { ...DEFAULT_PAYMENT_METHODS.paddle!, ...pm?.paddle },
+      square: { ...DEFAULT_PAYMENT_METHODS.square!, ...pm?.square },
       paypal: { ...DEFAULT_PAYMENT_METHODS.paypal!, ...pm?.paypal },
       cashapp: { ...DEFAULT_PAYMENT_METHODS.cashapp!, ...pm?.cashapp },
       bankTransfer: { ...DEFAULT_PAYMENT_METHODS.bankTransfer!, ...pm?.bankTransfer },
@@ -193,6 +215,8 @@ export default function PaymentsPage() {
   /* ── Helper to determine connection status ── */
 
   const isStripeConnected = !!(methods.stripe?.publishableKey && methods.stripe?.secretKey);
+  const isPaddleConnected = !!(methods.paddle?.apiKey && methods.paddle?.productId);
+  const isSquareConnected = !!(methods.square?.accessToken && methods.square?.locationId);
   const isPaypalConnected = !!(methods.paypal?.email || methods.paypal?.paypalMeLink);
   const isCashappConnected = !!methods.cashapp?.cashtag;
   const isBankConnected = !!(
@@ -205,6 +229,8 @@ export default function PaymentsPage() {
     if (!m?.enabled) return "disabled";
     switch (key) {
       case "stripe": return isStripeConnected ? "connected" : "error";
+      case "paddle": return isPaddleConnected ? "connected" : "error";
+      case "square": return isSquareConnected ? "connected" : "error";
       case "paypal": return isPaypalConnected ? "connected" : "error";
       case "cashapp": return isCashappConnected ? "connected" : "error";
       case "bankTransfer": return isBankConnected ? "connected" : "error";
@@ -264,7 +290,7 @@ export default function PaymentsPage() {
       </div>
 
       {/* Warning when deposit is on but no payment methods enabled */}
-      {requireDeposit && !methods.stripe?.enabled && !methods.paypal?.enabled && !methods.cashapp?.enabled && !methods.bankTransfer?.enabled && !methods.cash?.enabled && (
+      {requireDeposit && !methods.stripe?.enabled && !methods.paddle?.enabled && !methods.square?.enabled && !methods.paypal?.enabled && !methods.cashapp?.enabled && !methods.bankTransfer?.enabled && !methods.cash?.enabled && (
         <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-2xl p-4">
           <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -347,6 +373,175 @@ export default function PaymentsPage() {
               Get your API keys from{" "}
               <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
                 dashboard.stripe.com/apikeys
+              </a>
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Paddle ── */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <button
+          type="button"
+          onClick={() => toggleExpand("paddle")}
+          className="w-full px-6 py-5 flex items-center justify-between hover:bg-gray-50/50 transition-colors"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center flex-shrink-0">
+              <PaddleIcon />
+            </div>
+            <div className="text-left">
+              <div className="flex items-center gap-2.5">
+                <StatusDot status={getStatus("paddle")} />
+                <span className="text-sm font-bold text-gray-900">Paddle (Card Payments)</span>
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">Global card processing — Merchant of Record handles taxes</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            {methods.paddle?.enabled && <StatusBadge connected={isPaddleConnected} />}
+            <div onClick={(e) => e.stopPropagation()}>
+              <Toggle
+                value={methods.paddle?.enabled ?? false}
+                onChange={(v) => setMethods({ ...methods, paddle: { ...methods.paddle!, enabled: v } })}
+              />
+            </div>
+            <svg
+              className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${expanded === "paddle" ? "rotate-180" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </button>
+
+        {expanded === "paddle" && methods.paddle?.enabled && (
+          <div className="px-6 pb-6 space-y-4 border-t border-gray-100 pt-4">
+            <p className="text-sm text-gray-500">
+              Customers pay deposits via Paddle Checkout. You only need an API key and one &quot;Booking Deposit&quot; product in Paddle.
+            </p>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">API Key</label>
+              <input
+                type="password"
+                value={methods.paddle?.apiKey ?? ""}
+                onChange={(e) => setMethods({ ...methods, paddle: { ...methods.paddle!, apiKey: e.target.value } })}
+                placeholder="pdl_live_apikey_..."
+                className={INPUT_CLASS}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Product ID</label>
+              <input
+                type="text"
+                value={methods.paddle?.productId ?? ""}
+                onChange={(e) => setMethods({ ...methods, paddle: { ...methods.paddle!, productId: e.target.value } })}
+                placeholder="pro_..."
+                className={INPUT_CLASS}
+              />
+              <p className="text-xs text-gray-400 mt-1.5">
+                Create one product in Paddle named &quot;Booking Deposit&quot; — we&apos;ll set the price per booking automatically.
+              </p>
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+              <div>
+                <p className="text-sm font-semibold text-gray-700">Sandbox Mode</p>
+                <p className="text-xs text-gray-400 mt-0.5">Use Paddle sandbox for testing</p>
+              </div>
+              <Toggle
+                value={methods.paddle?.sandbox ?? false}
+                onChange={(v) => setMethods({ ...methods, paddle: { ...methods.paddle!, sandbox: v } })}
+              />
+            </div>
+            <p className="text-xs text-gray-400">
+              Get your API key at{" "}
+              <a href="https://vendors.paddle.com/authentication-v2" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                vendors.paddle.com → Developer Tools → Authentication
+              </a>
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Square ── */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <button
+          type="button"
+          onClick={() => toggleExpand("square")}
+          className="w-full px-6 py-5 flex items-center justify-between hover:bg-gray-50/50 transition-colors"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
+              <SquareIcon />
+            </div>
+            <div className="text-left">
+              <div className="flex items-center gap-2.5">
+                <StatusDot status={getStatus("square")} />
+                <span className="text-sm font-bold text-gray-900">Square (Card Payments)</span>
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">Popular with US service businesses — fast payouts</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            {methods.square?.enabled && <StatusBadge connected={isSquareConnected} />}
+            <div onClick={(e) => e.stopPropagation()}>
+              <Toggle
+                value={methods.square?.enabled ?? false}
+                onChange={(v) => setMethods({ ...methods, square: { ...methods.square!, enabled: v } })}
+              />
+            </div>
+            <svg
+              className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${expanded === "square" ? "rotate-180" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </button>
+
+        {expanded === "square" && methods.square?.enabled && (
+          <div className="px-6 pb-6 space-y-4 border-t border-gray-100 pt-4">
+            <p className="text-sm text-gray-500">
+              Customers pay deposits via Square&apos;s hosted checkout page. Funds go to your Square account.
+            </p>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Access Token</label>
+              <input
+                type="password"
+                value={methods.square?.accessToken ?? ""}
+                onChange={(e) => setMethods({ ...methods, square: { ...methods.square!, accessToken: e.target.value } })}
+                placeholder="EAAAEx..."
+                className={INPUT_CLASS}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Location ID</label>
+              <input
+                type="text"
+                value={methods.square?.locationId ?? ""}
+                onChange={(e) => setMethods({ ...methods, square: { ...methods.square!, locationId: e.target.value } })}
+                placeholder="L1ABCD..."
+                className={INPUT_CLASS}
+              />
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+              <div>
+                <p className="text-sm font-semibold text-gray-700">Sandbox Mode</p>
+                <p className="text-xs text-gray-400 mt-0.5">Use Square sandbox for testing</p>
+              </div>
+              <Toggle
+                value={methods.square?.sandbox ?? false}
+                onChange={(v) => setMethods({ ...methods, square: { ...methods.square!, sandbox: v } })}
+              />
+            </div>
+            <p className="text-xs text-gray-400">
+              Get your access token at{" "}
+              <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                developer.squareup.com → your app → Credentials
               </a>
             </p>
           </div>
