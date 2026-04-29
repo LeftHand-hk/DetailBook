@@ -179,11 +179,18 @@ export default function SettingsPage() {
 
   const flash = (key: string) => { setSaved(key); setTimeout(() => setSaved(""), 2500); };
 
-  const handleSaveHours = (e: React.FormEvent) => {
+  const handleSaveHours = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     const updated: User = { ...user, businessHours: hours as User["businessHours"] };
     setUser(updated); setUserState(updated); flash("hours");
+    try {
+      await fetch("/api/user", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessHours: hours }),
+      });
+    } catch {}
   };
 
   const handleSaveBooking = async (e: React.FormEvent) => {
