@@ -89,6 +89,12 @@ export async function PUT(
     });
 
     // Send confirmation email + SMS when status changes to "confirmed"
+    console.log("[BOOKING PUT] Status transition:", {
+      bookingId: id,
+      bodyStatus: body.status,
+      existingStatus: existing.status,
+      willTriggerNotifications: body.status === "confirmed" && existing.status !== "confirmed",
+    });
     if (body.status === "confirmed" && existing.status !== "confirmed") {
       const user = (updated as any).user;
       console.log("[CONFIRM EMAIL] Attempting to send to:", updated.customerEmail, "| SMTP_HOST:", process.env.SMTP_HOST || "NOT SET", "| emailConfirmations:", user?.emailConfirmations);
@@ -126,6 +132,14 @@ export async function PUT(
       }
 
       // Confirmation SMS to customer (Pro only)
+      console.log("[CONFIRM SMS] Conditions:", {
+        plan: user?.plan,
+        smsConfirmations: user?.smsConfirmations,
+        customerPhone: updated.customerPhone || "(empty)",
+        hasMessagingService: !!process.env.TWILIO_MESSAGING_SERVICE_SID,
+        hasAccountSid: !!process.env.TWILIO_ACCOUNT_SID,
+        hasAuthToken: !!process.env.TWILIO_AUTH_TOKEN,
+      });
       if (user?.plan === "pro" && user?.smsConfirmations && updated.customerPhone) {
         const formattedDate2 = new Date(updated.date + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
         const smsBody =
@@ -133,7 +147,13 @@ export async function PUT(
           `Service: ${updated.serviceName}\n` +
           `Date: ${formattedDate2} at ${updated.time}\n` +
           (user.phone ? `Questions? Call ${user.phone}` : "");
-        await sendSms(updated.customerPhone, smsBody).catch(() => {});
+        const smsResult = await sendSms(updated.customerPhone, smsBody).catch((err) => {
+          console.error("[CONFIRM SMS] sendSms threw:", err);
+          return { success: false, error: String(err) };
+        });
+        console.log("[CONFIRM SMS] Result:", smsResult);
+      } else {
+        console.log("[CONFIRM SMS] Skipped — at least one condition is false");
       }
     }
 
