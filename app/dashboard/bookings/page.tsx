@@ -20,10 +20,17 @@ const statusDots: Record<string, string> = {
 };
 
 type FilterType = "all" | "upcoming" | "completed" | "cancelled" | "pending";
+type RangeType = "all" | "day" | "week" | "month";
 
 export default function BookingsPage() {
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  // Hydrate from localStorage cache so the list paints instantly while the
+  // network refresh runs in the background.
+  const [bookings, setBookings] = useState<Booking[]>(() => {
+    if (typeof window === "undefined") return [];
+    try { return getBookings() || []; } catch { return []; }
+  });
   const [filter, setFilter] = useState<FilterType>("all");
+  const [range, setRange] = useState<RangeType>("all");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Booking | null>(null);
   const [showHelp, setShowHelp] = useState(false);
@@ -165,6 +172,22 @@ export default function BookingsPage() {
 
   const today = new Date().toISOString().split("T")[0];
 
+  // Compute date-range cutoffs for the day/week/month filter.
+  const rangeStart = (() => {
+    const d = new Date();
+    if (range === "day") return today;
+    if (range === "week") {
+      d.setDate(d.getDate() - 6);
+      return d.toISOString().split("T")[0];
+    }
+    if (range === "month") {
+      d.setDate(d.getDate() - 29);
+      return d.toISOString().split("T")[0];
+    }
+    return null;
+  })();
+  const inRange = (date: string) => !rangeStart || date >= rangeStart;
+
   const filtered = bookings.filter((b) => {
     const matchesSearch = b.customerName.toLowerCase().includes(search.toLowerCase()) ||
       b.serviceName.toLowerCase().includes(search.toLowerCase()) ||
@@ -172,6 +195,7 @@ export default function BookingsPage() {
       b.vehicle.model.toLowerCase().includes(search.toLowerCase()) ||
       b.customerEmail.toLowerCase().includes(search.toLowerCase());
     if (!matchesSearch) return false;
+    if (!inRange(b.date)) return false;
     if (filter === "all") return true;
     if (filter === "upcoming") return b.date >= today && b.status !== "cancelled";
     if (filter === "completed") return b.status === "completed";
@@ -277,6 +301,25 @@ export default function BookingsPage() {
                 <span className={`text-[10px] min-w-[18px] h-[18px] flex items-center justify-center rounded-full ${
                   filter === f ? "bg-white/20 text-white" : "bg-white text-gray-500"
                 }`}>{counts[f]}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Date range filter */}
+          <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0 sm:flex-wrap scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0 sm:border-l sm:border-gray-200 sm:pl-3">
+            {([
+              { key: "all", label: "All time" },
+              { key: "day", label: "Today" },
+              { key: "week", label: "Last 7 days" },
+              { key: "month", label: "Last 30 days" },
+            ] as { key: RangeType; label: string }[]).map((r) => (
+              <button key={r.key} onClick={() => setRange(r.key)}
+                className={`flex-shrink-0 px-3.5 py-2 rounded-full text-xs font-semibold transition-all ${
+                  range === r.key
+                    ? "bg-gray-900 text-white shadow-sm"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}>
+                {r.label}
               </button>
             ))}
           </div>

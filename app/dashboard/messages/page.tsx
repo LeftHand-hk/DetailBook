@@ -124,43 +124,47 @@ export default function MessagesPage() {
   };
 
   useEffect(() => {
-    const local = getUser();
-    if (local) setUserState(local);
+    const applyUser = (u: any) => {
+      if (!u) return;
+      setUserState(u);
+      if (u.smsTemplates) {
+        setSmsTemplates({
+          bookingConfirmation: u.smsTemplates.bookingConfirmation || DEFAULT_SMS.bookingConfirmation,
+          reminder24h: u.smsTemplates.reminder24h || DEFAULT_SMS.reminder24h,
+          followUp: u.smsTemplates.followUp || DEFAULT_SMS.followUp,
+        });
+      }
+      if (u.emailTemplates) {
+        setEmailTemplates({
+          bookingConfirmation: u.emailTemplates.bookingConfirmation || DEFAULT_EMAIL.bookingConfirmation,
+          reminder24h: u.emailTemplates.reminder24h || DEFAULT_EMAIL.reminder24h,
+          followUp: u.emailTemplates.followUp || DEFAULT_EMAIL.followUp,
+        });
+      }
+      setNotifToggles({
+        emailConfirmations: u.emailConfirmations !== false,
+        smsConfirmations: u.smsConfirmations === true,
+        smsRemindersEnabled: u.smsRemindersEnabled === true,
+        emailRemindersEnabled: u.emailRemindersEnabled !== false,
+        emailReminders: u.emailReminders !== false,
+      });
+    };
 
+    // Render immediately from cached local user — don't make the user wait for the network.
+    const local = getUser();
+    applyUser(local);
+    setMounted(true);
+
+    // Refresh in the background; merge any newer values from the server.
     fetch("/api/user")
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
-        const u: any = data?.user || local;
+        const u: any = data?.user;
         if (!u) return;
-        setUserState(u);
         setUser(u);
-        if (u.smsTemplates) {
-          setSmsTemplates({
-            bookingConfirmation: u.smsTemplates.bookingConfirmation || DEFAULT_SMS.bookingConfirmation,
-            reminder24h: u.smsTemplates.reminder24h || DEFAULT_SMS.reminder24h,
-            followUp: u.smsTemplates.followUp || DEFAULT_SMS.followUp,
-          });
-        }
-        if (u.emailTemplates) {
-          setEmailTemplates({
-            bookingConfirmation: u.emailTemplates.bookingConfirmation || DEFAULT_EMAIL.bookingConfirmation,
-            reminder24h: u.emailTemplates.reminder24h || DEFAULT_EMAIL.reminder24h,
-            followUp: u.emailTemplates.followUp || DEFAULT_EMAIL.followUp,
-          });
-        }
-        setNotifToggles({
-          emailConfirmations: u.emailConfirmations !== false,
-          smsConfirmations: u.smsConfirmations === true,
-          smsRemindersEnabled: u.smsRemindersEnabled === true,
-          emailRemindersEnabled: u.emailRemindersEnabled !== false,
-          emailReminders: u.emailReminders !== false,
-        });
+        applyUser(u);
       })
-      .catch(() => {
-        const u = getUser();
-        setUserState(u);
-      })
-      .finally(() => setMounted(true));
+      .catch(() => {});
   }, []);
 
   if (!mounted) {

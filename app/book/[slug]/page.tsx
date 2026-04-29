@@ -33,6 +33,33 @@ const EMPTY_FORM: BookingForm = {
   make:"",model:"",year:"",color:"",customerName:"",customerEmail:"",customerPhone:"",notes:"",
 };
 
+// Resize+re-encode image client-side. Returns a JPEG data URL.
+// Cuts payment-proof submit from megabytes to a few hundred KB.
+async function compressImage(file: File, maxEdge = 1600, quality = 0.85): Promise<string> {
+  const dataUrl: string = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Could not read file"));
+    reader.readAsDataURL(file);
+  });
+  const img: HTMLImageElement = await new Promise((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = () => reject(new Error("Could not load image"));
+    i.src = dataUrl;
+  });
+  const ratio = Math.min(1, maxEdge / Math.max(img.width, img.height));
+  const w = Math.round(img.width * ratio);
+  const h = Math.round(img.height * ratio);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return dataUrl;
+  ctx.drawImage(img, 0, 0, w, h);
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
 const PLACEHOLDER_REVIEWS = [
   { name: "Sarah M.", rating: 5, quote: "Absolutely amazing work! My car looked brand new after the full detail. Highly recommend!" },
   { name: "James R.", rating: 5, quote: "Professional, punctual, and the results speak for themselves. Best detailer in town." },
@@ -567,12 +594,10 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     }
     setProofUploading(true);
     try {
-      const base64: string = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error("Could not read file"));
-        reader.readAsDataURL(file);
-      });
+      // Compress client-side: payment proofs don't need 20MB. Resize the long
+      // edge to 1600px and re-encode as JPEG q=0.85 — keeps screenshots legible
+      // while dropping a 5MB photo to <500KB so submit is fast.
+      const base64 = await compressImage(file, 1600, 0.85);
       setPendingProofImage(base64);
       setProofUploaded(true);
     } catch (e) {
