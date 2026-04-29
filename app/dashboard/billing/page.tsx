@@ -411,7 +411,7 @@ export default function BillingPage() {
             <div className="flex-1">
               <p className="font-semibold text-amber-900">Card details syncing…</p>
               <p className="text-sm text-amber-700 mt-0.5">
-                Your subscription is active but we haven't received card details from Paddle yet. This usually takes a minute after the first charge.
+                Your subscription is active but we haven&apos;t received card details from Paddle yet. This usually takes a minute after the first charge.
               </p>
               <button
                 onClick={fetchCard}
