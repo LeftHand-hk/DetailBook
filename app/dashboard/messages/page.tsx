@@ -99,6 +99,28 @@ export default function MessagesPage() {
     smsRemindersEnabled: false,
     emailReminders: true,
   });
+  const [togglingKey, setTogglingKey] = useState<string | null>(null);
+
+  const toggleNotif = async (key: keyof typeof notifToggles) => {
+    const next = !notifToggles[key];
+    setNotifToggles((prev) => ({ ...prev, [key]: next }));
+    setTogglingKey(key);
+    try {
+      const res = await fetch("/api/user", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [key]: next }),
+      });
+      if (!res.ok) {
+        // revert on failure
+        setNotifToggles((prev) => ({ ...prev, [key]: !next }));
+      }
+    } catch {
+      setNotifToggles((prev) => ({ ...prev, [key]: !next }));
+    } finally {
+      setTogglingKey(null);
+    }
+  };
 
   useEffect(() => {
     const local = getUser();
@@ -302,21 +324,22 @@ export default function MessagesPage() {
               ].map(({ key, label, pro }) => {
                 const locked = pro && isPro === false;
                 const value = notifToggles[key as keyof typeof notifToggles];
+                const busy = togglingKey === key;
                 return (
                   <div key={key} className="flex items-center justify-between gap-2 px-1 py-1">
                     <span className={`text-xs font-medium ${locked ? "text-gray-300" : "text-gray-700"}`}>{label}</span>
                     <button
                       type="button"
-                      disabled={locked}
-                      onClick={() => !locked && setNotifToggles((prev) => ({ ...prev, [key]: !value }))}
-                      className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors flex-shrink-0 ${locked ? "opacity-40 cursor-not-allowed bg-gray-200" : value ? "bg-blue-600" : "bg-gray-200"}`}
+                      disabled={locked || busy}
+                      onClick={() => !locked && !busy && toggleNotif(key as keyof typeof notifToggles)}
+                      className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors flex-shrink-0 ${locked ? "opacity-40 cursor-not-allowed bg-gray-200" : busy ? "opacity-70" : ""} ${value ? "bg-blue-600" : "bg-gray-200"}`}
                     >
                       <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${value ? "translate-x-5" : "translate-x-1"}`} />
                     </button>
                   </div>
                 );
               })}
-              <p className="text-[10px] text-gray-400 pt-1">Changes saved with &quot;Save Templates&quot;</p>
+              <p className="text-[10px] text-gray-400 pt-1">Toggles save automatically.</p>
             </div>
           </div>
 
