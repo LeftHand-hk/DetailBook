@@ -29,29 +29,37 @@ export default function BookingsPage() {
   const [showHelp, setShowHelp] = useState(false);
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [isPro, setIsPro] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const loadBookings = async () => {
+    try {
+      const res = await fetch("/api/bookings", { cache: "no-store" });
+      if (!res.ok) {
+        setBookings(getBookings());
+        return;
+      }
+      const data = await res.json();
+      const mapped: Booking[] = data.map((b: any) => ({
+        ...b,
+        vehicle: b.vehicle || {
+          make: b.vehicleMake || "",
+          model: b.vehicleModel || "",
+          year: b.vehicleYear || "",
+          color: b.vehicleColor || "",
+        },
+      }));
+      const sorted = mapped.sort((a, b) =>
+        new Date((b as any).createdAt).getTime() - new Date((a as any).createdAt).getTime()
+      );
+      setBookings(sorted);
+      saveBookings(sorted);
+    } catch {
+      setBookings(getBookings());
+    }
+  };
 
   useEffect(() => {
-    // Load from API (source of truth)
-    fetch("/api/bookings")
-      .then((r) => r.ok ? r.json() : [])
-      .then((data: any[]) => {
-        // Map flat DB fields to nested shape the page expects
-        const mapped: Booking[] = data.map((b) => ({
-          ...b,
-          vehicle: b.vehicle || {
-            make: b.vehicleMake || "",
-            model: b.vehicleModel || "",
-            year: b.vehicleYear || "",
-            color: b.vehicleColor || "",
-          },
-        }));
-        // Sort by createdAt newest first
-        const sorted = mapped.sort((a, b) =>
-          new Date((b as any).createdAt).getTime() - new Date((a as any).createdAt).getTime()
-        );
-        setBookings(sorted);
-      })
-      .catch(() => setBookings(getBookings()));
+    loadBookings();
 
     fetch("/api/user")
       .then((r) => r.ok ? r.json() : null)
@@ -114,13 +122,24 @@ export default function BookingsPage() {
   };
 
   const removeBooking = async (id: string) => {
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/bookings/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setDeleteError(err.error || `Delete failed (${res.status})`);
+        return;
+      }
+    } catch (e: any) {
+      setDeleteError(e?.message || "Network error while deleting");
+      return;
+    }
     const updated = bookings.filter((b) => b.id !== id);
     setBookings(updated);
     saveBookings(updated);
     setSelected(null);
-    try {
-      await fetch(`/api/bookings/${id}`, { method: "DELETE" });
-    } catch { /* silent */ }
+    // Re-sync with DB to be safe
+    loadBookings();
   };
 
   const toggleDeposit = async (id: string) => {
@@ -188,6 +207,18 @@ export default function BookingsPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+      {deleteError && (
+        <div className="mb-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <svg className="mt-0.5 h-5 w-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div className="flex-1">
+            <div className="font-semibold">Could not delete booking</div>
+            <div className="text-red-600">{deleteError}</div>
+          </div>
+          <button onClick={() => setDeleteError(null)} className="text-red-400 hover:text-red-600">×</button>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
