@@ -453,146 +453,118 @@ export default function BookingsPage() {
       )}
 
       {/* ═══════════════════════════════════════════════
-          FULL-SCREEN BOOKING DETAIL PANEL
+          BOOKING DETAIL PANEL
       ═══════════════════════════════════════════════ */}
-      {selected && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-end" onClick={() => setSelected(null)}>
-          <div className="bg-white w-full max-w-2xl h-full overflow-y-auto shadow-2xl animate-slideInRight"
-            onClick={(e) => e.stopPropagation()}>
+      {selected && (() => {
+        const balance = selected.servicePrice - selected.depositPaid;
+        const initials = selected.customerName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
+        const member = selected.staffId ? staffList.find((s) => s.id === selected.staffId) : null;
+        const dateTag =
+          isToday(selected.date) ? { label: "TODAY", cls: "bg-blue-100 text-blue-700" } :
+          isTomorrow(selected.date) ? { label: "TOMORROW", cls: "bg-indigo-100 text-indigo-700" } :
+          (isPast(selected.date) && selected.status !== "completed" && selected.status !== "cancelled")
+            ? { label: "OVERDUE", cls: "bg-red-100 text-red-700" }
+            : null;
+        const pmRaw = (selected as any).paymentMethod;
+        const pmLabel =
+          pmRaw === "bankTransfer" ? "Bank Transfer" :
+          pmRaw === "cashapp" ? "Cash App" :
+          pmRaw === "stripe" ? "Card (Stripe)" :
+          pmRaw === "paddle" ? "Paddle" :
+          pmRaw === "square" ? "Square" :
+          pmRaw === "paypal" ? "PayPal" :
+          pmRaw === "cash" ? "Cash" : pmRaw;
+        const proof = (selected as any).paymentProof as string | undefined;
 
-            {/* Top Bar */}
-            <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 sm:px-8 py-4 flex items-center justify-between">
-              <button onClick={() => setSelected(null)}
-                className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors text-sm font-semibold">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                Back to Bookings
-              </button>
-              <div className="flex items-center gap-2">
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold capitalize ${statusColors[selected.status]}`}>
-                  <div className={`w-2 h-2 rounded-full ${statusDots[selected.status]}`} />
+        const statusOptions = [
+          { key: "confirmed", label: "Confirm", active: "bg-green-600 text-white", idle: "bg-green-50 text-green-700 hover:bg-green-100" },
+          { key: "completed", label: "Complete", active: "bg-blue-600 text-white", idle: "bg-blue-50 text-blue-700 hover:bg-blue-100" },
+          { key: "pending",   label: "Pending",  active: "bg-yellow-500 text-white", idle: "bg-yellow-50 text-yellow-700 hover:bg-yellow-100" },
+          { key: "cancelled", label: "Cancel",   active: "bg-red-600 text-white", idle: "bg-red-50 text-red-700 hover:bg-red-100" },
+        ];
+
+        return (
+          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-end" onClick={() => setSelected(null)}>
+            <div className="bg-white w-full max-w-md h-full shadow-2xl animate-slideInRight flex flex-col"
+              onClick={(e) => e.stopPropagation()}>
+
+              {/* Sticky header */}
+              <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold capitalize ${statusColors[selected.status]}`}>
+                  <div className={`w-1.5 h-1.5 rounded-full ${statusDots[selected.status]}`} />
                   {selected.status}
                 </span>
+                <button onClick={() => setSelected(null)}
+                  className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
+                  <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-            </div>
 
-            <div className="px-6 sm:px-8 py-6 space-y-8">
+              <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
 
-              {/* ── Customer ── */}
-              <div>
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-md">
-                    <span className="text-white font-extrabold text-xl">{selected.customerName.split(" ").map(n => n[0]).join("").slice(0, 2)}</span>
+                {/* Hero */}
+                <div className="text-center pt-1">
+                  <div className="w-16 h-16 mx-auto bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-600/20 mb-3">
+                    <span className="text-white font-extrabold text-lg">{initials}</span>
                   </div>
-                  <div>
-                    <h2 className="text-xl font-extrabold text-gray-900">{selected.customerName}</h2>
-                    <div className="flex flex-wrap items-center gap-3 mt-1">
-                      {isToday(selected.date) && <span className="text-xs bg-purple-100 text-purple-700 font-bold px-2.5 py-1 rounded-lg">TODAY</span>}
-                      {isTomorrow(selected.date) && <span className="text-xs bg-indigo-100 text-indigo-700 font-bold px-2.5 py-1 rounded-lg">TOMORROW</span>}
-                      {isPast(selected.date) && selected.status !== "completed" && selected.status !== "cancelled" && (
-                        <span className="text-xs bg-red-100 text-red-700 font-bold px-2.5 py-1 rounded-lg">OVERDUE</span>
-                      )}
-                    </div>
-                  </div>
+                  <h2 className="text-xl font-extrabold text-gray-900">{selected.customerName}</h2>
+                  <p className="text-sm text-gray-500 mt-0.5">{formatDate(selected.date)} · {selected.time}</p>
+                  {dateTag && (
+                    <span className={`inline-block mt-2 text-[10px] font-bold px-2 py-0.5 rounded ${dateTag.cls}`}>
+                      {dateTag.label}
+                    </span>
+                  )}
                 </div>
 
-                {/* Contact buttons */}
-                <div className="grid grid-cols-2 gap-3">
+                {/* Quick contact */}
+                <div className="grid grid-cols-2 gap-2">
                   <a href={`mailto:${selected.customerEmail}`}
-                    className="flex items-center gap-3 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-xl p-4 transition-colors group">
-                    <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 transition-colors">
-                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs text-gray-400 font-semibold">Email</p>
-                      <p className="text-sm font-semibold text-gray-900 truncate">{selected.customerEmail}</p>
-                    </div>
+                    className="flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-sm py-2.5 rounded-xl transition-colors">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    Email
                   </a>
                   <a href={`tel:${selected.customerPhone}`}
-                    className="flex items-center gap-3 bg-gray-50 hover:bg-green-50 border border-gray-200 hover:border-green-200 rounded-xl p-4 transition-colors group">
-                    <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-green-200 transition-colors">
-                      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                      </svg>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs text-gray-400 font-semibold">Phone</p>
-                      <p className="text-sm font-semibold text-gray-900">{selected.customerPhone}</p>
-                    </div>
+                    className="flex items-center justify-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 font-semibold text-sm py-2.5 rounded-xl transition-colors">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    </svg>
+                    Call
                   </a>
                 </div>
-              </div>
 
-              {/* ── Appointment Details ── */}
-              <div>
-                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Appointment</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-5">
-                    <div className="flex items-center gap-2 mb-2">
-                      <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      <span className="text-xs text-blue-600 font-bold uppercase">Date & Time</span>
+                {/* Info list */}
+                <div className="bg-white border border-gray-100 rounded-2xl divide-y divide-gray-100 shadow-sm">
+                  <div className="flex items-start justify-between gap-4 px-4 py-3.5">
+                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Service</p>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-gray-900">{selected.serviceName}</p>
+                      <p className="text-sm font-extrabold text-gray-900">${selected.servicePrice}</p>
                     </div>
-                    <p className="text-base font-bold text-gray-900">{formatDate(selected.date)}</p>
-                    <p className="text-sm text-gray-600 mt-0.5">{selected.time}</p>
                   </div>
-                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
-                    <div className="flex items-center gap-2 mb-2">
-                      <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                      </svg>
-                      <span className="text-xs text-gray-500 font-bold uppercase">Vehicle</span>
+                  <div className="flex items-start justify-between gap-4 px-4 py-3.5">
+                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Vehicle</p>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-gray-900">{selected.vehicle.year} {selected.vehicle.make} {selected.vehicle.model}</p>
+                      {selected.vehicle.color && <p className="text-xs text-gray-500 mt-0.5">{selected.vehicle.color}</p>}
                     </div>
-                    <p className="text-base font-bold text-gray-900">{selected.vehicle.year} {selected.vehicle.make} {selected.vehicle.model}</p>
-                    <p className="text-sm text-gray-600 mt-0.5">{selected.vehicle.color}</p>
                   </div>
-                </div>
-              </div>
-
-              {/* ── Service ── */}
-              <div>
-                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Service</h3>
-                <div className="bg-white border-2 border-gray-200 rounded-xl p-5">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-lg font-bold text-gray-900">{selected.serviceName}</p>
-                    <p className="text-lg font-extrabold text-gray-900">${selected.servicePrice}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* ── Assigned Staff ── */}
-              {isPro && staffList.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Assigned Staff</h3>
-                  <div className="bg-white border-2 border-gray-200 rounded-xl p-4">
-                    <div className="flex items-center gap-3">
-                      {selected.staffId ? (
-                        (() => {
-                          const member = staffList.find((s) => s.id === selected.staffId);
-                          return (
-                            <div className="flex items-center gap-3 flex-1">
-                              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
-                                style={{ backgroundColor: member?.color || "#3B82F6" }}>
-                                {(member?.name || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
-                              </div>
-                              <div>
-                                <p className="text-sm font-semibold text-gray-900">{member?.name || selected.staffName}</p>
-                                <p className="text-xs text-gray-500 capitalize">{member?.role || ""}</p>
-                              </div>
-                            </div>
-                          );
-                        })()
-                      ) : (
-                        <p className="text-sm text-gray-400 flex-1">No staff assigned</p>
-                      )}
+                  {selected.address && (
+                    <div className="flex items-start justify-between gap-4 px-4 py-3.5">
+                      <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Address</p>
+                      <p className="text-sm text-gray-900 text-right max-w-[60%]">{selected.address}</p>
+                    </div>
+                  )}
+                  {isPro && staffList.length > 0 && (
+                    <div className="flex items-center justify-between gap-4 px-4 py-3">
+                      <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Staff</p>
                       <select
                         value={selected.staffId || ""}
                         onChange={(e) => assignStaff(selected.id, e.target.value)}
-                        className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                        className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white max-w-[60%]"
                       >
                         <option value="">Unassigned</option>
                         {staffList.filter((s) => s.active).map((s) => (
@@ -600,145 +572,100 @@ export default function BookingsPage() {
                         ))}
                       </select>
                     </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ── Payment & Deposit ── */}
-              <div>
-                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Payment</h3>
-                <div className="bg-white border-2 border-gray-200 rounded-xl overflow-hidden">
-                  {/* Deposit row */}
-                  <div className="p-5 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${selected.depositPaid > 0 ? "bg-green-100" : "bg-red-100"}`}>
-                        {selected.depositPaid > 0 ? (
-                          <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                        ) : (
-                          <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-gray-900">Deposit</p>
-                        <p className={`text-lg font-extrabold ${selected.depositPaid > 0 ? "text-green-600" : "text-red-500"}`}>
-                          ${selected.depositPaid}
-                          {selected.depositPaid > 0 ? " paid" : " unpaid"}
-                        </p>
-                      </div>
+                  )}
+                  {member && !staffList.length && selected.staffName && (
+                    <div className="flex items-center justify-between gap-4 px-4 py-3.5">
+                      <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Staff</p>
+                      <p className="text-sm font-semibold text-gray-900">{selected.staffName}</p>
                     </div>
+                  )}
+                </div>
+
+                {/* Payment card */}
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-5 border border-blue-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-bold text-blue-700 uppercase tracking-wider">Deposit</p>
                     <button
                       onClick={() => toggleDeposit(selected.id)}
-                      className={`px-5 py-3 rounded-xl font-bold text-sm transition-colors ${
+                      className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${
                         selected.depositPaid > 0
-                          ? "bg-red-50 text-red-600 border-2 border-red-200 hover:bg-red-100"
-                          : "bg-green-600 text-white hover:bg-green-700 shadow-md"
+                          ? "bg-white text-red-600 border border-red-200 hover:bg-red-50"
+                          : "bg-blue-600 text-white hover:bg-blue-700"
                       }`}
                     >
-                      {selected.depositPaid > 0 ? "Mark as Unpaid" : "Mark as Paid"}
+                      {selected.depositPaid > 0 ? "Mark Unpaid" : "Mark Paid"}
                     </button>
                   </div>
-
-                  {/* Balance */}
-                  <div className="bg-gray-50 border-t-2 border-gray-200 p-5 flex items-center justify-between">
-                    <p className="text-base font-bold text-gray-700">Balance Due</p>
-                    <p className={`text-2xl font-extrabold ${(selected.servicePrice - selected.depositPaid) > 0 ? "text-gray-900" : "text-green-600"}`}>
-                      ${selected.servicePrice - selected.depositPaid}
-                    </p>
+                  <p className="text-3xl font-extrabold text-gray-900">
+                    ${selected.depositPaid}
+                    <span className={`text-sm font-bold ml-2 ${selected.depositPaid > 0 ? "text-green-600" : "text-gray-400"}`}>
+                      {selected.depositPaid > 0 ? "paid" : "unpaid"}
+                    </span>
+                  </p>
+                  {pmLabel && (
+                    <p className="text-xs text-gray-500 mt-1">via {pmLabel}</p>
+                  )}
+                  <div className="border-t border-blue-200/60 mt-4 pt-3 flex items-center justify-between">
+                    <span className="text-sm font-semibold text-gray-700">Balance due</span>
+                    <span className={`text-lg font-extrabold ${balance > 0 ? "text-gray-900" : "text-green-600"}`}>
+                      ${balance}
+                    </span>
                   </div>
                 </div>
+
+                {/* Payment proof */}
+                {proof && (
+                  <div>
+                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-2">Proof of payment</p>
+                    <a href={proof} target="_blank" rel="noopener noreferrer" className="block">
+                      <img
+                        src={proof}
+                        alt="Payment proof"
+                        className="w-full rounded-xl border border-gray-200 hover:opacity-90 transition-opacity"
+                      />
+                    </a>
+                  </div>
+                )}
+
+                {/* Notes */}
+                {selected.notes && (
+                  <div>
+                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-2">Customer notes</p>
+                    <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+                      <p className="text-sm text-gray-700 leading-relaxed">{selected.notes}</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* ── Payment Method & Proof ── */}
-              {((selected as any).paymentMethod || (selected as any).paymentProof) && (
-                <div>
-                  <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Payment Details</h3>
-                  <div className="bg-white border-2 border-gray-200 rounded-xl p-5 space-y-3">
-                    {(selected as any).paymentMethod && (
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg">
-                          {(selected as any).paymentMethod === "stripe" ? "💳" :
-                           (selected as any).paymentMethod === "paypal" ? "🅿️" :
-                           (selected as any).paymentMethod === "cashapp" ? "💵" :
-                           (selected as any).paymentMethod === "bankTransfer" ? "🏦" : "💰"}
-                        </span>
-                        <div>
-                          <p className="text-xs text-gray-500">Payment Method</p>
-                          <p className="text-sm font-bold text-gray-900 capitalize">
-                            {(selected as any).paymentMethod === "bankTransfer" ? "Bank Transfer" :
-                             (selected as any).paymentMethod === "cashapp" ? "Cash App" :
-                             (selected as any).paymentMethod === "stripe" ? "Card (Stripe)" :
-                             (selected as any).paymentMethod}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                    {(selected as any).paymentProof && (
-                      <div>
-                        <p className="text-xs text-gray-500 mb-2">Proof of Payment</p>
-                        <a href={(selected as any).paymentProof} target="_blank" rel="noopener noreferrer">
-                          <img
-                            src={(selected as any).paymentProof}
-                            alt="Payment proof"
-                            className="w-full max-w-sm rounded-xl border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
-                          />
-                        </a>
-                      </div>
-                    )}
-                  </div>
+              {/* Sticky action footer */}
+              <div className="sticky bottom-0 bg-white border-t border-gray-100 px-4 py-3 space-y-2">
+                <div className="grid grid-cols-4 gap-1.5">
+                  {statusOptions.map((opt) => {
+                    const isActive = selected.status === opt.key;
+                    return (
+                      <button
+                        key={opt.key}
+                        onClick={() => !isActive && updateStatus(selected.id, opt.key)}
+                        disabled={isActive}
+                        className={`text-xs font-bold py-2.5 rounded-xl transition-colors ${
+                          isActive ? `${opt.active} cursor-default` : opt.idle
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
                 </div>
-              )}
-
-              {/* ── Notes ── */}
-              {selected.notes && (
-                <div>
-                  <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Customer Notes</h3>
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
-                    <p className="text-sm text-gray-700 leading-relaxed">{selected.notes}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* ── Change Status ── */}
-              <div>
-                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Change Status</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {selected.status !== "completed" && (
-                    <button onClick={() => updateStatus(selected.id, "completed")}
-                      className="flex items-center justify-center gap-2 p-4 bg-blue-50 text-blue-700 border-2 border-blue-200 font-bold text-base rounded-xl hover:bg-blue-100 transition-colors">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                      Complete
-                    </button>
-                  )}
-                  {selected.status !== "pending" && (
-                    <button onClick={() => updateStatus(selected.id, "pending")}
-                      className="flex items-center justify-center gap-2 p-4 bg-yellow-50 text-yellow-700 border-2 border-yellow-200 font-bold text-base rounded-xl hover:bg-yellow-100 transition-colors">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                      Pending
-                    </button>
-                  )}
-                  {selected.status !== "cancelled" && (
-                    <button onClick={() => updateStatus(selected.id, "cancelled")}
-                      className="flex items-center justify-center gap-2 p-4 bg-red-50 text-red-700 border-2 border-red-200 font-bold text-base rounded-xl hover:bg-red-100 transition-colors">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                      Cancel
-                    </button>
-                  )}
-                </div>
+                <button onClick={() => removeBooking(selected.id)}
+                  className="w-full text-xs text-red-500 hover:text-red-700 font-semibold py-1 transition-colors">
+                  Delete booking
+                </button>
               </div>
-
-              {/* ── Delete ── */}
-              <button onClick={() => removeBooking(selected.id)}
-                className="w-full flex items-center justify-center gap-2 p-3 bg-red-50 text-red-600 border border-red-200 font-semibold text-sm rounded-xl hover:bg-red-100 transition-colors">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                Delete Booking
-              </button>
-
-              {/* Booking ID */}
-              <p className="text-xs text-gray-300 text-center font-mono">Booking ID: {selected.id}</p>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ═══════════════════════════════════════════════
           HELP GUIDE MODAL
