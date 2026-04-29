@@ -97,6 +97,7 @@ export default function MessagesPage() {
     emailConfirmations: true,
     smsConfirmations: false,
     smsRemindersEnabled: false,
+    emailRemindersEnabled: true,
     emailReminders: true,
   });
   const [togglingKey, setTogglingKey] = useState<string | null>(null);
@@ -151,6 +152,7 @@ export default function MessagesPage() {
           emailConfirmations: u.emailConfirmations !== false,
           smsConfirmations: u.smsConfirmations === true,
           smsRemindersEnabled: u.smsRemindersEnabled === true,
+          emailRemindersEnabled: u.emailRemindersEnabled !== false,
           emailReminders: u.emailReminders !== false,
         });
       })
@@ -318,6 +320,7 @@ export default function MessagesPage() {
             <div className="p-3 space-y-2">
               {[
                 { key: "emailConfirmations", label: "Confirmation Email", pro: false },
+                { key: "emailRemindersEnabled", label: "2-Hour Reminder Email", pro: false },
                 { key: "emailReminders", label: "Owner Alert Email", pro: false },
                 { key: "smsConfirmations", label: "Confirmation SMS", pro: true },
                 { key: "smsRemindersEnabled", label: "2-Hour Reminder SMS", pro: true },

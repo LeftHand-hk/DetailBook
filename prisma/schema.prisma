@@ -82,9 +82,10 @@ model User {
   googleCalendarEnabled Boolean @default(false)
 
   // Notification settings
-  emailConfirmations   Boolean @default(true)
-  smsConfirmations     Boolean @default(false)
-  smsRemindersEnabled  Boolean @default(false)
+  emailConfirmations    Boolean @default(true)
+  smsConfirmations      Boolean @default(false)
+  smsRemindersEnabled   Boolean @default(false)
+  emailRemindersEnabled Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

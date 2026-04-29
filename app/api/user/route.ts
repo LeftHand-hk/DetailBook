@@ -60,7 +60,7 @@ export async function PUT(request: NextRequest) {
       "showTrustBadges", "requireDeposit",
       "thankYouMessage", "termsText", "smsTemplates", "emailTemplates",
       "paymentMethods", "suspended",
-      "emailConfirmations", "smsConfirmations", "smsRemindersEnabled",
+      "emailConfirmations", "smsConfirmations", "smsRemindersEnabled", "emailRemindersEnabled",
     ];
 
     const updateData: Record<string, unknown> = {};
