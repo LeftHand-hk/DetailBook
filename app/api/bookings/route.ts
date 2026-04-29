@@ -173,6 +173,24 @@ export async function POST(request: NextRequest) {
       safeProof = rawProof;
     }
 
+    // Idempotency guard: if the same customer just submitted the same slot
+    // (double-click, network retry, refresh during slow request), return the
+    // existing booking instead of creating a duplicate.
+    const dedupWindow = new Date(Date.now() - 60_000);
+    const recentDuplicate = await prisma.booking.findFirst({
+      where: {
+        userId,
+        customerEmail,
+        date,
+        time,
+        serviceName,
+        createdAt: { gte: dedupWindow },
+      },
+    });
+    if (recentDuplicate) {
+      return NextResponse.json(recentDuplicate, { status: 200 });
+    }
+
     const booking = await prisma.booking.create({
       data: {
         userId,

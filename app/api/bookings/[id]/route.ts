@@ -82,78 +82,77 @@ export async function PUT(
     if (body.vehicleColor !== undefined) data.vehicleColor = body.vehicleColor;
     if (body.staffId !== undefined) data.staffId = body.staffId || null;
 
-    const updated = await prisma.booking.update({
+    // Atomic status-transition guard: if we're moving to "confirmed",
+    // only one concurrent request should "win" the transition. updateMany
+    // applies the where filter atomically — count===0 means another
+    // request already flipped the status, so we must NOT re-send notifications.
+    let didTransitionToConfirmed = false;
+    if (body.status === "confirmed" && existing.status !== "confirmed") {
+      const r = await prisma.booking.updateMany({
+        where: { id, status: { not: "confirmed" } },
+        data,
+      });
+      didTransitionToConfirmed = r.count > 0;
+      if (!didTransitionToConfirmed) {
+        // Lost the race — apply non-status fields only so we don't trample
+        // anyone else's confirmation.
+        const { status: _s, ...rest } = data as any;
+        if (Object.keys(rest).length > 0) {
+          await prisma.booking.update({ where: { id }, data: rest });
+        }
+      }
+    } else {
+      await prisma.booking.update({ where: { id }, data });
+    }
+
+    const updated = await prisma.booking.findUnique({
       where: { id },
-      data,
       include: { user: true },
     });
+    if (!updated) {
+      return NextResponse.json({ error: "Booking disappeared" }, { status: 500 });
+    }
 
     // Send confirmation email + SMS when status changes to "confirmed"
-    console.log("[BOOKING PUT] Status transition:", {
-      bookingId: id,
-      bodyStatus: body.status,
-      existingStatus: existing.status,
-      willTriggerNotifications: body.status === "confirmed" && existing.status !== "confirmed",
-    });
-    if (body.status === "confirmed" && existing.status !== "confirmed") {
+    if (didTransitionToConfirmed) {
       const user = (updated as any).user;
-      console.log("[CONFIRM EMAIL] Attempting to send to:", updated.customerEmail, "| SMTP_HOST:", process.env.SMTP_HOST || "NOT SET", "| emailConfirmations:", user?.emailConfirmations);
       const formattedDate = new Date(updated.date + "T00:00:00").toLocaleDateString("en-US", {
         weekday: "long", month: "long", day: "numeric", year: "numeric",
       });
 
-      // Confirmation email to customer
+      const ctx: Record<string, string> = {
+        customerName: updated.customerName || "",
+        serviceName: updated.serviceName || "",
+        date: formattedDate,
+        time: updated.time || "",
+        businessName: user?.businessName || "",
+      };
+      const render = (tpl: string) =>
+        tpl.replace(/\{(\w+)\}/g, (_m, k) => ctx[k] ?? "");
+
+      const DEFAULT_SMS =
+        "Hi {customerName}, your {serviceName} appointment is confirmed for {date} at {time}. — {businessName}";
+      const DEFAULT_EMAIL =
+        "Dear {customerName},\n\nYour booking for {serviceName} has been confirmed!\n\nDate: {date}\nTime: {time}\n\nWe look forward to seeing you!\n\n— {businessName}";
+
+      // Confirmation email to customer (uses configured template, falls back to default)
       if (updated.customerEmail && user?.emailConfirmations !== false) {
-        const customerHtml = `
-          <div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;">
-            <div style="background:#2563EB;color:white;padding:24px;border-radius:8px 8px 0 0;">
-              <div style="font-size:12px;opacity:0.85;text-transform:uppercase;letter-spacing:1px;">${user.businessName}</div>
-              <h1 style="margin:8px 0 0;font-size:22px;">Booking Confirmed!</h1>
-            </div>
-            <div style="background:#f9fafb;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
-              <p style="font-size:14px;color:#374151;">Hi ${updated.customerName}, your booking has been confirmed. Here are your details:</p>
-              <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0;">
-                <table style="width:100%;font-size:14px;border-collapse:collapse;">
-                  <tr><td style="padding:6px 0;color:#6b7280;width:40%;">Service</td><td style="padding:6px 0;font-weight:600;color:#111827;">${updated.serviceName}</td></tr>
-                  <tr><td style="padding:6px 0;color:#6b7280;">Date</td><td style="padding:6px 0;font-weight:600;color:#111827;">${formattedDate}</td></tr>
-                  <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;font-weight:600;color:#111827;">${updated.time}</td></tr>
-                  <tr><td style="padding:6px 0;color:#6b7280;">Vehicle</td><td style="padding:6px 0;font-weight:600;color:#111827;">${updated.vehicleYear} ${updated.vehicleMake} ${updated.vehicleModel} (${updated.vehicleColor})</td></tr>
-                  <tr><td style="padding:6px 0;color:#6b7280;">Price</td><td style="padding:6px 0;font-weight:600;color:#111827;">$${updated.servicePrice}</td></tr>
-                  ${updated.address ? `<tr><td style="padding:6px 0;color:#6b7280;">Address</td><td style="padding:6px 0;font-weight:600;color:#111827;">${updated.address}</td></tr>` : ""}
-                </table>
-              </div>
-              ${user.phone ? `<p style="font-size:13px;color:#6b7280;">Questions? Contact us at <strong>${user.phone}</strong></p>` : ""}
-              <p style="font-size:13px;color:#6b7280;">— ${user.businessName}</p>
-            </div>
-          </div>`;
-        const customerText = `Booking Confirmed!\n\nHi ${updated.customerName},\n\nService: ${updated.serviceName}\nDate: ${formattedDate}\nTime: ${updated.time}\nPrice: $${updated.servicePrice}${updated.address ? `\nAddress: ${updated.address}` : ""}\n\n— ${user.businessName}`;
+        const emailTemplate = (user?.emailTemplates as any)?.bookingConfirmation || DEFAULT_EMAIL;
+        const customerText = render(emailTemplate);
+        const customerHtml = `<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9fafb;border-radius:8px;color:#111827;font-size:14px;line-height:1.6;white-space:pre-wrap;">${customerText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`;
         const emailResult = await sendEmail({ to: updated.customerEmail, subject: `Booking Confirmed – ${updated.serviceName} on ${formattedDate}`, html: customerHtml, text: customerText });
         console.log("[CONFIRM EMAIL] Result:", emailResult);
       }
 
       // Confirmation SMS to customer (Pro only)
-      console.log("[CONFIRM SMS] Conditions:", {
-        plan: user?.plan,
-        smsConfirmations: user?.smsConfirmations,
-        customerPhone: updated.customerPhone || "(empty)",
-        hasMessagingService: !!process.env.TWILIO_MESSAGING_SERVICE_SID,
-        hasAccountSid: !!process.env.TWILIO_ACCOUNT_SID,
-        hasAuthToken: !!process.env.TWILIO_AUTH_TOKEN,
-      });
       if (user?.plan === "pro" && user?.smsConfirmations && updated.customerPhone) {
-        const formattedDate2 = new Date(updated.date + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-        const smsBody =
-          `Booking confirmed with ${user.businessName}!\n` +
-          `Service: ${updated.serviceName}\n` +
-          `Date: ${formattedDate2} at ${updated.time}\n` +
-          (user.phone ? `Questions? Call ${user.phone}` : "");
+        const smsTemplate = (user?.smsTemplates as any)?.bookingConfirmation || DEFAULT_SMS;
+        const smsBody = render(smsTemplate);
         const smsResult = await sendSms(updated.customerPhone, smsBody).catch((err) => {
           console.error("[CONFIRM SMS] sendSms threw:", err);
           return { success: false, error: String(err) };
         });
         console.log("[CONFIRM SMS] Result:", smsResult);
-      } else {
-        console.log("[CONFIRM SMS] Skipped — at least one condition is false");
       }
     }
 
