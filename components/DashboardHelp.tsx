@@ -81,9 +81,8 @@ const helpData: Record<PageKey, HelpContent> = {
   reviews: {
     title: "Review Management",
     steps: [
-      { title: "Auto Requests", desc: "After completing a job, an automated review request is sent to the customer via SMS or email." },
-      { title: "Google Integration", desc: "Connect your Google Business Profile to funnel reviews directly to Google." },
-      { title: "Monitor Reviews", desc: "Track your average rating, total reviews, and response rate from the dashboard." },
+      { title: "Monitor Reviews", desc: "Track your average rating and total reviews at a glance." },
+      { title: "Recent Feedback", desc: "Newest customer reviews appear in the Recent Reviews list as they come in." },
     ],
   },
   messages: {

@@ -35,7 +35,10 @@
       "Bash(node -e ':*)",
       "Bash(curl -s -X POST \"https://detailbookapp.netlify.app/api/admin/auth\" -H \"Content-Type: application/json\" -d \"{\\\\\"email\\\\\":\\\\\"admin@detailbookapp.com\\\\\",\\\\\"password\\\\\":\\\\\"Obelisk123!@#\\\\\"}\")",
       "Bash(xargs grep:*)",
-      "Bash(curl -s -X POST https://detailbookapp.com/api/bookings -H 'Content-Type: application/json' -d '{ *)"
+      "Bash(curl -s -X POST https://detailbookapp.com/api/bookings -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
