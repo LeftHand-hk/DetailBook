@@ -181,9 +181,11 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   const [pendingProofImage, setPendingProofImage] = useState<string | null>(null);
   const [stripeDepositPaid, setStripeDepositPaid] = useState(false);
   const [smsConsent, setSmsConsent] = useState(false);
-  // Stripe embedded modal state. When set, the modal opens with this bookingId
-  // and walks the customer through paying without leaving the booking page.
-  const [stripeModalBookingId, setStripeModalBookingId] = useState<string | null>(null);
+  // Stripe embedded modal state. We hold the booking payload in memory and only
+  // create the booking on the server AFTER the customer pays — so closing the
+  // modal leaves zero side effects.
+  const [stripeModalOpen, setStripeModalOpen] = useState(false);
+  const [pendingStripeBookingData, setPendingStripeBookingData] = useState<any>(null);
 
   useEffect(() => {
     // Fetch public business data (staff + serviceType) from API
@@ -380,6 +382,15 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       paymentProof: pendingProofImage || undefined,
     };
 
+    // Stripe path: open the embedded modal FIRST. The booking is created only
+    // after the payment succeeds — so closing the modal leaves no orphan booking.
+    if (paymentMethod === "stripe" && depositAmount > 0) {
+      setPendingStripeBookingData(bookingData);
+      setStripeModalOpen(true);
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const res = await fetch("/api/bookings", {
         method: "POST",
@@ -389,13 +400,6 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       if (res.ok) {
         const created = await res.json();
         setBookingId(created.id);
-
-        // Stripe is handled in-place via embedded Elements modal — no redirect.
-        if (paymentMethod === "stripe" && depositAmount > 0) {
-          setSubmitting(false);
-          setStripeModalBookingId(created.id);
-          return;
-        }
 
         // Square still uses hosted-checkout redirect for now.
         const checkoutEndpoints: Record<string, string> = {
@@ -2083,28 +2087,46 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
         <div className="mt-8 py-6" />
       )}
 
-      {/* Stripe embedded payment modal — replaces hosted-checkout redirect */}
-      {stripeModalBookingId && selectedPackage && (
+      {/* Stripe embedded payment modal — booking is created only after success */}
+      {stripeModalOpen && selectedPackage && pendingStripeBookingData && (
         <StripeDepositModal
           open
           publishableKey={(user as any)?.paymentMethods?.stripe?.publishableKey || ""}
           userId={(user as any)?.id || ""}
-          bookingId={stripeModalBookingId}
           amount={depositAmount}
           customerEmail={form.customerEmail}
           serviceName={selectedPackage.name}
-          onSuccess={(_amt) => {
-            setStripeModalBookingId(null);
-            setStripeDepositPaid(true);
-            setBookingId(stripeModalBookingId);
-            setStep(3);
+          onSuccess={async (paymentIntentId) => {
+            try {
+              const res = await fetch("/api/bookings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  ...pendingStripeBookingData,
+                  depositPaid: depositAmount,
+                  paymentProof: `stripe:${paymentIntentId}`,
+                }),
+              });
+              if (res.ok) {
+                const created = await res.json();
+                setBookingId(created.id);
+                setStripeDepositPaid(true);
+                setStripeModalOpen(false);
+                setPendingStripeBookingData(null);
+                setStep(3);
+              } else {
+                setBookingError("Payment succeeded but we couldn't save your booking. Please contact the business — your card was charged.");
+                setStripeModalOpen(false);
+              }
+            } catch {
+              setBookingError("Payment succeeded but we couldn't save your booking. Please contact the business — your card was charged.");
+              setStripeModalOpen(false);
+            }
           }}
           onClose={() => {
-            setStripeModalBookingId(null);
-            // Customer cancelled — they can still see the booking on the
-            // success page with a "deposit pending" state, or retry from
-            // their email link.
-            setStep(3);
+            // No booking was created — closing is safe.
+            setStripeModalOpen(false);
+            setPendingStripeBookingData(null);
           }}
         />
       )}

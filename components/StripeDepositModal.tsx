@@ -7,17 +7,16 @@ import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-
 interface Props {
   open: boolean;
   publishableKey: string;
-  bookingId: string;
   userId: string;
   amount: number;
   customerEmail: string;
   serviceName: string;
-  onSuccess: (amountPaid: number) => void;
+  // Called with the Stripe PaymentIntent id after a successful payment.
+  // The parent is responsible for creating the booking using this id as proof.
+  onSuccess: (paymentIntentId: string) => void;
   onClose: () => void;
 }
 
-// We cache Stripe.js loader Promises per publishable key so multiple opens
-// don't re-fetch the script.
 const stripePromises: Record<string, Promise<Stripe | null>> = {};
 const getStripePromise = (key: string) => {
   if (!stripePromises[key]) stripePromises[key] = loadStripe(key);
@@ -26,18 +25,27 @@ const getStripePromise = (key: string) => {
 
 export default function StripeDepositModal(props: Props) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Lock body scroll while open
+  useEffect(() => {
+    if (!props.open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [props.open]);
 
   useEffect(() => {
     if (!props.open) return;
     setClientSecret(null);
+    setPaymentIntentId(null);
     setError(null);
     fetch("/api/stripe/deposit-intent", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         userId: props.userId,
-        bookingId: props.bookingId,
         amount: props.amount,
         customerEmail: props.customerEmail,
         serviceName: props.serviceName,
@@ -48,64 +56,129 @@ export default function StripeDepositModal(props: Props) {
         if (!r.ok) throw new Error(data?.error || "Failed to start payment");
         if (!data.clientSecret) throw new Error("No client secret returned");
         setClientSecret(data.clientSecret);
+        setPaymentIntentId(data.paymentIntentId);
       })
       .catch((e) => setError(e.message || "Failed to start payment"));
-  }, [props.open, props.userId, props.bookingId, props.amount, props.customerEmail, props.serviceName]);
+  }, [props.open, props.userId, props.amount, props.customerEmail, props.serviceName]);
 
   if (!props.open) return null;
 
   const stripePromise = props.publishableKey ? getStripePromise(props.publishableKey) : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="font-bold text-gray-900">Pay deposit</h3>
-          <button onClick={props.onClose} className="p-1 rounded-lg hover:bg-gray-100" aria-label="Close">
-            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-fadeIn"
+      onClick={props.onClose}
+    >
+      <div
+        className="bg-white w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl shadow-2xl max-h-[92vh] overflow-hidden flex flex-col animate-slideUp"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="relative px-6 pt-6 pb-5 bg-gradient-to-br from-blue-600 to-indigo-700 text-white">
+          <button
+            onClick={props.onClose}
+            className="absolute top-4 right-4 p-1.5 rounded-full bg-white/15 hover:bg-white/25 transition-colors"
+            aria-label="Close"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
+
+          <div className="flex items-center gap-2 mb-3">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <span className="text-xs uppercase tracking-wider font-bold opacity-90">Secure deposit</span>
+          </div>
+          <p className="text-sm opacity-80">{props.serviceName}</p>
+          <div className="mt-1 text-3xl font-extrabold tracking-tight">
+            ${props.amount.toFixed(2)}
+            <span className="ml-2 text-sm font-medium opacity-70">USD</span>
+          </div>
         </div>
 
-        <div className="px-6 py-5">
-          <div className="mb-4 text-sm text-gray-600">
-            Deposit for <span className="font-semibold text-gray-900">{props.serviceName}</span>
-            <div className="mt-1 text-2xl font-extrabold text-gray-900">${props.amount.toFixed(2)}</div>
-          </div>
-
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-6">
           {error && (
-            <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-              {error}
+            <div className="mb-4 flex items-start gap-2.5 px-4 py-3 bg-red-50 border border-red-200 rounded-xl">
+              <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="text-sm text-red-700">{error}</div>
             </div>
           )}
 
           {!props.publishableKey && (
             <div className="px-4 py-3 bg-yellow-50 border border-yellow-200 rounded-xl text-sm text-yellow-800">
-              This business has not finished configuring Stripe.
+              This business hasn&apos;t finished configuring Stripe.
             </div>
           )}
 
           {props.publishableKey && !clientSecret && !error && (
-            <div className="flex items-center gap-3 text-gray-500 text-sm py-6 justify-center">
-              <svg className="animate-spin w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24">
+            <div className="flex flex-col items-center justify-center py-10 gap-3">
+              <svg className="animate-spin w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              Setting up secure payment…
+              <p className="text-sm font-semibold text-gray-700">Setting up secure payment</p>
+              <p className="text-xs text-gray-400">Powered by Stripe</p>
             </div>
           )}
 
-          {clientSecret && stripePromise && (
-            <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: "stripe" } }}>
+          {clientSecret && stripePromise && paymentIntentId && (
+            <Elements
+              stripe={stripePromise}
+              options={{
+                clientSecret,
+                appearance: {
+                  theme: "stripe",
+                  variables: {
+                    colorPrimary: "#2563EB",
+                    colorBackground: "#ffffff",
+                    colorText: "#111827",
+                    colorDanger: "#dc2626",
+                    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                    borderRadius: "12px",
+                    spacingUnit: "4px",
+                  },
+                  rules: {
+                    ".Input": {
+                      border: "1px solid #e5e7eb",
+                      boxShadow: "none",
+                      padding: "12px 14px",
+                    },
+                    ".Input:focus": {
+                      border: "1px solid #2563EB",
+                      boxShadow: "0 0 0 3px rgba(37,99,235,0.15)",
+                    },
+                    ".Label": {
+                      fontWeight: "600",
+                      fontSize: "13px",
+                      color: "#374151",
+                      marginBottom: "6px",
+                    },
+                  },
+                },
+              }}
+            >
               <PaymentForm
                 amount={props.amount}
-                bookingId={props.bookingId}
+                paymentIntentId={paymentIntentId}
                 onSuccess={props.onSuccess}
                 onClose={props.onClose}
               />
             </Elements>
           )}
+        </div>
+
+        {/* Footer trust strip */}
+        <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-center gap-2">
+          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+          <span className="text-[11px] text-gray-500 font-medium">256-bit SSL encrypted · Powered by Stripe</span>
         </div>
       </div>
     </div>
@@ -114,18 +187,19 @@ export default function StripeDepositModal(props: Props) {
 
 function PaymentForm({
   amount,
-  bookingId,
+  paymentIntentId,
   onSuccess,
   onClose,
 }: {
   amount: number;
-  bookingId: string;
-  onSuccess: (amountPaid: number) => void;
+  paymentIntentId: string;
+  onSuccess: (paymentIntentId: string) => void;
   onClose: () => void;
 }) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
+  const [paid, setPaid] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -134,76 +208,93 @@ function PaymentForm({
     setSubmitting(true);
     setErrMsg(null);
 
-    // Confirm the card payment in-place — no redirect. We pass redirect: "if_required"
-    // so any methods that DO require a redirect (e.g. iDEAL) still work, but cards
-    // resolve here.
     const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
       redirect: "if_required",
     });
 
     if (error) {
-      setErrMsg(error.message || "Payment failed. Please try again.");
+      setErrMsg(error.message || "Payment failed. Please check your card and try again.");
       setSubmitting(false);
       return;
     }
 
     if (paymentIntent?.status === "succeeded") {
-      // Verify on the server — this also flips booking.depositPaid in the DB.
-      try {
-        await fetch("/api/deposit/verify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bookingId }),
-        });
-      } catch { /* webhook will reconcile if this fails */ }
-      onSuccess(amount);
+      setPaid(true);
+      // Brief success animation, then notify parent
+      setTimeout(() => onSuccess(paymentIntent.id || paymentIntentId), 800);
       return;
     }
 
-    // Some statuses (processing, requires_action handled by Stripe.js) end here;
-    // treat them as "submitted, will reconcile" — close the modal optimistically.
+    if (paymentIntent?.status === "processing") {
+      // Some banks clear async — treat as success and reconcile via webhook.
+      setPaid(true);
+      setTimeout(() => onSuccess(paymentIntent.id || paymentIntentId), 800);
+      return;
+    }
+
     setSubmitting(false);
-    setErrMsg("Payment is processing. You will receive a confirmation shortly.");
+    setErrMsg("We couldn't confirm your payment. Please try again.");
   };
 
+  if (paid) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 animate-fadeIn">
+        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 animate-scaleIn">
+          <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <p className="text-lg font-bold text-gray-900">Payment confirmed!</p>
+        <p className="text-sm text-gray-500 mt-1">Finalizing your booking…</p>
+      </div>
+    );
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <PaymentElement options={{ layout: "tabs" }} />
 
       {errMsg && (
-        <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-          {errMsg}
+        <div className="flex items-start gap-2.5 px-4 py-3 bg-red-50 border border-red-200 rounded-xl">
+          <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div className="text-sm text-red-700">{errMsg}</div>
         </div>
       )}
 
-      <div className="flex gap-3 pt-2">
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={submitting}
-          className="flex-1 px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-sm disabled:opacity-50"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={!stripe || submitting}
-          className="flex-1 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm disabled:opacity-50 inline-flex items-center justify-center gap-2"
-        >
-          {submitting && (
+      <button
+        type="submit"
+        disabled={!stripe || submitting}
+        className="w-full px-5 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-sm shadow-lg shadow-blue-600/25 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none inline-flex items-center justify-center gap-2"
+      >
+        {submitting ? (
+          <>
             <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
-          )}
-          {submitting ? "Processing…" : `Pay $${amount.toFixed(2)}`}
-        </button>
-      </div>
+            <span>Processing payment…</span>
+          </>
+        ) : (
+          <>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <span>Pay ${amount.toFixed(2)} now</span>
+          </>
+        )}
+      </button>
 
-      <p className="text-[11px] text-gray-400 text-center pt-1">
-        Payments are processed securely by Stripe. Your card details never touch this site.
-      </p>
+      <button
+        type="button"
+        onClick={onClose}
+        disabled={submitting}
+        className="w-full text-sm text-gray-500 hover:text-gray-700 font-medium disabled:opacity-50"
+      >
+        Cancel
+      </button>
     </form>
   );
 }
