@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getUser, setUser } from "@/lib/storage";
 import type { User } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
@@ -151,6 +151,10 @@ export default function PaymentsPage() {
   const [methods, setMethods] = useState<PaymentMethods>(DEFAULT_PAYMENT_METHODS);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [requireDeposit, setRequireDeposit] = useState(false);
+  // Track whether initial load completed; we don't want autosave to fire on
+  // the initial hydration from API/localStorage, only on real user edits.
+  const hydratedRef = useRef(false);
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     // Load from localStorage for instant render, then fetch fresh from API
@@ -170,7 +174,12 @@ export default function PaymentsPage() {
           setRequireDeposit(data.user.requireDeposit ?? false);
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        // Mark hydrated on next tick so the state updates above are flushed
+        // before the autosave effect treats subsequent changes as user edits.
+        setTimeout(() => { hydratedRef.current = true; }, 0);
+      });
   }, []);
 
   const applyMethods = (pm: any) => {
@@ -207,6 +216,21 @@ export default function PaymentsPage() {
     } catch {}
     setSaving(false);
   };
+
+  // Autosave: whenever the user edits methods or the deposit toggle, save 800ms
+  // after they stop typing. Skips the initial hydration so we don't make a
+  // pointless PUT echoing back what we just loaded.
+  useEffect(() => {
+    if (!hydratedRef.current || !user) return;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(() => {
+      handleSave();
+    }, 800);
+    return () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [methods, requireDeposit]);
 
   const toggleExpand = (key: string) => {
     setExpanded(expanded === key ? null : key);
@@ -905,17 +929,21 @@ export default function PaymentsPage() {
         )}
       </div>
 
-      {/* ── Save Button ── */}
-      <div className="flex items-center gap-4">
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold text-sm px-8 py-3 rounded-xl transition-colors shadow-sm"
-        >
-          {saving ? "Saving..." : "Save Changes"}
-        </button>
-        {saved && <SavedBadge />}
+      {/* ── Autosave indicator ── */}
+      <div className="flex items-center gap-3 text-sm text-gray-500">
+        {saving ? (
+          <span className="inline-flex items-center gap-2">
+            <svg className="animate-spin w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Saving…
+          </span>
+        ) : saved ? (
+          <SavedBadge />
+        ) : (
+          <span className="text-gray-400">Changes save automatically.</span>
+        )}
       </div>
 
       {/* ── Help ── */}

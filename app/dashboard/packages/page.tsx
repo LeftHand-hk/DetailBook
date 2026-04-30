@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { getPackages, setPackages, getUser, generateId } from "@/lib/storage";
 import type { Package, User } from "@/types";
@@ -32,6 +32,10 @@ export default function PackagesPage() {
   const [form, setForm] = useState<PackageFormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  // Guard against double submission. `saving` state alone isn't enough because
+  // React batches state updates — a fast double-click can fire handleSave twice
+  // before the disabled prop kicks in, creating duplicate packages on the server.
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     setUser(getUser());
@@ -66,6 +70,8 @@ export default function PackagesPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSaving(true);
 
     const depositVal = form.deposit ? parseFloat(form.deposit) : undefined;
@@ -117,6 +123,7 @@ export default function PackagesPage() {
     }
 
     setSaving(false);
+    submittingRef.current = false;
     setShowModal(false);
   };
 

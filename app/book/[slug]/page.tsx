@@ -495,6 +495,34 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     return slotMin < openMin || slotMin >= closeMin;
   };
 
+  // Format minutes-from-midnight into the same "8:00 AM" / "6:00 PM" string
+  // shape used by businessHours.open/close so the rest of the page stays consistent.
+  const minutesToAmPm = (mins: number): string => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    const period = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return `${h12}:${m.toString().padStart(2, "0")} ${period}`;
+  };
+
+  // Build the visible time-slot list from the business's hours for the selected
+  // day. Falls back to the static 8 AM–5 PM range if no hours are configured.
+  const availableTimes: string[] = (() => {
+    if (!selectedDate || !user?.businessHours) return TIMES;
+    const date = new Date(selectedDate + "T00:00:00");
+    const dayName = DAY_NAMES[date.getDay()];
+    const hours = user.businessHours[dayName];
+    if (!hours || hours.closed) return [];
+    const openMin = timeToMinutes(hours.open);
+    const closeMin = timeToMinutes(hours.close);
+    if (closeMin <= openMin) return TIMES;
+    const slots: string[] = [];
+    for (let m = openMin; m < closeMin; m += 60) {
+      slots.push(minutesToAmPm(m));
+    }
+    return slots;
+  })();
+
   // When the customer picks today, disable time slots earlier than the current
   // time in the business's timezone.
   const isTimeInPast = (time: string): boolean => {
@@ -1433,7 +1461,12 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                 </h3>
                 <p className="text-gray-400 text-xs mb-4">{formatDate(selectedDate)}</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-                  {TIMES.map((time) => {
+                  {availableTimes.length === 0 && (
+                    <p className="col-span-full text-sm text-gray-500 py-4 text-center">
+                      Closed on this day. Please choose another date.
+                    </p>
+                  )}
+                  {availableTimes.map((time) => {
                     const booked = isTimeBooked(time);
                     const outsideHours = isTimeOutsideBusinessHours(time);
                     const past = isTimeInPast(time);

@@ -476,12 +476,19 @@ export default function BookingsPage() {
           pmRaw === "cash" ? "Cash" : pmRaw;
         const proof = (selected as any).paymentProof as string | undefined;
 
-        const statusOptions = [
+        const allStatusOptions = [
           { key: "confirmed", label: "Confirm", active: "bg-green-600 text-white", idle: "bg-green-50 text-green-700 hover:bg-green-100" },
           { key: "completed", label: "Complete", active: "bg-blue-600 text-white", idle: "bg-blue-50 text-blue-700 hover:bg-blue-100" },
           { key: "pending",   label: "Pending",  active: "bg-yellow-500 text-white", idle: "bg-yellow-50 text-yellow-700 hover:bg-yellow-100" },
           { key: "cancelled", label: "Cancel",   active: "bg-red-600 text-white", idle: "bg-red-50 text-red-700 hover:bg-red-100" },
         ];
+        // Once a booking is confirmed, the Confirm button is irrelevant —
+        // re-clicking would not re-fire the email/SMS (intentional dedup),
+        // so hide it to avoid confusion.
+        const statusOptions = selected.status === "confirmed"
+          ? allStatusOptions.filter((o) => o.key !== "confirmed")
+          : allStatusOptions;
+        const gridCols = statusOptions.length === 4 ? "grid-cols-4" : "grid-cols-3";
 
         return (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-end" onClick={() => setSelected(null)}>
@@ -640,7 +647,7 @@ export default function BookingsPage() {
 
               {/* Sticky action footer */}
               <div className="sticky bottom-0 bg-white border-t border-gray-100 px-4 py-3 space-y-2">
-                <div className="grid grid-cols-4 gap-1.5">
+                <div className={`grid ${gridCols} gap-1.5`}>
                   {statusOptions.map((opt) => {
                     const isActive = selected.status === opt.key;
                     return (

@@ -113,7 +113,9 @@ export async function PUT(
       return NextResponse.json({ error: "Booking disappeared" }, { status: 500 });
     }
 
-    // Send confirmation email + SMS when status changes to "confirmed"
+    // Send confirmation email + SMS when status changes to "confirmed".
+    // Fire-and-forget so the dashboard doesn't wait on SMTP/Twilio (which can
+    // take seconds and block the optimistic UI update from being acknowledged).
     if (didTransitionToConfirmed) {
       const user = (updated as any).user;
       const formattedDate = new Date(updated.date + "T00:00:00").toLocaleDateString("en-US", {
@@ -135,24 +137,31 @@ export async function PUT(
       const DEFAULT_EMAIL =
         "Dear {customerName},\n\nYour booking for {serviceName} has been confirmed!\n\nDate: {date}\nTime: {time}\n\nWe look forward to seeing you!\n\n— {businessName}";
 
+      console.log("[CONFIRM] Booking", id, "transitioned to confirmed. Sending notifications.", {
+        hasCustomerEmail: !!updated.customerEmail,
+        emailConfirmations: user?.emailConfirmations,
+        plan: user?.plan,
+        smsConfirmations: user?.smsConfirmations,
+        hasCustomerPhone: !!updated.customerPhone,
+      });
+
       // Confirmation email to customer (uses configured template, falls back to default)
       if (updated.customerEmail && user?.emailConfirmations !== false) {
         const emailTemplate = (user?.emailTemplates as any)?.bookingConfirmation || DEFAULT_EMAIL;
         const customerText = render(emailTemplate);
         const customerHtml = `<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9fafb;border-radius:8px;color:#111827;font-size:14px;line-height:1.6;white-space:pre-wrap;">${customerText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`;
-        const emailResult = await sendEmail({ to: updated.customerEmail, subject: `Booking Confirmed – ${updated.serviceName} on ${formattedDate}`, html: customerHtml, text: customerText });
-        console.log("[CONFIRM EMAIL] Result:", emailResult);
+        sendEmail({ to: updated.customerEmail, subject: `Booking Confirmed – ${updated.serviceName} on ${formattedDate}`, html: customerHtml, text: customerText })
+          .then((r) => console.log("[CONFIRM EMAIL] Result:", r))
+          .catch((err) => console.error("[CONFIRM EMAIL] threw:", err));
       }
 
       // Confirmation SMS to customer (Pro only)
       if (user?.plan === "pro" && user?.smsConfirmations && updated.customerPhone) {
         const smsTemplate = (user?.smsTemplates as any)?.bookingConfirmation || DEFAULT_SMS;
         const smsBody = render(smsTemplate);
-        const smsResult = await sendSms(updated.customerPhone, smsBody).catch((err) => {
-          console.error("[CONFIRM SMS] sendSms threw:", err);
-          return { success: false, error: String(err) };
-        });
-        console.log("[CONFIRM SMS] Result:", smsResult);
+        sendSms(updated.customerPhone, smsBody)
+          .then((r) => console.log("[CONFIRM SMS] Result:", r))
+          .catch((err) => console.error("[CONFIRM SMS] threw:", err));
       }
     }
 

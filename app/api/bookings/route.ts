@@ -217,6 +217,18 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Create in-app notification for the business owner — fire and forget so
+    // the booking response isn't blocked by it.
+    prisma.notification.create({
+      data: {
+        userId,
+        type: "booking_new",
+        title: "New booking",
+        message: `${customerName} booked ${serviceName} for ${date} at ${time}`,
+        bookingId: booking.id,
+      },
+    }).catch(() => {});
+
     // Auto-sync to Google Calendar (non-blocking)
     syncBookingToGoogleCalendar(booking).catch(() => {});
 

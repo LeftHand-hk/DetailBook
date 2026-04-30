@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { isLoggedIn, logout, getUser, initializeDemo, syncFromServer } from "@/lib/storage";
 import type { User } from "@/types";
 import { LogoIcon, LogoWordmark } from "@/components/Logo";
+import NotificationBell from "@/components/NotificationBell";
 
 interface NavItem {
   label: string;
@@ -376,9 +377,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <LogoWordmark darkText size="text-base" />
             </div>
           </div>
-          {isPro && (
-            <span className="text-[10px] font-bold bg-gray-700 text-white px-2.5 py-1 rounded-full uppercase tracking-wider">Pro</span>
-          )}
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            {isPro && (
+              <span className="text-[10px] font-bold bg-gray-700 text-white px-2.5 py-1 rounded-full uppercase tracking-wider">Pro</span>
+            )}
+          </div>
+        </div>
+
+        {/* Desktop Top Bar */}
+        <div className="hidden lg:flex items-center justify-end px-6 py-2.5 bg-white border-b border-gray-200 flex-shrink-0">
+          <NotificationBell />
         </div>
 
         {/* Impersonation banner — admin viewing as this client */}
