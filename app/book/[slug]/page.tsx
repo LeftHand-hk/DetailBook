@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { getUser, getPackages } from "@/lib/storage";
 import type { User, Package } from "@/types";
 import { usePlatformName } from "@/components/PlatformName";
+import StripeDepositModal from "@/components/StripeDepositModal";
 
 const TIMES = [
   "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM",
@@ -180,6 +181,9 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   const [pendingProofImage, setPendingProofImage] = useState<string | null>(null);
   const [stripeDepositPaid, setStripeDepositPaid] = useState(false);
   const [smsConsent, setSmsConsent] = useState(false);
+  // Stripe embedded modal state. When set, the modal opens with this bookingId
+  // and walks the customer through paying without leaving the booking page.
+  const [stripeModalBookingId, setStripeModalBookingId] = useState<string | null>(null);
 
   useEffect(() => {
     // Fetch public business data (staff + serviceType) from API
@@ -386,9 +390,15 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
         const created = await res.json();
         setBookingId(created.id);
 
-        // For API-driven processors (Stripe / Square), redirect to hosted checkout.
+        // Stripe is handled in-place via embedded Elements modal — no redirect.
+        if (paymentMethod === "stripe" && depositAmount > 0) {
+          setSubmitting(false);
+          setStripeModalBookingId(created.id);
+          return;
+        }
+
+        // Square still uses hosted-checkout redirect for now.
         const checkoutEndpoints: Record<string, string> = {
-          stripe: "/api/stripe/deposit",
           square: "/api/square/deposit",
         };
         if (checkoutEndpoints[paymentMethod] && depositAmount > 0) {
@@ -2071,6 +2081,32 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
         </div>
       ) : (
         <div className="mt-8 py-6" />
+      )}
+
+      {/* Stripe embedded payment modal — replaces hosted-checkout redirect */}
+      {stripeModalBookingId && selectedPackage && (
+        <StripeDepositModal
+          open
+          publishableKey={(user as any)?.paymentMethods?.stripe?.publishableKey || ""}
+          userId={(user as any)?.id || ""}
+          bookingId={stripeModalBookingId}
+          amount={depositAmount}
+          customerEmail={form.customerEmail}
+          serviceName={selectedPackage.name}
+          onSuccess={(_amt) => {
+            setStripeModalBookingId(null);
+            setStripeDepositPaid(true);
+            setBookingId(stripeModalBookingId);
+            setStep(3);
+          }}
+          onClose={() => {
+            setStripeModalBookingId(null);
+            // Customer cancelled — they can still see the booking on the
+            // success page with a "deposit pending" state, or retry from
+            // their email link.
+            setStep(3);
+          }}
+        />
       )}
     </div>
   );

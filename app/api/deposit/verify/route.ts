@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getBusinessStripe } from "@/lib/stripe";
 
 function squareApiBase(sandbox: boolean) {
   return sandbox ? "https://connect.squareupsandbox.com" : "https://connect.squareup.com";
@@ -34,7 +35,19 @@ export async function POST(request: NextRequest) {
     let paid = false;
     let paidAmount = 0;
 
-    if (provider === "square") {
+    if (provider === "stripe") {
+      const stripe = await getBusinessStripe(booking.userId);
+      if (!stripe) return NextResponse.json({ paid: false, reason: "Stripe not configured" });
+      try {
+        const intent = await stripe.paymentIntents.retrieve(refId);
+        if (intent.status === "succeeded") {
+          paid = true;
+          paidAmount = intent.amount > 0 ? intent.amount / 100 : booking.depositRequired;
+        }
+      } catch (e) {
+        console.error("[verify] Stripe retrieve failed:", e);
+      }
+    } else if (provider === "square") {
       const cfg = pm?.square;
       if (!cfg?.accessToken) return NextResponse.json({ paid: false, reason: "Square not configured" });
       // Look up payments tied to this order — Square pays the order via one or more payments.
