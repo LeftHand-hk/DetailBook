@@ -224,7 +224,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
 
   // Once user data is loaded AND we have a pending hosted-checkout return,
   // verify the payment server-side before showing success. Stripe is verified
-  // by its webhook — Paddle/Square use this verify endpoint.
+  // by its webhook — Square uses this verify endpoint.
   useEffect(() => {
     if (pendingStripeReturn && user && !loading) {
       const bId = pendingStripeReturn;
@@ -307,9 +307,6 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     if (pm?.stripe?.enabled && pm.stripe.connected) {
       methods.push({ key: "stripe", label: "Card Payment", icon: "💳", detail: "Pay securely with credit/debit card" });
     }
-    if (pm?.paddle?.enabled && pm.paddle.apiKey && pm.paddle.productId) {
-      methods.push({ key: "paddle", label: "Card Payment (Paddle)", icon: "💳", detail: "Pay securely with credit/debit card" });
-    }
     if (pm?.square?.enabled && pm.square.accessToken && pm.square.locationId) {
       methods.push({ key: "square", label: "Card Payment (Square)", icon: "💳", detail: "Pay securely with credit/debit card" });
     }
@@ -389,10 +386,9 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
         const created = await res.json();
         setBookingId(created.id);
 
-        // For API-driven processors (Stripe / Paddle / Square), redirect to hosted checkout.
+        // For API-driven processors (Stripe / Square), redirect to hosted checkout.
         const checkoutEndpoints: Record<string, string> = {
           stripe: "/api/stripe/deposit",
-          paddle: "/api/paddle/deposit",
           square: "/api/square/deposit",
         };
         if (checkoutEndpoints[paymentMethod] && depositAmount > 0) {

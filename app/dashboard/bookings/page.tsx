@@ -470,7 +470,6 @@ export default function BookingsPage() {
           pmRaw === "bankTransfer" ? "Bank Transfer" :
           pmRaw === "cashapp" ? "Cash App" :
           pmRaw === "stripe" ? "Card (Stripe)" :
-          pmRaw === "paddle" ? "Paddle" :
           pmRaw === "square" ? "Square" :
           pmRaw === "paypal" ? "PayPal" :
           pmRaw === "cash" ? "Cash" : pmRaw;

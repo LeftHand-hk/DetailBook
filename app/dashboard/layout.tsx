@@ -385,9 +385,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </div>
 
-        {/* Desktop Top Bar */}
-        <div className="hidden lg:flex items-center justify-end px-6 py-2.5 bg-white border-b border-gray-200 flex-shrink-0">
-          <NotificationBell />
+        {/* Desktop floating notification box — fixed in the top-right corner */}
+        <div className="hidden lg:block fixed top-4 right-6 z-30">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-md p-1">
+            <NotificationBell />
+          </div>
         </div>
 
         {/* Impersonation banner — admin viewing as this client */}

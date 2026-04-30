@@ -61,7 +61,6 @@ export interface User {
   // Payment methods
   paymentMethods?: {
     stripe?: { enabled: boolean; publishableKey?: string; secretKey?: string; connected?: boolean };
-    paddle?: { enabled: boolean; apiKey?: string; productId?: string; sandbox?: boolean };
     square?: { enabled: boolean; accessToken?: string; locationId?: string; sandbox?: boolean };
     paypal?: { enabled: boolean; email?: string; paypalMeLink?: string; requireProof?: boolean };
     cashapp?: { enabled: boolean; cashtag?: string; requireProof?: boolean };

@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
-function paddleApiBase(sandbox: boolean) {
-  return sandbox ? "https://sandbox-api.paddle.com" : "https://api.paddle.com";
-}
-
 function squareApiBase(sandbox: boolean) {
   return sandbox ? "https://connect.squareupsandbox.com" : "https://connect.squareup.com";
 }
@@ -38,23 +34,7 @@ export async function POST(request: NextRequest) {
     let paid = false;
     let paidAmount = 0;
 
-    if (provider === "paddle") {
-      const cfg = pm?.paddle;
-      if (!cfg?.apiKey) return NextResponse.json({ paid: false, reason: "Paddle not configured" });
-      const r = await fetch(`${paddleApiBase(!!cfg.sandbox)}/transactions/${refId}`, {
-        headers: { Authorization: `Bearer ${cfg.apiKey}` },
-        cache: "no-store",
-      });
-      if (r.ok) {
-        const j = await r.json();
-        const status = j?.data?.status;
-        if (status === "completed" || status === "paid" || status === "billed") {
-          const cents = parseInt(j?.data?.details?.totals?.grand_total || "0", 10);
-          paid = true;
-          paidAmount = cents > 0 ? cents / 100 : booking.depositRequired;
-        }
-      }
-    } else if (provider === "square") {
+    if (provider === "square") {
       const cfg = pm?.square;
       if (!cfg?.accessToken) return NextResponse.json({ paid: false, reason: "Square not configured" });
       // Look up payments tied to this order — Square pays the order via one or more payments.
