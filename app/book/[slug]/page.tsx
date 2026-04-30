@@ -2084,6 +2084,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                   ...pendingStripeBookingData,
                   depositPaid: depositAmount,
                   paymentProof: `stripe:${paymentIntentId}`,
+                  status: "confirmed",
                 }),
               });
               if (res.ok) {
@@ -2130,6 +2131,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                   ...pendingSquareBookingData,
                   depositPaid: depositAmount,
                   paymentProof: `square:${paymentId}`,
+                  status: "confirmed",
                 }),
               });
               if (res.ok) {

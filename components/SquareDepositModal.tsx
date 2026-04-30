@@ -72,7 +72,25 @@ export default function SquareDepositModal(props: Props) {
 
   // Load + attach Square card form
   useEffect(() => {
-    if (!props.open || !props.applicationId || !props.locationId) return;
+    if (!props.open) return;
+    if (!props.applicationId || !props.locationId) {
+      setSetupErr(
+        "This business hasn't finished setting up Square. Please choose a different payment method or contact them."
+      );
+      return;
+    }
+    // Sandbox application IDs start with "sandbox-sq0idb-" and the SDK refuses
+    // to initialize with the prod URL — fail loud here instead of a cryptic
+    // SDK error.
+    const looksLikeSandbox = props.applicationId.startsWith("sandbox-");
+    if (looksLikeSandbox !== !!props.sandbox) {
+      setSetupErr(
+        looksLikeSandbox
+          ? "Square is configured with a sandbox Application ID but Sandbox Mode is off. Ask the business to fix this."
+          : "Square's Sandbox Mode is on but a production Application ID is being used. Ask the business to fix this."
+      );
+      return;
+    }
     let destroyed = false;
 
     (async () => {

@@ -286,9 +286,38 @@ export async function POST(request: NextRequest) {
       sendEmail({ to: user.email, subject: `New Booking: ${customerName} - ${serviceName} on ${formattedDate}`, html: ownerHtml }).catch(() => {});
     }
 
-    // Note: Customer confirmation email is sent by PUT /api/bookings/[id] when the
-    // booking status is changed to "confirmed" (either by the owner or automatically
-    // after proof of payment upload). POST only notifies the business owner.
+    // If the booking is created already "confirmed" (card payment paid),
+    // send the customer confirmation email + SMS the same way PUT does on
+    // a status transition. Fire-and-forget.
+    if (booking.status === "confirmed") {
+      const ctx: Record<string, string> = {
+        customerName: booking.customerName || "",
+        serviceName: booking.serviceName || "",
+        date: formattedDate,
+        time: booking.time || "",
+        businessName: user.businessName || "",
+      };
+      const render = (tpl: string) =>
+        tpl.replace(/\{(\w+)\}/g, (_m, k) => ctx[k] ?? "");
+
+      const DEFAULT_SMS =
+        "Hi {customerName}, your {serviceName} appointment is confirmed for {date} at {time}. — {businessName}";
+      const DEFAULT_EMAIL =
+        "Dear {customerName},\n\nYour booking for {serviceName} has been confirmed!\n\nDate: {date}\nTime: {time}\n\nWe look forward to seeing you!\n\n— {businessName}";
+
+      if (booking.customerEmail && (user as any).emailConfirmations !== false) {
+        const emailTemplate = ((user as any).emailTemplates as any)?.bookingConfirmation || DEFAULT_EMAIL;
+        const customerText = render(emailTemplate);
+        const customerHtml = `<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9fafb;border-radius:8px;color:#111827;font-size:14px;line-height:1.6;white-space:pre-wrap;">${customerText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`;
+        sendEmail({ to: booking.customerEmail, subject: `Booking Confirmed – ${booking.serviceName} on ${formattedDate}`, html: customerHtml, text: customerText }).catch(() => {});
+      }
+
+      if ((user as any).plan === "pro" && (user as any).smsConfirmations && booking.customerPhone) {
+        const smsTemplate = ((user as any).smsTemplates as any)?.bookingConfirmation || DEFAULT_SMS;
+        const smsBody = render(smsTemplate);
+        sendSms(booking.customerPhone, smsBody).catch(() => {});
+      }
+    }
 
     return NextResponse.json(booking, { status: 201 });
   } catch (error) {
