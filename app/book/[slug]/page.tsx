@@ -5,6 +5,7 @@ import { getUser, getPackages } from "@/lib/storage";
 import type { User, Package } from "@/types";
 import { usePlatformName } from "@/components/PlatformName";
 import StripeDepositModal from "@/components/StripeDepositModal";
+import SquareDepositModal from "@/components/SquareDepositModal";
 
 const TIMES = [
   "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM",
@@ -186,6 +187,9 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   // modal leaves zero side effects.
   const [stripeModalOpen, setStripeModalOpen] = useState(false);
   const [pendingStripeBookingData, setPendingStripeBookingData] = useState<any>(null);
+  // Same pattern for Square — booking is held until payment succeeds.
+  const [squareModalOpen, setSquareModalOpen] = useState(false);
+  const [pendingSquareBookingData, setPendingSquareBookingData] = useState<any>(null);
 
   useEffect(() => {
     // Fetch public business data (staff + serviceType) from API
@@ -313,7 +317,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     if (pm?.stripe?.enabled && pm.stripe.connected) {
       methods.push({ key: "stripe", label: "Card Payment", icon: "💳", detail: "Pay securely with credit/debit card" });
     }
-    if (pm?.square?.enabled && pm.square.accessToken && pm.square.locationId) {
+    if (pm?.square?.enabled && pm.square.connected) {
       methods.push({ key: "square", label: "Card Payment (Square)", icon: "💳", detail: "Pay securely with credit/debit card" });
     }
     if (pm?.paypal?.enabled && (pm.paypal.paypalMeLink || pm.paypal.email)) {
@@ -382,11 +386,17 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       paymentProof: pendingProofImage || undefined,
     };
 
-    // Stripe path: open the embedded modal FIRST. The booking is created only
-    // after the payment succeeds — so closing the modal leaves no orphan booking.
+    // Stripe / Square: open the embedded modal FIRST. The booking is created
+    // only after payment succeeds — so closing the modal leaves no orphan booking.
     if (paymentMethod === "stripe" && depositAmount > 0) {
       setPendingStripeBookingData(bookingData);
       setStripeModalOpen(true);
+      setSubmitting(false);
+      return;
+    }
+    if (paymentMethod === "square" && depositAmount > 0) {
+      setPendingSquareBookingData(bookingData);
+      setSquareModalOpen(true);
       setSubmitting(false);
       return;
     }
@@ -400,37 +410,6 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       if (res.ok) {
         const created = await res.json();
         setBookingId(created.id);
-
-        // Square still uses hosted-checkout redirect for now.
-        const checkoutEndpoints: Record<string, string> = {
-          square: "/api/square/deposit",
-        };
-        if (checkoutEndpoints[paymentMethod] && depositAmount > 0) {
-          try {
-            const r = await fetch(checkoutEndpoints[paymentMethod], {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                userId: (user as any)?.id,
-                bookingId: created.id,
-                amount: depositAmount,
-                customerEmail: form.customerEmail,
-                serviceName: selectedPackage.name,
-              }),
-            });
-            if (r.ok) {
-              const { url } = await r.json();
-              if (url) {
-                window.location.href = url;
-                return;
-              }
-            }
-            setBookingError(null);
-          } catch {
-            // Redirect failed — fall through to success screen with manual instructions
-          }
-        }
-
         setSubmitting(false);
         setStep(3);
       } else {
@@ -2127,6 +2106,51 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
             // No booking was created — closing is safe.
             setStripeModalOpen(false);
             setPendingStripeBookingData(null);
+          }}
+        />
+      )}
+
+      {/* Square embedded payment modal — booking is created only after success */}
+      {squareModalOpen && selectedPackage && pendingSquareBookingData && (
+        <SquareDepositModal
+          open
+          applicationId={(user as any)?.paymentMethods?.square?.applicationId || ""}
+          locationId={(user as any)?.paymentMethods?.square?.locationId || ""}
+          sandbox={!!(user as any)?.paymentMethods?.square?.sandbox}
+          userId={(user as any)?.id || ""}
+          amount={depositAmount}
+          customerEmail={form.customerEmail}
+          serviceName={selectedPackage.name}
+          onSuccess={async (paymentId) => {
+            try {
+              const res = await fetch("/api/bookings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  ...pendingSquareBookingData,
+                  depositPaid: depositAmount,
+                  paymentProof: `square:${paymentId}`,
+                }),
+              });
+              if (res.ok) {
+                const created = await res.json();
+                setBookingId(created.id);
+                setStripeDepositPaid(true);
+                setSquareModalOpen(false);
+                setPendingSquareBookingData(null);
+                setStep(3);
+              } else {
+                setBookingError("Payment succeeded but we couldn't save your booking. Please contact the business — your card was charged.");
+                setSquareModalOpen(false);
+              }
+            } catch {
+              setBookingError("Payment succeeded but we couldn't save your booking. Please contact the business — your card was charged.");
+              setSquareModalOpen(false);
+            }
+          }}
+          onClose={() => {
+            setSquareModalOpen(false);
+            setPendingSquareBookingData(null);
           }}
         />
       )}

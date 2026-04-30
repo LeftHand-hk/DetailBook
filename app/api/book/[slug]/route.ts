@@ -101,6 +101,15 @@ export async function GET(
         if (pm.stripe?.enabled) {
           safe.stripe = { enabled: true, connected: !!(pm.stripe.publishableKey && pm.stripe.secretKey), publishableKey: pm.stripe.publishableKey || "" };
         }
+        if (pm.square?.enabled) {
+          safe.square = {
+            enabled: true,
+            connected: !!(pm.square.applicationId && pm.square.accessToken && pm.square.locationId),
+            applicationId: pm.square.applicationId || "",
+            locationId: pm.square.locationId || "",
+            sandbox: !!pm.square.sandbox,
+          };
+        }
         if (pm.paypal?.enabled) {
           safe.paypal = { enabled: true, email: pm.paypal.email || "", paypalMeLink: pm.paypal.paypalMeLink || "", requireProof: pm.paypal.requireProof !== false };
         }

@@ -126,7 +126,7 @@ type PaymentMethods = NonNullable<User["paymentMethods"]>;
 
 const DEFAULT_PAYMENT_METHODS: PaymentMethods = {
   stripe: { enabled: false, publishableKey: "", secretKey: "", connected: false },
-  square: { enabled: false, accessToken: "", locationId: "", sandbox: false },
+  square: { enabled: false, applicationId: "", accessToken: "", locationId: "", sandbox: false },
   paypal: { enabled: false, email: "", paypalMeLink: "", requireProof: true },
   cashapp: { enabled: false, cashtag: "", requireProof: true },
   bankTransfer: { enabled: false, bankName: "", accountName: "", iban: "", sortCode: "", accountNumber: "", instructions: "", requireProof: true },
@@ -228,7 +228,7 @@ export default function PaymentsPage() {
   /* ── Helper to determine connection status ── */
 
   const isStripeConnected = !!(methods.stripe?.publishableKey && methods.stripe?.secretKey);
-  const isSquareConnected = !!(methods.square?.accessToken && methods.square?.locationId);
+  const isSquareConnected = !!(methods.square?.applicationId && methods.square?.accessToken && methods.square?.locationId);
   const isPaypalConnected = !!(methods.paypal?.email || methods.paypal?.paypalMeLink);
   const isCashappConnected = !!methods.cashapp?.cashtag;
   const isBankConnected = !!(
@@ -431,8 +431,18 @@ export default function PaymentsPage() {
         {expanded === "square" && methods.square?.enabled && (
           <div className="px-6 pb-6 space-y-4 border-t border-gray-100 pt-4">
             <p className="text-sm text-gray-500">
-              Customers pay deposits via Square&apos;s hosted checkout page. Funds go to your Square account.
+              Customers pay deposits via an embedded Square card form on your booking page — no redirect.
             </p>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Application ID</label>
+              <input
+                type="text"
+                value={methods.square?.applicationId ?? ""}
+                onChange={(e) => setMethods({ ...methods, square: { ...methods.square!, applicationId: e.target.value } })}
+                placeholder="sq0idp-... or sandbox-sq0idb-..."
+                className={INPUT_CLASS}
+              />
+            </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Access Token</label>
               <input
@@ -464,10 +474,11 @@ export default function PaymentsPage() {
               />
             </div>
             <p className="text-xs text-gray-400">
-              Get your access token at{" "}
+              Get all three at{" "}
               <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
                 developer.squareup.com → your app → Credentials
               </a>
+              . Application ID is public and embedded in the booking page.
             </p>
           </div>
         )}
