@@ -35,33 +35,6 @@ const EMPTY_FORM: BookingForm = {
   make:"",model:"",year:"",color:"",customerName:"",customerEmail:"",customerPhone:"",notes:"",
 };
 
-// Resize+re-encode image client-side. Returns a JPEG data URL.
-// Cuts payment-proof submit from megabytes to a few hundred KB.
-async function compressImage(file: File, maxEdge = 1600, quality = 0.85): Promise<string> {
-  const dataUrl: string = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error("Could not read file"));
-    reader.readAsDataURL(file);
-  });
-  const img: HTMLImageElement = await new Promise((resolve, reject) => {
-    const i = new Image();
-    i.onload = () => resolve(i);
-    i.onerror = () => reject(new Error("Could not load image"));
-    i.src = dataUrl;
-  });
-  const ratio = Math.min(1, maxEdge / Math.max(img.width, img.height));
-  const w = Math.round(img.width * ratio);
-  const h = Math.round(img.height * ratio);
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return dataUrl;
-  ctx.drawImage(img, 0, 0, w, h);
-  return canvas.toDataURL("image/jpeg", quality);
-}
-
 const PLACEHOLDER_REVIEWS = [
   { name: "Sarah M.", rating: 5, quote: "Absolutely amazing work! My car looked brand new after the full detail. Highly recommend!" },
   { name: "James R.", rating: 5, quote: "Professional, punctual, and the results speak for themselves. Best detailer in town." },
@@ -96,64 +69,6 @@ function MiniStarRating({ rating }: { rating: number }) {
   );
 }
 
-function ProofSection({
-  proofUploaded,
-  proofUploading,
-  proofError,
-  onUpload,
-}: {
-  proofUploaded: boolean;
-  proofUploading: boolean;
-  proofError: string | null;
-  onUpload: (file: File) => void | Promise<void>;
-}) {
-  if (proofUploaded) {
-    return (
-      <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-xl p-3">
-        <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-        </svg>
-        <p className="text-green-400 text-sm font-semibold">Proof attached — this will help the business confirm your booking faster.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <p className="text-white/60 text-xs mb-2 font-semibold">
-        Upload Proof of Payment <span className="text-white/40 font-normal">(optional — speeds up confirmation)</span>
-      </p>
-      <label className={`flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-5 py-3 rounded-xl cursor-pointer transition-colors ${proofUploading ? "opacity-60 pointer-events-none" : ""}`}>
-        {proofUploading ? (
-          <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Uploading...</>
-        ) : (
-          <>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            Upload Screenshot / Receipt
-          </>
-        )}
-        <input
-          type="file"
-          accept="image/*"
-          className="hidden"
-          disabled={proofUploading}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) onUpload(file);
-            e.target.value = "";
-          }}
-        />
-      </label>
-      {proofError && (
-        <p className="text-red-400 text-xs mt-2">{proofError}</p>
-      )}
-      <p className="text-white/40 text-xs mt-2">You can also skip this and confirm your booking below — the business will verify the payment when it arrives.</p>
-    </div>
-  );
-}
-
 export default function BookingPage({ params }: { params: { slug: string } }) {
   const { slug } = params;
   const platformName = usePlatformName();
@@ -176,12 +91,14 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   const [selectedServiceMode, setSelectedServiceMode] = useState<"mobile" | "shop" | null>(null);
   const [bookedSlots, setBookedSlots] = useState<{ date: string; time: string; staffId: string | null }[]>([]);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
-  const [proofUploading, setProofUploading] = useState(false);
-  const [proofUploaded, setProofUploaded] = useState(false);
-  const [proofError, setProofError] = useState<string | null>(null);
-  const [pendingProofImage, setPendingProofImage] = useState<string | null>(null);
   const [stripeDepositPaid, setStripeDepositPaid] = useState(false);
   const [smsConsent, setSmsConsent] = useState(false);
+  // Customer ticks "I have paid" before submitting a manual-payment booking.
+  // Required so we don't accept a manual-payment submission without a confirmation.
+  const [manualPaymentConfirmed, setManualPaymentConfirmed] = useState(false);
+  // The actual status the API stored for the new booking. "confirmed" for card
+  // payments, "pending" for manual / cash / no-deposit. Drives the final screen.
+  const [bookingStatusReturned, setBookingStatusReturned] = useState<"confirmed" | "pending" | null>(null);
   // Stripe embedded modal state. We hold the booking payload in memory and only
   // create the booking on the server AFTER the customer pays — so closing the
   // modal leaves zero side effects.
@@ -239,7 +156,8 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     if (pendingStripeReturn && user && !loading) {
       const bId = pendingStripeReturn;
       setBookingId(bId);
-      setStep(3);
+      setBookingStatusReturned("confirmed");
+      setStep(4);
       setPendingStripeReturn(null);
       (async () => {
         try {
@@ -335,6 +253,34 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     return methods;
   };
 
+  // Build the shared booking payload from the current form state. Used by
+  // every submit path — step-2 no-deposit submit, manual-payment submit at
+  // step 3, and the Stripe/Square modal payloads.
+  const buildBookingData = () => {
+    const assignedStaffId = selectedStaff?.id || autoAssignStaff();
+    const assignedStaffName = selectedStaff?.name || staffList.find((s) => s.id === assignedStaffId)?.name;
+    const bookingAddress = (serviceType === "both" && selectedServiceMode === "shop")
+      ? `SHOP: ${user?.address || ""}`
+      : customerAddress.trim() || undefined;
+    return {
+      userId: (user as any)?.id,
+      customerName: form.customerName,
+      customerEmail: form.customerEmail,
+      customerPhone: form.customerPhone,
+      vehicle: { make: form.make, model: form.model, year: form.year, color: form.color },
+      serviceId: selectedPackage!.id,
+      serviceName: selectedPackage!.name,
+      servicePrice: selectedPackage!.price,
+      date: selectedDate,
+      time: selectedTime,
+      depositRequired: depositAmount,
+      notes: form.notes,
+      address: bookingAddress,
+      staffId: assignedStaffId,
+      staffName: assignedStaffName,
+    };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPackage || !selectedDate || !selectedTime) return;
@@ -348,70 +294,39 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     }
 
     setBookingError(null);
-    setSubmitting(true);
-    const assignedStaffId = selectedStaff?.id || autoAssignStaff();
-    const assignedStaffName = selectedStaff?.name || staffList.find((s) => s.id === assignedStaffId)?.name;
-    const bookingAddress = (serviceType === "both" && selectedServiceMode === "shop") ? `SHOP: ${user?.address || ""}` : customerAddress.trim() || undefined;
 
-    // Determine payment method — if deposit required and methods available, must select one
     const pm = (user as any)?.paymentMethods;
     const enabledMethods = getEnabledPaymentMethods(pm);
-    const paymentMethod = depositAmount > 0 && enabledMethods.length > 0 ? (selectedPaymentMethod || "") : (selectedPaymentMethod || "cash");
+    const needsPaymentStep = depositAmount > 0 && enabledMethods.length > 0;
 
-    if (depositAmount > 0 && enabledMethods.length > 0 && !selectedPaymentMethod) {
-      setBookingError("Please select a payment method for your deposit.");
-      setSubmitting(false);
+    // If there's a deposit AND payment methods configured, the customer picks
+    // how to pay on a dedicated screen. Otherwise we submit straight away as
+    // a no-deposit pending booking.
+    if (needsPaymentStep) {
+      setSelectedPaymentMethod(null);
+      setManualPaymentConfirmed(false);
+      setStep(3);
       return;
     }
 
-    const bookingData = {
-      userId: (user as any)?.id,
-      customerName: form.customerName,
-      customerEmail: form.customerEmail,
-      customerPhone: form.customerPhone,
-      vehicle: { make: form.make, model: form.model, year: form.year, color: form.color },
-      serviceId: selectedPackage.id,
-      serviceName: selectedPackage.name,
-      servicePrice: selectedPackage.price,
-      date: selectedDate,
-      time: selectedTime,
-      status: "pending",
-      depositPaid: 0,
-      depositRequired: depositAmount,
-      notes: form.notes,
-      address: bookingAddress,
-      staffId: assignedStaffId,
-      staffName: assignedStaffName,
-      paymentMethod,
-      paymentProof: pendingProofImage || undefined,
-    };
-
-    // Stripe / Square: open the embedded modal FIRST. The booking is created
-    // only after payment succeeds — so closing the modal leaves no orphan booking.
-    if (paymentMethod === "stripe" && depositAmount > 0) {
-      setPendingStripeBookingData(bookingData);
-      setStripeModalOpen(true);
-      setSubmitting(false);
-      return;
-    }
-    if (paymentMethod === "square" && depositAmount > 0) {
-      setPendingSquareBookingData(bookingData);
-      setSquareModalOpen(true);
-      setSubmitting(false);
-      return;
-    }
-
+    setSubmitting(true);
     try {
       const res = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(bookingData),
+        body: JSON.stringify({
+          ...buildBookingData(),
+          status: "pending",
+          depositPaid: 0,
+          paymentMethod: depositAmount > 0 ? "cash" : "",
+        }),
       });
       if (res.ok) {
         const created = await res.json();
         setBookingId(created.id);
+        setBookingStatusReturned("pending");
         setSubmitting(false);
-        setStep(3);
+        setStep(4);
       } else {
         const errData = await res.json().catch(() => ({}));
         setBookingError(errData.error || "Failed to create booking. Please try again.");
@@ -420,6 +335,59 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     } catch {
       setBookingError("Network error. Please check your connection and try again.");
       setSubmitting(false);
+    }
+  };
+
+  // Manual payment confirmation (PayPal / Cash App / Bank Transfer / Cash)
+  // — customer ticks "I have paid" then submits. Booking lands as "pending"
+  // and the business owner verifies the payment before confirming.
+  const handleManualPaymentSubmit = async () => {
+    if (!selectedPackage || !selectedPaymentMethod) return;
+    if (selectedPaymentMethod !== "cash" && !manualPaymentConfirmed) return;
+    setBookingError(null);
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...buildBookingData(),
+          status: "pending",
+          depositPaid: 0,
+          paymentMethod: selectedPaymentMethod,
+        }),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setBookingId(created.id);
+        setBookingStatusReturned("pending");
+        setSubmitting(false);
+        setStep(4);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setBookingError(errData.error || "Failed to create booking. Please try again.");
+        setSubmitting(false);
+      }
+    } catch {
+      setBookingError("Network error. Please check your connection and try again.");
+      setSubmitting(false);
+    }
+  };
+
+  // Card payment — opens the embedded modal. Booking is only created
+  // after payment succeeds, inside the modal's onSuccess handler.
+  const handleCardPaymentStart = () => {
+    if (!selectedPackage || !selectedPaymentMethod) return;
+    const data = {
+      ...buildBookingData(),
+      paymentMethod: selectedPaymentMethod,
+    };
+    if (selectedPaymentMethod === "stripe") {
+      setPendingStripeBookingData(data);
+      setStripeModalOpen(true);
+    } else if (selectedPaymentMethod === "square") {
+      setPendingSquareBookingData(data);
+      setSquareModalOpen(true);
     }
   };
 
@@ -596,57 +564,16 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     );
   }
 
-  // Proof upload handler — runs BEFORE booking creation. Stores base64 locally
-  // so the image can be sent along with the booking POST. No network call here.
-  const handleUploadProof = async (file: File) => {
-    if (!file) return;
-    setProofError(null);
-    if (file.size > 20 * 1024 * 1024) {
-      setProofError("Image too large. Max 20MB. Try a smaller photo or screenshot.");
-      return;
-    }
-    if (!file.type.startsWith("image/")) {
-      setProofError("Only image files are allowed (JPG, PNG, etc).");
-      return;
-    }
-    setProofUploading(true);
-    try {
-      // Compress client-side: payment proofs don't need 20MB. Resize the long
-      // edge to 1600px and re-encode as JPEG q=0.85 — keeps screenshots legible
-      // while dropping a 5MB photo to <500KB so submit is fast.
-      const base64 = await compressImage(file, 1600, 0.85);
-      setPendingProofImage(base64);
-      setProofUploaded(true);
-    } catch (e) {
-      setProofError(e instanceof Error ? e.message : "Failed to upload proof");
-    } finally {
-      setProofUploading(false);
-    }
-  };
-
   // ── Success Screen ──────────────────────────────────
-  if (step === 3) {
-    // Customer has already paid+uploaded (for proof-based methods), or paid via Stripe,
-    // or chose cash-at-appointment. The owner still needs to review and confirm.
-    const proofAwaitingReview =
-      depositAmount > 0 &&
-      !stripeDepositPaid &&
-      !!pendingProofImage;
-    const fullyConfirmed = stripeDepositPaid;
+  if (step === 4) {
+    const fullyConfirmed = bookingStatusReturned === "confirmed";
 
-    const screenTitle = proofAwaitingReview
-      ? "Payment Proof Received"
-      : fullyConfirmed
-      ? "Booking Confirmed!"
-      : "Booking Request Sent";
-    const screenSubtitle = proofAwaitingReview
-      ? `${user?.name || "The business"} will review your payment and confirm shortly. You'll get an email once it's approved.`
-      : fullyConfirmed
-      ? `${user?.name || "The business"} will confirm your appointment shortly. Check your email for details.`
-      : `${user?.name || "The business"} will review and confirm your request. You'll get an email once it's approved.`;
+    const screenTitle = fullyConfirmed ? "Booking Confirmed!" : "Booking Request Sent";
+    const screenSubtitle = fullyConfirmed
+      ? `${user?.name || "The business"} will see your appointment shortly. Check your email for details.`
+      : `${user?.name || "The business"} will review your payment and confirm your booking. You'll get an email once it's approved.`;
 
     const useAmberIcon = false;
-    const useBlueIcon = proofAwaitingReview || !fullyConfirmed;
     const useGreenIcon = fullyConfirmed;
 
     return (
@@ -746,8 +673,8 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
               ...(selectedDate ? [{ label: "Date", value: formatDate(selectedDate) }] : []),
               ...(selectedTime ? [{ label: "Time", value: selectedTime }] : []),
               ...(selectedPackage ? [{ label: "Total", value: `$${selectedPackage.price}` }] : []),
-              ...(depositAmount > 0 && (stripeDepositPaid || proofUploaded) ? [{ label: "Deposit Paid", value: `$${depositAmount}`, highlight: true }] : []),
-              ...(depositAmount > 0 && !stripeDepositPaid && !proofUploaded ? [{ label: "Deposit Due", value: `$${depositAmount}`, highlight: true }] : []),
+              ...(depositAmount > 0 && fullyConfirmed ? [{ label: "Deposit Paid", value: `$${depositAmount}`, highlight: true }] : []),
+              ...(depositAmount > 0 && !fullyConfirmed ? [{ label: "Deposit Due", value: `$${depositAmount}`, highlight: true }] : []),
               ...(selectedStaff ? [{ label: "Detailer", value: selectedStaff.name }] : []),
             ].filter(item => item.value).map(({ label, value, mono, highlight }) => (
               <div key={label} className="flex justify-between text-sm">
@@ -758,7 +685,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
           </div>
 
           {/* ── Payment-specific success content ── */}
-          {stripeDepositPaid && (
+          {fullyConfirmed && (
             <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-4 mb-6 flex items-center gap-3">
               <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0">
                 <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -772,22 +699,22 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
             </div>
           )}
 
-          {/* Proof-based methods: payment + proof were already completed in step 2 */}
-          {pendingProofImage && depositAmount > 0 && !stripeDepositPaid && (selectedPaymentMethod === "paypal" || selectedPaymentMethod === "cashapp" || selectedPaymentMethod === "bankTransfer") && (
+          {/* Manual payment methods: business will verify before confirming */}
+          {!fullyConfirmed && depositAmount > 0 && (selectedPaymentMethod === "paypal" || selectedPaymentMethod === "cashapp" || selectedPaymentMethod === "bankTransfer") && (
             <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 mb-6 flex items-center gap-3 text-left">
               <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center flex-shrink-0">
                 <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
               <div>
-                <p className="text-blue-300 text-sm font-bold">Payment Proof Submitted</p>
+                <p className="text-blue-300 text-sm font-bold">Payment Pending Verification</p>
                 <p className="text-white/50 text-xs">Your ${depositAmount} payment is being verified. You&apos;ll get an email once confirmed.</p>
               </div>
             </div>
           )}
 
-          {selectedPaymentMethod === "cash" && depositAmount > 0 && !stripeDepositPaid && (
+          {selectedPaymentMethod === "cash" && depositAmount > 0 && !fullyConfirmed && (
             <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-5 mb-6 text-left">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-lg">💰</span>
@@ -892,7 +819,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
           )}
 
           <button
-            onClick={() => { setStep(0); setSelectedPackage(null); setSelectedDate(null); setSelectedTime(null); setForm(EMPTY_FORM); setBookingId(null); setBookingError(null); setCustomerAddress(""); setSelectedStaff(null); setSelectedServiceMode(null); setSelectedPaymentMethod(null); setProofUploaded(false); setProofError(null); setPendingProofImage(null); setStripeDepositPaid(false); setSmsConsent(false); }}
+            onClick={() => { setStep(0); setSelectedPackage(null); setSelectedDate(null); setSelectedTime(null); setForm(EMPTY_FORM); setBookingId(null); setBookingError(null); setCustomerAddress(""); setSelectedStaff(null); setSelectedServiceMode(null); setSelectedPaymentMethod(null); setStripeDepositPaid(false); setSmsConsent(false); setManualPaymentConfirmed(false); setBookingStatusReturned(null); }}
             className="w-full glass border border-white/20 text-white font-semibold py-3.5 rounded-2xl hover:bg-white/10 transition-all"
           >
             Book Another Appointment
@@ -1082,35 +1009,45 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       )}
 
       {/* ── Step Indicator ── */}
-      <div className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            {["Choose Service", "Date & Time", "Your Details"].map((label, i) => (
-              <div key={i} className={`flex items-center ${i < 2 ? "flex-1" : ""}`}>
-                <div className="flex items-center gap-2">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
-                    i < step  ? "bg-blue-600 text-white shadow-md shadow-blue-600/30" :
-                    i === step ? "bg-blue-600 text-white shadow-md shadow-blue-600/30 ring-4 ring-blue-100" :
-                                 "bg-gray-100 text-gray-400"
-                  }`}>
-                    {i < step ? (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : i + 1}
+      {(() => {
+        const pmAvailable = getEnabledPaymentMethods((user as any).paymentMethods).length > 0;
+        const showPaymentStep = depositAmount > 0 && pmAvailable;
+        const labels = showPaymentStep
+          ? ["Choose Service", "Date & Time", "Your Details", "Payment"]
+          : ["Choose Service", "Date & Time", "Your Details"];
+        const last = labels.length - 1;
+        return (
+          <div className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-10">
+            <div className="max-w-2xl mx-auto px-4 py-4">
+              <div className="flex items-center justify-between">
+                {labels.map((label, i) => (
+                  <div key={i} className={`flex items-center ${i < last ? "flex-1" : ""}`}>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
+                        i < step  ? "bg-blue-600 text-white shadow-md shadow-blue-600/30" :
+                        i === step ? "bg-blue-600 text-white shadow-md shadow-blue-600/30 ring-4 ring-blue-100" :
+                                     "bg-gray-100 text-gray-400"
+                      }`}>
+                        {i < step ? (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : i + 1}
+                      </div>
+                      <span className={`text-xs font-semibold hidden sm:block transition-colors duration-300 ${
+                        i === step ? "text-blue-600" : i < step ? "text-blue-400" : "text-gray-400"
+                      }`}>{label}</span>
+                    </div>
+                    {i < last && (
+                      <div className={`flex-1 h-0.5 mx-3 rounded-full transition-all duration-500 ${i < step ? "bg-blue-500" : "bg-gray-200"}`} />
+                    )}
                   </div>
-                  <span className={`text-xs font-semibold hidden sm:block transition-colors duration-300 ${
-                    i === step ? "text-blue-600" : i < step ? "text-blue-400" : "text-gray-400"
-                  }`}>{label}</span>
-                </div>
-                {i < 2 && (
-                  <div className={`flex-1 h-0.5 mx-3 rounded-full transition-all duration-500 ${i < step ? "bg-blue-500" : "bg-gray-200"}`} />
-                )}
+                ))}
               </div>
-            ))}
+            </div>
           </div>
-        </div>
-      </div>
+        );
+      })()}
 
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-5">
 
@@ -1804,185 +1741,6 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                   </div>
                 )}
 
-                {/* Payment Method Selection */}
-                {(() => {
-                  const pm = (user as any).paymentMethods;
-                  const methods = getEnabledPaymentMethods(pm);
-                  if (methods.length > 0 && depositAmount > 0) {
-                    return (
-                      <div className="mb-4">
-                        <p className="text-white/40 text-xs font-bold uppercase tracking-widest mb-2">Select Payment Method</p>
-                        <div className="space-y-2">
-                          {methods.map((m) => (
-                            <button
-                              key={m.key}
-                              type="button"
-                              onClick={() => {
-                                setSelectedPaymentMethod(m.key);
-                                setProofUploaded(false);
-                                setPendingProofImage(null);
-                                setProofError(null);
-                              }}
-                              className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
-                                selectedPaymentMethod === m.key
-                                  ? "border-blue-400 bg-blue-500/20"
-                                  : "border-white/10 bg-white/5 hover:bg-white/10"
-                              }`}
-                            >
-                              <span className="text-lg flex-shrink-0">{m.icon}</span>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-white text-sm font-semibold">{m.label}</p>
-                                <p className="text-white/50 text-xs truncate">{m.detail}</p>
-                              </div>
-                              {selectedPaymentMethod === m.key && (
-                                <svg className="w-5 h-5 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                </svg>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
-
-                {/* ── INLINE PAYMENT INSTRUCTIONS (must pay + upload proof BEFORE submit) ── */}
-                {depositAmount > 0 && selectedPaymentMethod === "paypal" && (() => {
-                  const pm = (user as any)?.paymentMethods;
-                  const link = pm?.paypal?.paypalMeLink ? `https://paypal.me/${pm.paypal.paypalMeLink}/${depositAmount}` : null;
-                  const showProof = pm?.paypal?.requireProof !== false;
-                  return (
-                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-lg">🅿️</span>
-                        <p className="text-white text-sm font-bold">Pay Deposit via PayPal</p>
-                      </div>
-                      <p className="text-white/60 text-xs mb-3">Send <strong className="text-white">${depositAmount}</strong> to complete your deposit.</p>
-                      {pm?.paypal?.email && (
-                        <p className="text-white/60 text-xs mb-2">PayPal email: <span className="text-white font-mono">{pm.paypal.email}</span></p>
-                      )}
-                      {link && (
-                        <a href={link} target="_blank" rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 bg-blue-600 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors mb-3">
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                          Pay ${depositAmount} with PayPal
-                        </a>
-                      )}
-                      {showProof && (
-                        <ProofSection
-                          proofUploaded={proofUploaded}
-                          proofUploading={proofUploading}
-                          proofError={proofError}
-                          onUpload={handleUploadProof}
-                        />
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {depositAmount > 0 && selectedPaymentMethod === "cashapp" && (() => {
-                  const pm = (user as any)?.paymentMethods;
-                  const showProof = pm?.cashapp?.requireProof !== false;
-                  return (
-                    <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 mb-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-lg">💵</span>
-                        <p className="text-white text-sm font-bold">Pay Deposit via Cash App</p>
-                      </div>
-                      <p className="text-white/60 text-xs mb-3">Send <strong className="text-white">${depositAmount}</strong> to:</p>
-                      <div className="bg-white/10 rounded-lg p-2.5 flex items-center justify-between mb-3">
-                        <span className="text-white font-bold">${pm?.cashapp?.cashtag}</span>
-                        <button
-                          type="button"
-                          onClick={() => { navigator.clipboard.writeText(`$${pm?.cashapp?.cashtag}`); }}
-                          className="text-xs text-blue-400 hover:text-blue-300 font-semibold"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                      {showProof && (
-                        <ProofSection
-                          proofUploaded={proofUploaded}
-                          proofUploading={proofUploading}
-                          proofError={proofError}
-                          onUpload={handleUploadProof}
-                        />
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {depositAmount > 0 && selectedPaymentMethod === "bankTransfer" && (() => {
-                  const pm = (user as any)?.paymentMethods;
-                  const bt = pm?.bankTransfer;
-                  const showProof = bt?.requireProof !== false;
-                  return (
-                    <div className="bg-white/5 border border-white/20 rounded-xl p-4 mb-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-lg">🏦</span>
-                        <p className="text-white text-sm font-bold">Bank Transfer Details</p>
-                      </div>
-                      <p className="text-white/60 text-xs mb-3">Transfer <strong className="text-white">${depositAmount}</strong> to:</p>
-                      <div className="bg-white/5 rounded-lg p-3 space-y-1.5 mb-3">
-                        {bt?.bankName && <div className="flex justify-between text-xs"><span className="text-white/50">Bank</span><span className="text-white font-semibold">{bt.bankName}</span></div>}
-                        {bt?.accountName && <div className="flex justify-between text-xs"><span className="text-white/50">Account Name</span><span className="text-white font-semibold">{bt.accountName}</span></div>}
-                        {bt?.iban && <div className="flex justify-between text-xs"><span className="text-white/50">IBAN</span><span className="text-white font-mono font-semibold">{bt.iban}</span></div>}
-                        {bt?.sortCode && <div className="flex justify-between text-xs"><span className="text-white/50">Sort Code</span><span className="text-white font-mono font-semibold">{bt.sortCode}</span></div>}
-                        {bt?.accountNumber && <div className="flex justify-between text-xs"><span className="text-white/50">Account #</span><span className="text-white font-mono font-semibold">{bt.accountNumber}</span></div>}
-                      </div>
-                      {bt?.instructions && (
-                        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5 mb-3">
-                          <p className="text-amber-300 text-xs">{bt.instructions}</p>
-                        </div>
-                      )}
-                      {showProof && (
-                        <ProofSection
-                          proofUploaded={proofUploaded}
-                          proofUploading={proofUploading}
-                          proofError={proofError}
-                          onUpload={handleUploadProof}
-                        />
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {depositAmount > 0 && selectedPaymentMethod === "cash" && (
-                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-lg">💰</span>
-                      <p className="text-white text-sm font-bold">Cash Deposit at Appointment</p>
-                    </div>
-                    <p className="text-white/60 text-xs">
-                      Bring <strong className="text-white">${depositAmount}</strong> in cash at the time of your appointment. No upfront payment needed — just confirm below.
-                    </p>
-                    {(() => {
-                      const pm = (user as any)?.paymentMethods;
-                      return pm?.cash?.instructions ? (
-                        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5 mt-3">
-                          <p className="text-amber-300 text-xs">{pm.cash.instructions}</p>
-                        </div>
-                      ) : null;
-                    })()}
-                  </div>
-                )}
-
-                {depositAmount > 0 && selectedPaymentMethod === "stripe" && (
-                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-lg">💳</span>
-                      <p className="text-white text-sm font-bold">Card Payment</p>
-                    </div>
-                    <p className="text-white/60 text-xs">
-                      After you click <strong className="text-white">Confirm</strong>, you&apos;ll be redirected to Stripe to securely pay your <strong className="text-white">${depositAmount}</strong> deposit.
-                    </p>
-                  </div>
-                )}
-
                 <div className="flex justify-between items-center pt-3 border-t border-white/10 text-sm">
                   <span className="text-white/50">{depositAmount > 0 ? "Balance due on service day" : "Total due on service day"}</span>
                   <span className="text-lg font-bold">${(selectedPackage?.price ?? 0) - depositAmount}</span>
@@ -2012,29 +1770,26 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
 
               {(() => {
                 const pm = (user as any)?.paymentMethods;
-                const methodMissing = depositAmount > 0 && getEnabledPaymentMethods(pm).length > 0 && !selectedPaymentMethod;
-                const submitDisabled = submitting || methodMissing;
-                const submitLabel = methodMissing
-                  ? "Select a payment method above"
-                  : submitting
-                  ? "Confirming your booking..."
-                  : depositAmount > 0 && selectedPaymentMethod === "stripe"
-                  ? `Pay $${depositAmount} Deposit & Confirm`
-                  : depositAmount > 0
-                  ? `Confirm Booking · $${depositAmount} Deposit`
-                  : "Confirm Booking";
+                const needsPayment = depositAmount > 0 && getEnabledPaymentMethods(pm).length > 0;
+                const submitLabel = submitting
+                  ? (needsPayment ? "Loading..." : "Confirming your booking...")
+                  : needsPayment
+                    ? `Continue to Payment \u2192`
+                    : depositAmount > 0
+                      ? `Confirm Booking \u00b7 $${depositAmount} Deposit`
+                      : "Confirm Booking";
                 return (
-              <button type="submit" disabled={submitDisabled}
+              <button type="submit" disabled={submitting}
                 className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 text-white font-extrabold text-base py-4 rounded-2xl transition-all duration-300 shadow-lg shadow-blue-600/30 hover:-translate-y-0.5 flex items-center justify-center gap-3">
                 {submitting ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Confirming your booking...
+                    {submitLabel}
                   </>
                 ) : (
                   <>
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={needsPayment ? "M9 5l7 7-7 7" : "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"} />
                     </svg>
                     {submitLabel}
                   </>
@@ -2047,6 +1802,299 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                 By booking, you agree to our cancellation policy. Deposits are fully refundable up to 24 hours before your appointment.
               </p>
             </form>
+          </div>
+        )}
+
+        {/* ── Step 3: Payment ── */}
+        {step === 3 && selectedPackage && (
+          <div className="animate-fadeInUp">
+            {/* Summary bar */}
+            <div className="bg-gradient-to-r from-slate-900 to-blue-950 rounded-2xl p-4 mb-6">
+              <div className="flex items-center justify-between text-sm">
+                <div>
+                  <p className="text-white font-bold">{selectedPackage.name}</p>
+                  <p className="text-blue-300 text-xs">{selectedDate ? formatDate(selectedDate) : ""} · {selectedTime}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-white font-extrabold text-lg">${depositAmount}</p>
+                  <p className="text-blue-400 text-xs">Deposit</p>
+                </div>
+              </div>
+            </div>
+
+            <h2 className="text-2xl font-extrabold text-gray-900 mb-1">Choose How to Pay</h2>
+            <p className="text-gray-500 text-sm mb-6">Pick a payment method to secure your booking.</p>
+
+            {/* Method picker */}
+            {(() => {
+              const pm = (user as any)?.paymentMethods;
+              const methods = getEnabledPaymentMethods(pm);
+              return (
+                <div className="space-y-2.5 mb-5">
+                  {methods.map((m) => {
+                    const selected = selectedPaymentMethod === m.key;
+                    return (
+                      <button
+                        key={m.key}
+                        type="button"
+                        onClick={() => {
+                          setSelectedPaymentMethod(m.key);
+                          setManualPaymentConfirmed(false);
+                          setBookingError(null);
+                        }}
+                        className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all text-left ${
+                          selected
+                            ? "border-blue-500 bg-blue-50 shadow-sm"
+                            : "border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/30"
+                        }`}
+                      >
+                        <span className="text-2xl flex-shrink-0">{m.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-gray-900 text-sm font-bold">{m.label}</p>
+                          <p className="text-gray-500 text-xs truncate">{m.detail}</p>
+                        </div>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
+                          selected ? "bg-blue-600" : "border-2 border-gray-300"
+                        }`}>
+                          {selected && (
+                            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {/* Method-specific action panel */}
+            {selectedPaymentMethod && (() => {
+              const pm = (user as any)?.paymentMethods;
+              const isCard = selectedPaymentMethod === "stripe" || selectedPaymentMethod === "square";
+
+              return (
+                <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-5 shadow-sm animate-fadeInUp">
+                  {selectedPaymentMethod === "stripe" && (
+                    <>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-xl">💳</span>
+                        <h3 className="text-gray-900 font-bold text-sm">Pay by Card</h3>
+                      </div>
+                      <p className="text-gray-500 text-sm mb-4">
+                        Pay your <strong className="text-gray-900">${depositAmount}</strong> deposit securely with credit or debit card. Your booking will be confirmed automatically.
+                      </p>
+                    </>
+                  )}
+
+                  {selectedPaymentMethod === "square" && (
+                    <>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-xl">💳</span>
+                        <h3 className="text-gray-900 font-bold text-sm">Pay by Card</h3>
+                      </div>
+                      <p className="text-gray-500 text-sm mb-4">
+                        Pay your <strong className="text-gray-900">${depositAmount}</strong> deposit securely with credit or debit card. Your booking will be confirmed automatically.
+                      </p>
+                    </>
+                  )}
+
+                  {selectedPaymentMethod === "paypal" && (
+                    <>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-xl">🅿️</span>
+                        <h3 className="text-gray-900 font-bold text-sm">Pay with PayPal</h3>
+                      </div>
+                      <p className="text-gray-600 text-sm mb-3">
+                        Send <strong className="text-gray-900">${depositAmount}</strong> to:
+                      </p>
+                      {pm?.paypal?.email && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex items-center justify-between mb-3">
+                          <span className="text-gray-900 font-mono text-sm break-all">{pm.paypal.email}</span>
+                          <button
+                            type="button"
+                            onClick={() => navigator.clipboard.writeText(pm.paypal.email)}
+                            className="text-xs text-blue-600 hover:text-blue-700 font-semibold ml-2 flex-shrink-0"
+                          >
+                            Copy
+                          </button>
+                        </div>
+                      )}
+                      {pm?.paypal?.paypalMeLink && (
+                        <a
+                          href={`https://paypal.me/${pm.paypal.paypalMeLink}/${depositAmount}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors mb-1"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                          Open PayPal
+                        </a>
+                      )}
+                    </>
+                  )}
+
+                  {selectedPaymentMethod === "cashapp" && (
+                    <>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-xl">💵</span>
+                        <h3 className="text-gray-900 font-bold text-sm">Pay with Cash App</h3>
+                      </div>
+                      <p className="text-gray-600 text-sm mb-3">
+                        Send <strong className="text-gray-900">${depositAmount}</strong> to:
+                      </p>
+                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex items-center justify-between">
+                        <span className="text-gray-900 font-bold text-base">${pm?.cashapp?.cashtag}</span>
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard.writeText(`$${pm?.cashapp?.cashtag}`)}
+                          className="text-xs text-blue-600 hover:text-blue-700 font-semibold"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </>
+                  )}
+
+                  {selectedPaymentMethod === "bankTransfer" && (() => {
+                    const bt = pm?.bankTransfer;
+                    return (
+                      <>
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-xl">🏦</span>
+                          <h3 className="text-gray-900 font-bold text-sm">Bank Transfer</h3>
+                        </div>
+                        <p className="text-gray-600 text-sm mb-3">
+                          Transfer <strong className="text-gray-900">${depositAmount}</strong> to:
+                        </p>
+                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-2">
+                          {bt?.bankName && <div className="flex justify-between text-sm"><span className="text-gray-500">Bank</span><span className="text-gray-900 font-semibold">{bt.bankName}</span></div>}
+                          {bt?.accountName && <div className="flex justify-between text-sm"><span className="text-gray-500">Account Name</span><span className="text-gray-900 font-semibold">{bt.accountName}</span></div>}
+                          {bt?.iban && <div className="flex justify-between text-sm"><span className="text-gray-500">IBAN</span><span className="text-gray-900 font-mono font-semibold">{bt.iban}</span></div>}
+                          {bt?.sortCode && <div className="flex justify-between text-sm"><span className="text-gray-500">Sort Code</span><span className="text-gray-900 font-mono font-semibold">{bt.sortCode}</span></div>}
+                          {bt?.accountNumber && <div className="flex justify-between text-sm"><span className="text-gray-500">Account #</span><span className="text-gray-900 font-mono font-semibold">{bt.accountNumber}</span></div>}
+                        </div>
+                        {bt?.instructions && (
+                          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-3">
+                            <p className="text-amber-800 text-xs">{bt.instructions}</p>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+
+                  {selectedPaymentMethod === "cash" && (
+                    <>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-xl">💰</span>
+                        <h3 className="text-gray-900 font-bold text-sm">Cash on Arrival</h3>
+                      </div>
+                      <p className="text-gray-600 text-sm">
+                        Bring <strong className="text-gray-900">${depositAmount}</strong> in cash on the day of your appointment. No payment needed now — just confirm to send your request.
+                      </p>
+                      {pm?.cash?.instructions && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-3">
+                          <p className="text-amber-800 text-xs">{pm.cash.instructions}</p>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* ── Action area: card vs manual ── */}
+                  {isCard ? (
+                    <button
+                      type="button"
+                      onClick={handleCardPaymentStart}
+                      className="w-full mt-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold text-base py-4 rounded-2xl transition-all duration-300 shadow-lg shadow-blue-600/30 hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                      </svg>
+                      Pay ${depositAmount} Now
+                    </button>
+                  ) : selectedPaymentMethod === "cash" ? (
+                    <button
+                      type="button"
+                      onClick={handleManualPaymentSubmit}
+                      disabled={submitting}
+                      className="w-full mt-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 text-white font-extrabold text-base py-4 rounded-2xl transition-all duration-300 shadow-lg shadow-blue-600/30 hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                    >
+                      {submitting ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          Submitting...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Submit Booking Request
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <>
+                      <label className="flex items-start gap-3 bg-gray-50 border-2 border-gray-200 rounded-xl p-4 cursor-pointer hover:bg-gray-100 transition-colors mt-5">
+                        <input
+                          type="checkbox"
+                          checked={manualPaymentConfirmed}
+                          onChange={(e) => setManualPaymentConfirmed(e.target.checked)}
+                          className="mt-0.5 w-5 h-5 flex-shrink-0 accent-blue-600 cursor-pointer"
+                        />
+                        <div>
+                          <p className="text-gray-900 text-sm font-bold">I have sent the ${depositAmount} payment</p>
+                          <p className="text-gray-500 text-xs mt-0.5">Tick this once you&apos;ve completed the transfer. The business will verify and confirm your booking.</p>
+                        </div>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleManualPaymentSubmit}
+                        disabled={submitting || !manualPaymentConfirmed}
+                        className="w-full mt-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-extrabold text-base py-4 rounded-2xl transition-all duration-300 shadow-lg shadow-blue-600/30 hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                      >
+                        {submitting ? (
+                          <>
+                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            Submitting...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Submit Booking Request
+                          </>
+                        )}
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
+
+            {bookingError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 text-sm font-medium px-4 py-3 rounded-xl flex items-start gap-2 mb-4">
+                <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {bookingError}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              className="w-full text-gray-500 hover:text-gray-700 text-sm font-semibold py-3 transition-colors flex items-center justify-center gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to your details
+            </button>
           </div>
         )}
       </div>
@@ -2091,9 +2139,10 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                 const created = await res.json();
                 setBookingId(created.id);
                 setStripeDepositPaid(true);
+                setBookingStatusReturned("confirmed");
                 setStripeModalOpen(false);
                 setPendingStripeBookingData(null);
-                setStep(3);
+                setStep(4);
               } else {
                 setBookingError("Payment succeeded but we couldn't save your booking. Please contact the business — your card was charged.");
                 setStripeModalOpen(false);
@@ -2138,9 +2187,10 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                 const created = await res.json();
                 setBookingId(created.id);
                 setStripeDepositPaid(true);
+                setBookingStatusReturned("confirmed");
                 setSquareModalOpen(false);
                 setPendingSquareBookingData(null);
-                setStep(3);
+                setStep(4);
               } else {
                 setBookingError("Payment succeeded but we couldn't save your booking. Please contact the business — your card was charged.");
                 setSquareModalOpen(false);
