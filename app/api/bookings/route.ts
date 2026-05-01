@@ -153,18 +153,22 @@ export async function POST(request: NextRequest) {
     const vYear = vehicle?.year || body.vehicleYear || "";
     const vColor = vehicle?.color || body.vehicleColor || "";
 
-    // Validate optional paymentProof (base64 data URL) if provided
+    // paymentProof is either a "stripe:<payment_intent_id>" / "square:<payment_id>"
+    // reference (set by the embedded card modals after a successful charge) or
+    // a legacy base64 data URL from the old proof-upload UI. Reject anything
+    // else, and cap base64 size so a megabyte payload can't blow up the row.
     const rawProof = typeof body.paymentProof === "string" ? body.paymentProof : null;
     let safeProof: string | null = null;
     if (rawProof) {
-      if (!rawProof.startsWith("data:image/")) {
+      const isPaymentRef = rawProof.startsWith("stripe:") || rawProof.startsWith("square:");
+      const isDataUrl = rawProof.startsWith("data:image/");
+      if (!isPaymentRef && !isDataUrl) {
         return NextResponse.json(
-          { error: "Invalid payment proof image format. Please upload a JPG or PNG." },
+          { error: "Invalid payment proof format." },
           { status: 400 }
         );
       }
-      // base64 data URL inflates raw bytes ~33%; allow ~28MB string = ~20MB file
-      if (rawProof.length > 28 * 1024 * 1024) {
+      if (isDataUrl && rawProof.length > 28 * 1024 * 1024) {
         return NextResponse.json(
           { error: "Payment proof image is too large. Max 20MB." },
           { status: 400 }
