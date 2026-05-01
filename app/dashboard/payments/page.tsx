@@ -215,7 +215,7 @@ export default function PaymentsPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-5 pb-16">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-5 pb-16">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
@@ -265,8 +265,8 @@ export default function PaymentsPage() {
         </div>
       )}
 
-      {/* Methods list */}
-      <div className="space-y-3">
+      {/* Methods grid — 2 cards per row on desktop */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
         {/* Stripe */}
         <MethodCard
           icon={<StripeIcon />}

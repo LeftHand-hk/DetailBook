@@ -290,6 +290,13 @@ export async function POST(request: NextRequest) {
     // send the customer confirmation email + SMS the same way PUT does on
     // a status transition. Fire-and-forget.
     if (booking.status === "confirmed") {
+      console.log("[CONFIRM POST] Booking", booking.id, "created as confirmed. Sending notifications.", {
+        hasCustomerEmail: !!booking.customerEmail,
+        emailConfirmations: (user as any).emailConfirmations,
+        plan: (user as any).plan,
+        smsConfirmations: (user as any).smsConfirmations,
+        hasCustomerPhone: !!booking.customerPhone,
+      });
       const ctx: Record<string, string> = {
         customerName: booking.customerName || "",
         serviceName: booking.serviceName || "",
@@ -309,13 +316,23 @@ export async function POST(request: NextRequest) {
         const emailTemplate = ((user as any).emailTemplates as any)?.bookingConfirmation || DEFAULT_EMAIL;
         const customerText = render(emailTemplate);
         const customerHtml = `<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9fafb;border-radius:8px;color:#111827;font-size:14px;line-height:1.6;white-space:pre-wrap;">${customerText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`;
-        sendEmail({ to: booking.customerEmail, subject: `Booking Confirmed – ${booking.serviceName} on ${formattedDate}`, html: customerHtml, text: customerText }).catch(() => {});
+        sendEmail({ to: booking.customerEmail, subject: `Booking Confirmed – ${booking.serviceName} on ${formattedDate}`, html: customerHtml, text: customerText })
+          .then((r) => console.log("[CONFIRM POST EMAIL] Result:", r))
+          .catch((err) => console.error("[CONFIRM POST EMAIL] threw:", err));
       }
 
       if ((user as any).plan === "pro" && (user as any).smsConfirmations && booking.customerPhone) {
         const smsTemplate = ((user as any).smsTemplates as any)?.bookingConfirmation || DEFAULT_SMS;
         const smsBody = render(smsTemplate);
-        sendSms(booking.customerPhone, smsBody).catch(() => {});
+        sendSms(booking.customerPhone, smsBody)
+          .then((r) => console.log("[CONFIRM POST SMS] Result:", r))
+          .catch((err) => console.error("[CONFIRM POST SMS] threw:", err));
+      } else {
+        console.log("[CONFIRM POST SMS] Skipped — gate not met:", {
+          plan: (user as any).plan,
+          smsConfirmations: (user as any).smsConfirmations,
+          hasCustomerPhone: !!booking.customerPhone,
+        });
       }
     }
 

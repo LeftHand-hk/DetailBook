@@ -102,11 +102,13 @@ export default function SquareDepositModal(props: Props) {
         if (!window.Square) throw new Error("Square SDK unavailable");
 
         const payments = window.Square.payments(props.applicationId, props.locationId);
+        // Square's SDK only accepts a single font family name (no system font
+        // stacks, no quotes). Use one safe sans-serif that ships everywhere.
         const card = await payments.card({
           style: {
             input: {
               fontSize: "15px",
-              fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+              fontFamily: "Helvetica Neue",
               color: "#111827",
             },
             ".input-container": {
