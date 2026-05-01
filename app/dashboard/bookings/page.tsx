@@ -487,12 +487,17 @@ export default function BookingsPage() {
         const statusOptions = selected.status === "confirmed"
           ? allStatusOptions.filter((o) => o.key !== "confirmed")
           : allStatusOptions;
-        const gridCols = statusOptions.length === 4 ? "grid-cols-4" : "grid-cols-3";
+        const gridCols = statusOptions.length === 4 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3";
 
         return (
-          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-end" onClick={() => setSelected(null)}>
-            <div className="bg-white w-full max-w-md h-full shadow-2xl animate-slideInRight flex flex-col"
+          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end sm:items-stretch sm:justify-end" onClick={() => setSelected(null)}>
+            <div className="bg-white w-full sm:max-w-md max-h-[92vh] sm:max-h-none sm:h-full rounded-t-3xl sm:rounded-none shadow-2xl animate-slideUp sm:animate-slideInRight flex flex-col"
               onClick={(e) => e.stopPropagation()}>
+
+              {/* Mobile drag handle */}
+              <div className="sm:hidden pt-2 pb-1 flex justify-center">
+                <div className="w-10 h-1.5 bg-gray-300 rounded-full" />
+              </div>
 
               {/* Sticky header */}
               <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-gray-100 px-5 py-3 flex items-center justify-between">
@@ -501,7 +506,7 @@ export default function BookingsPage() {
                   {selected.status}
                 </span>
                 <button onClick={() => setSelected(null)}
-                  className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
+                  className="p-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors -mr-2">
                   <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -645,7 +650,10 @@ export default function BookingsPage() {
               </div>
 
               {/* Sticky action footer */}
-              <div className="sticky bottom-0 bg-white border-t border-gray-100 px-4 py-3 space-y-2">
+              <div
+                className="sticky bottom-0 bg-white border-t border-gray-100 px-4 pt-3 space-y-2"
+                style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+              >
                 <div className={`grid ${gridCols} gap-1.5`}>
                   {statusOptions.map((opt) => {
                     const isActive = selected.status === opt.key;

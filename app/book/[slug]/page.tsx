@@ -99,6 +99,8 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   // The actual status the API stored for the new booking. "confirmed" for card
   // payments, "pending" for manual / cash / no-deposit. Drives the final screen.
   const [bookingStatusReturned, setBookingStatusReturned] = useState<"confirmed" | "pending" | null>(null);
+  // Country code for phone input. Temporary +383 (Kosovo) for testing alongside +1.
+  const [phoneCountry, setPhoneCountry] = useState<"+1" | "+383">("+1");
   // Stripe embedded modal state. We hold the booking payload in memory and only
   // create the booking on the server AFTER the customer pays — so closing the
   // modal leaves zero side effects.
@@ -1680,7 +1682,6 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                   {[
                     { key: "customerName",  label: "Full Name",     type: "text",  placeholder: "Your full name" },
                     { key: "customerEmail", label: "Email Address", type: "email", placeholder: "you@example.com" },
-                    { key: "customerPhone", label: "Phone Number",  type: "tel",   placeholder: "(555) 123-4567" },
                   ].map(({ key, label, type, placeholder }) => (
                     <div key={key}>
                       <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">{label}</label>
@@ -1690,6 +1691,52 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-300 text-sm transition-all" />
                     </div>
                   ))}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Phone Number</label>
+                    <div className="flex items-stretch border border-gray-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">
+                      <select
+                        value={phoneCountry}
+                        onChange={(e) => {
+                          const next = e.target.value as "+1" | "+383";
+                          setPhoneCountry(next);
+                          // Reset the phone value so the new format applies cleanly.
+                          setForm({ ...form, customerPhone: "" });
+                        }}
+                        className="bg-gray-50 border-r border-gray-200 text-sm text-gray-700 font-semibold pl-3 pr-2 focus:outline-none cursor-pointer"
+                        aria-label="Country code"
+                      >
+                        <option value="+1">🇺🇸 +1</option>
+                        <option value="+383">🇽🇰 +383</option>
+                      </select>
+                      <input
+                        type="tel"
+                        required
+                        inputMode="numeric"
+                        autoComplete="tel-national"
+                        value={form.customerPhone.replace(new RegExp(`^\\${phoneCountry}\\s?`), "")}
+                        onChange={(e) => {
+                          const maxDigits = phoneCountry === "+1" ? 10 : 9;
+                          const digits = e.target.value.replace(/\D/g, "").slice(0, maxDigits);
+                          let local = "";
+                          if (digits.length === 0) {
+                            local = "";
+                          } else if (phoneCountry === "+1") {
+                            if (digits.length <= 3) local = `(${digits}`;
+                            else if (digits.length <= 6) local = `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+                            else local = `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+                          } else {
+                            // +383: format as "XX XXX XXX" / "XX XXX XXXX"
+                            if (digits.length <= 2) local = digits;
+                            else if (digits.length <= 5) local = `${digits.slice(0, 2)} ${digits.slice(2)}`;
+                            else local = `${digits.slice(0, 2)} ${digits.slice(2, 5)} ${digits.slice(5)}`;
+                          }
+                          setForm({ ...form, customerPhone: local ? `${phoneCountry} ${local}` : "" });
+                        }}
+                        placeholder={phoneCountry === "+1" ? "(555) 123-4567" : "49 384 457"}
+                        className="flex-1 px-4 py-3 text-gray-900 focus:outline-none placeholder-gray-300 text-sm"
+                      />
+                    </div>
+                  </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Notes (optional)</label>
                     <textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
