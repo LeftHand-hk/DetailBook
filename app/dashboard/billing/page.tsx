@@ -146,7 +146,16 @@ export default function BillingPage() {
               await waitForActivation();
             }
           } else if (event.name === "checkout.error") {
-            console.error("[Paddle] checkout.error", event);
+            console.error("[Paddle] checkout.error full event:", JSON.stringify(event, null, 2));
+            const ev: any = event;
+            const detail =
+              ev?.data?.error?.detail ||
+              ev?.error?.detail ||
+              ev?.data?.message ||
+              ev?.error?.message ||
+              ev?.data?.error?.code ||
+              "Paddle Checkout failed. Open browser console for details.";
+            setChangePlanError(`Paddle: ${detail}`);
           }
         },
       }).then((instance) => {
@@ -273,6 +282,11 @@ export default function BillingPage() {
           );
           return;
         }
+        // Paddle sometimes needs a moment to propagate the cancellation
+        // through its checkout system. Without this, opening Checkout
+        // immediately after can fail with "Something went wrong" because
+        // the customer is still seen as having an active subscription.
+        await new Promise((r) => setTimeout(r, 1500));
       }
 
       // Open Paddle Checkout for the new plan.
