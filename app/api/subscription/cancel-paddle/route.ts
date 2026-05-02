@@ -19,7 +19,7 @@ export async function POST() {
   const session = await getSessionUser();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const apiKey = process.env.PADDLE_API_KEY;
+  const apiKey = process.env.PADDLE_API_KEY?.trim();
   if (!apiKey) {
     return NextResponse.json({ error: "Payment system not configured" }, { status: 503 });
   }

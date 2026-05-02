@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const apiKey = process.env.PADDLE_API_KEY;
+  const apiKey = process.env.PADDLE_API_KEY?.trim();
   if (!apiKey) {
     return NextResponse.json({ error: "Payment system not configured" }, { status: 503 });
   }

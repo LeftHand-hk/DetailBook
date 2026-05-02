@@ -22,7 +22,7 @@ export async function POST() {
       const res = await fetch(`${apiBase}/subscriptions/${subId}/cancel`, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${process.env.PADDLE_API_KEY}`,
+          "Authorization": `Bearer ${process.env.PADDLE_API_KEY?.trim()}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ effective_from: "next_billing_period" }),

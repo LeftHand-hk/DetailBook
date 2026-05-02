@@ -14,7 +14,7 @@ function paddleApiBase() {
 }
 
 async function fetchPaddleCustomerEmail(customerId: string): Promise<string | null> {
-  const apiKey = process.env.PADDLE_API_KEY;
+  const apiKey = process.env.PADDLE_API_KEY?.trim();
   if (!apiKey) return null;
   try {
     const r = await fetch(`${paddleApiBase()}/customers/${customerId}`, {

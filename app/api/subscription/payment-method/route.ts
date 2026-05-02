@@ -19,7 +19,7 @@ export async function GET() {
     const subId = (user as any).paddleSubscriptionId as string | null;
     if (!subId) return NextResponse.json({ card: null });
 
-    const apiKey = process.env.PADDLE_API_KEY;
+    const apiKey = process.env.PADDLE_API_KEY?.trim();
     if (!apiKey) return NextResponse.json({ card: null });
 
     // 1. Fetch subscription for next_billed_at + status
@@ -123,7 +123,7 @@ export async function POST() {
       return NextResponse.json({ error: "No active subscription" }, { status: 400 });
     }
 
-    const apiKey = process.env.PADDLE_API_KEY;
+    const apiKey = process.env.PADDLE_API_KEY?.trim();
     if (!apiKey) {
       return NextResponse.json({ error: "Payment system not configured" }, { status: 500 });
     }
