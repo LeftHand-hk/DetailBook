@@ -144,6 +144,11 @@ export default function BillingPage() {
               await fetchCard({ retry: true });
             } else {
               await waitForActivation();
+              // Reload so sidebar / plan-gated UI reflects the new plan.
+              // State updates alone don't cascade to other layout chunks.
+              if (typeof window !== "undefined") {
+                window.location.reload();
+              }
             }
           } else if (event.name === "checkout.error") {
             console.error("[Paddle] checkout.error full event:", JSON.stringify(event, null, 2));
