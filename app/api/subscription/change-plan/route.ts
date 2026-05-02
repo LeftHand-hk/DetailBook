@@ -196,14 +196,58 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Webhook will eventually update plan via subscription.updated, but
-    // mirror locally now so the UI flips immediately.
+    // Verify with Paddle: the PATCH may have either applied the change
+    // immediately (prorated_immediately) OR scheduled it for the next
+    // period (do_not_bill, used during trial). Either way, Paddle is
+    // the source of truth — read back what it actually decided.
+    let paddleVerified = false;
+    try {
+      const verifyRes = await fetch(`${base}/subscriptions/${subId}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        cache: "no-store",
+      });
+      if (verifyRes.ok) {
+        const verifyJson = await verifyRes.json();
+        const subData = verifyJson?.data || {};
+        const currentItems: any[] = subData.items || [];
+        const scheduledItems: any[] = subData.scheduled_change?.items || [];
+        const itemsToCheck = scheduledItems.length > 0 ? scheduledItems : currentItems;
+        const hasTargetPrice = itemsToCheck.some(
+          (i: any) => (i.price?.id || i.price_id) === targetPriceId
+        );
+        if (hasTargetPrice) {
+          paddleVerified = true;
+        } else {
+          console.warn(
+            "[change-plan] Paddle PATCH returned 2xx but verification did NOT find target price",
+            JSON.stringify({
+              targetPriceId,
+              currentItemsPriceIds: currentItems.map((i) => i.price?.id || i.price_id),
+              scheduledItemsPriceIds: scheduledItems.map((i) => i.price?.id || i.price_id),
+            })
+          );
+        }
+      } else {
+        console.warn("[change-plan] verification GET failed:", verifyRes.status);
+      }
+    } catch (e) {
+      console.warn("[change-plan] verification GET threw:", e);
+    }
+
+    // Mirror locally so the UI flips immediately. Webhook will reconcile
+    // any drift later. We only mirror if Paddle PATCH succeeded — but
+    // we don't block on the verification GET (it's defensive logging).
     await prisma.user.update({
       where: { id: user.id },
       data: { plan: targetPlan },
     });
 
-    return NextResponse.json({ success: true, plan: targetPlan });
+    return NextResponse.json({
+      success: true,
+      plan: targetPlan,
+      verified: paddleVerified,
+      scheduledForTrialEnd: isTrialing,
+    });
   } catch (err) {
     console.error("[change-plan] error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

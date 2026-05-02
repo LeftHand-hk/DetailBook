@@ -245,30 +245,40 @@ export default function OnboardingPage() {
     if (!selectedPlan || !user) return;
     selectedPlanRef.current = selectedPlan;
 
-    const priceId = selectedPlan === "pro"
-      ? process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID
-      : process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
-    if (!priceId) {
-      alert(`Payment is not configured (missing ${selectedPlan} price ID). Please contact support.`);
-      console.error("[Paddle] price ID missing for plan:", selectedPlan);
-      return;
-    }
-    if (!paddle) {
-      alert("Payment system is still loading. Please wait a moment and try again.");
-      return;
-    }
-
     try {
-      // If user re-entered onboarding with an active Paddle sub, cancel
-      // it first — Paddle rejects creating a 2nd active subscription
-      // per customer, so we cancel then open a fresh Checkout.
-      if ((user as any).subscriptionStatus === "active") {
-        const cancelRes = await fetch("/api/subscription/cancel-paddle", { method: "POST" });
-        const cancelData = await cancelRes.json().catch(() => ({}));
-        if (!cancelRes.ok) {
-          alert(cancelData.error || "Could not cancel current subscription. Please contact support.");
+      // If user re-entered onboarding with an existing Paddle sub
+      // (paid OR trialing-with-link), switch plan via PATCH instead
+      // of opening a new Checkout. This avoids losing their existing
+      // sub if they close the new checkout without paying.
+      const status = (user as any).subscriptionStatus;
+      const hasLinkedSub = Boolean(status) && status !== "canceled";
+
+      if (hasLinkedSub) {
+        const res = await fetch("/api/subscription/change-plan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan: selectedPlan }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          alert(data.error || "Could not change plan. Please contact support.");
           return;
         }
+        router.push("/dashboard");
+        return;
+      }
+
+      const priceId = selectedPlan === "pro"
+        ? process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID
+        : process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
+      if (!priceId) {
+        alert(`Payment is not configured (missing ${selectedPlan} price ID). Please contact support.`);
+        console.error("[Paddle] price ID missing for plan:", selectedPlan);
+        return;
+      }
+      if (!paddle) {
+        alert("Payment system is still loading. Please wait a moment and try again.");
+        return;
       }
 
       paddle.Checkout.open({
@@ -277,8 +287,8 @@ export default function OnboardingPage() {
         customData: { userId: (user as any).id },
       });
     } catch (err) {
-      console.error("[Paddle] Checkout.open threw:", err);
-      alert("Could not open checkout. Please refresh the page and try again.");
+      console.error("[Paddle] handlePayNow threw:", err);
+      alert("Could not change plan. Please refresh the page and try again.");
     }
   };
 

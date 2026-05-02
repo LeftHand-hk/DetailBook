@@ -35,6 +35,7 @@ export default function BillingPage() {
   const [updateCardError, setUpdateCardError] = useState("");
   const [changingPlan, setChangingPlan] = useState<"starter" | "pro" | null>(null);
   const [changePlanError, setChangePlanError] = useState("");
+  const [discountCode, setDiscountCode] = useState("");
   const pendingPlanRef = useRef<"starter" | "pro">("starter");
   const checkoutIntentRef = useRef<"subscribe" | "update-card">("subscribe");
 
@@ -270,55 +271,65 @@ export default function BillingPage() {
   const handlePlanAction = async (plan: "starter" | "pro") => {
     if (!user) return;
 
-    const priceId = plan === "pro"
-      ? process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID
-      : process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
-    if (!priceId) {
-      alert(`Payment is not configured (missing ${plan} price ID). Please contact support.`);
-      return;
-    }
-    if (!paddle) {
-      alert("Payment system is still loading. Please wait a moment and try again.");
-      return;
-    }
-
     setChangingPlan(plan);
     setChangePlanError("");
 
     try {
-      // If user has an active Paddle subscription, cancel it first.
-      // Paddle rejects creating a 2nd active subscription for the same
-      // customer, so plan switches must go: cancel current → fresh
-      // Checkout for the new plan.
-      if (user.subscriptionStatus === "active") {
-        const cancelRes = await fetch("/api/subscription/cancel-paddle", { method: "POST" });
-        const cancelData = await cancelRes.json().catch(() => ({}));
-        if (!cancelRes.ok) {
-          setChangePlanError(
-            cancelData.error || "Could not cancel current subscription. Please contact support."
-          );
+      // If user has an active Paddle subscription (paid OR trialing
+      // with linked sub), use PATCH /subscriptions to switch plans.
+      // This keeps the same subscription on the same card — no second
+      // checkout, no risk of being left with no plan if the user
+      // closes a checkout window.
+      const hasLinkedSub = Boolean((user as any).subscriptionStatus) &&
+        user.subscriptionStatus !== "canceled";
+
+      const trimmedCode = discountCode.trim();
+
+      if (hasLinkedSub) {
+        const res = await fetch("/api/subscription/change-plan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan, discountCode: trimmedCode || undefined }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setChangePlanError(data.error || "Could not change plan. Please contact support.");
           return;
         }
-        // Paddle sometimes needs a moment to propagate the cancellation
-        // through its checkout system. Without this, opening Checkout
-        // immediately after can fail with "Something went wrong" because
-        // the customer is still seen as having an active subscription.
-        await new Promise((r) => setTimeout(r, 1500));
+        if (typeof window !== "undefined") {
+          setTimeout(() => window.location.reload(), 500);
+        }
+        return;
       }
 
-      // Open Paddle Checkout for the new plan.
+      // No active sub — open Paddle Checkout for first-time purchase
+      // or for canceled/suspended users reactivating.
+      const priceId = plan === "pro"
+        ? process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID
+        : process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
+      if (!priceId) {
+        setChangePlanError(`Payment is not configured (missing ${plan} price ID). Please contact support.`);
+        return;
+      }
+      if (!paddle) {
+        setChangePlanError("Payment system is still loading. Please wait a moment and try again.");
+        return;
+      }
+
       pendingPlanRef.current = plan;
       checkoutIntentRef.current = "subscribe";
       setWaitTimedOut(false);
       setActivateSuccess(false);
-      paddle.Checkout.open({
+      const checkoutOptions: any = {
         items: [{ priceId, quantity: 1 }],
         customer: { email: user.email },
         customData: { userId: user.id },
-      });
+      };
+      if (trimmedCode) checkoutOptions.discountCode = trimmedCode;
+      paddle.Checkout.open(checkoutOptions);
     } catch (err) {
       console.error("[Paddle] handlePlanAction threw:", err);
-      setChangePlanError("Could not open checkout. Please refresh and try again.");
+      setChangePlanError("Could not change plan. Please refresh and try again.");
     } finally {
       setChangingPlan(null);
     }
@@ -606,6 +617,19 @@ export default function BillingPage() {
             {changePlanError}
           </div>
         )}
+        <div className="mb-4 bg-white border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-shrink-0">
+            <p className="text-sm font-semibold text-gray-700">Promo code</p>
+            <p className="text-xs text-gray-500">Applied when you switch or subscribe below.</p>
+          </div>
+          <input
+            type="text"
+            value={discountCode}
+            onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
+            placeholder="ENTER CODE"
+            className="flex-1 px-3 py-2 text-sm font-mono uppercase tracking-wider border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
         <div className="grid sm:grid-cols-2 gap-4">
           {plans.map((plan) => {
             const isCurrent = user?.plan === plan.id;

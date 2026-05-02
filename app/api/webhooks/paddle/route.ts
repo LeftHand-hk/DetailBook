@@ -217,14 +217,34 @@ export async function POST(req: NextRequest) {
 
       case "subscription.updated": {
         const subId = data.id;
-        const plan = getPlanFromItems(data.items);
         const status = data.status;
+
+        // When a plan switch is made on a trialing sub, Paddle uses
+        // proration_billing_mode: "do_not_bill" which SCHEDULES the
+        // new price for the next billing cycle rather than applying
+        // it immediately. In that case, data.items still shows the
+        // OLD price and data.scheduled_change.items shows the NEW.
+        // Prefer the scheduled change so we don't revert the user's
+        // plan back to whatever Paddle is currently billing for.
+        const scheduledItems: any[] = data.scheduled_change?.items || [];
+        const plan = scheduledItems.length > 0
+          ? getPlanFromItems(scheduledItems)
+          : getPlanFromItems(data.items);
 
         const user = await prisma.user.findFirst({ where: { paddleSubscriptionId: subId } });
         if (user) {
           const updateData: Record<string, string> = { subscriptionStatus: status };
           if (plan) updateData.plan = plan;
           await prisma.user.update({ where: { id: user.id }, data: updateData });
+          console.log(
+            "[Paddle webhook] subscription.updated applied",
+            JSON.stringify({
+              userId: user.id,
+              status,
+              plan: plan || "(unchanged)",
+              source: scheduledItems.length > 0 ? "scheduled_change" : "items",
+            })
+          );
         }
         break;
       }
