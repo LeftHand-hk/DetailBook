@@ -245,28 +245,6 @@ export default function OnboardingPage() {
     if (!selectedPlan || !user) return;
     selectedPlanRef.current = selectedPlan;
 
-    // If user already has an active Paddle subscription (rare here, but
-    // possible if they re-entered onboarding) — switch plans via API
-    // instead of opening a second checkout (Paddle would reject it).
-    if ((user as any).subscriptionStatus === "active") {
-      try {
-        const res = await fetch("/api/subscription/change-plan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ plan: selectedPlan }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          alert(data.error || "Could not change plan. Please contact support.");
-          return;
-        }
-        router.push("/dashboard");
-      } catch {
-        alert("Network error. Please try again.");
-      }
-      return;
-    }
-
     const priceId = selectedPlan === "pro"
       ? process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID
       : process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
@@ -279,7 +257,20 @@ export default function OnboardingPage() {
       alert("Payment system is still loading. Please wait a moment and try again.");
       return;
     }
+
     try {
+      // If user re-entered onboarding with an active Paddle sub, cancel
+      // it first — Paddle rejects creating a 2nd active subscription
+      // per customer, so we cancel then open a fresh Checkout.
+      if ((user as any).subscriptionStatus === "active") {
+        const cancelRes = await fetch("/api/subscription/cancel-paddle", { method: "POST" });
+        const cancelData = await cancelRes.json().catch(() => ({}));
+        if (!cancelRes.ok) {
+          alert(cancelData.error || "Could not cancel current subscription. Please contact support.");
+          return;
+        }
+      }
+
       paddle.Checkout.open({
         items: [{ priceId, quantity: 1 }],
         customer: { email: user.email },

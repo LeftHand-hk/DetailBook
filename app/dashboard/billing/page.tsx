@@ -226,12 +226,15 @@ export default function BillingPage() {
     setCanceling(true);
     try {
       const res = await fetch("/api/subscription/cancel", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setCancelDone(true);
         setTimeout(() => window.location.href = "/login", 3000);
+      } else {
+        alert(data.error || "Could not cancel subscription. Please contact support.");
       }
     } catch {
-      alert("Something went wrong. Please contact support.");
+      alert("Network error. Please try again.");
     } finally {
       setCanceling(false);
       setShowCancelModal(false);
@@ -241,38 +244,6 @@ export default function BillingPage() {
   const handlePlanAction = async (plan: "starter" | "pro") => {
     if (!user) return;
 
-    // Active subscriber → switch plan via Paddle Subscription Update API.
-    // This is the ONLY reliable way Paddle Billing supports plan changes:
-    // it charges/credits the saved card with prorated difference and
-    // switches the plan instantly. Opening a 2nd Checkout fails because
-    // Paddle rejects duplicate active subscriptions per customer.
-    if (user.subscriptionStatus === "active") {
-      setChangingPlan(plan);
-      setChangePlanError("");
-      try {
-        const res = await fetch("/api/subscription/change-plan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ plan }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          setChangePlanError(data.error || "Could not change plan. Please contact support.");
-          return;
-        }
-        setUser((u) => (u ? { ...u, plan } : u));
-        setActivateSuccess(true);
-        await fetchUser();
-        await fetchCard({ retry: true });
-      } catch {
-        setChangePlanError("Network error. Try again.");
-      } finally {
-        setChangingPlan(null);
-      }
-      return;
-    }
-
-    // No active subscription → open Paddle Checkout fresh
     const priceId = plan === "pro"
       ? process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID
       : process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
@@ -284,19 +255,41 @@ export default function BillingPage() {
       alert("Payment system is still loading. Please wait a moment and try again.");
       return;
     }
-    pendingPlanRef.current = plan;
-    checkoutIntentRef.current = "subscribe";
-    setWaitTimedOut(false);
-    setActivateSuccess(false);
+
+    setChangingPlan(plan);
+    setChangePlanError("");
+
     try {
+      // If user has an active Paddle subscription, cancel it first.
+      // Paddle rejects creating a 2nd active subscription for the same
+      // customer, so plan switches must go: cancel current → fresh
+      // Checkout for the new plan.
+      if (user.subscriptionStatus === "active") {
+        const cancelRes = await fetch("/api/subscription/cancel-paddle", { method: "POST" });
+        const cancelData = await cancelRes.json().catch(() => ({}));
+        if (!cancelRes.ok) {
+          setChangePlanError(
+            cancelData.error || "Could not cancel current subscription. Please contact support."
+          );
+          return;
+        }
+      }
+
+      // Open Paddle Checkout for the new plan.
+      pendingPlanRef.current = plan;
+      checkoutIntentRef.current = "subscribe";
+      setWaitTimedOut(false);
+      setActivateSuccess(false);
       paddle.Checkout.open({
         items: [{ priceId, quantity: 1 }],
         customer: { email: user.email },
         customData: { userId: user.id },
       });
     } catch (err) {
-      console.error("[Paddle] Checkout.open threw:", err);
-      alert("Could not open checkout. Please refresh the page and try again.");
+      console.error("[Paddle] handlePlanAction threw:", err);
+      setChangePlanError("Could not open checkout. Please refresh and try again.");
+    } finally {
+      setChangingPlan(null);
     }
   };
 

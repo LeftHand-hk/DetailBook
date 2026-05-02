@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 
+function paddleApiBase() {
+  return process.env.NEXT_PUBLIC_PADDLE_ENV === "sandbox"
+    ? "https://sandbox-api.paddle.com"
+    : "https://api.paddle.com";
+}
+
 export async function POST() {
   const session = await getSessionUser();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -10,32 +16,49 @@ export async function POST() {
     const user = await prisma.user.findUnique({ where: { id: session.id } });
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-    const subId = (user as any).paddleSubscriptionId;
+    const subId = (user as any).paddleSubscriptionId as string | null;
+    const apiKey = process.env.PADDLE_API_KEY?.replace(/^["']|["']$/g, "")?.trim();
 
-    // Cancel in Paddle if they have an active subscription
-    if (subId) {
-      const paddleEnv = process.env.NEXT_PUBLIC_PADDLE_ENV === "sandbox" ? "sandbox" : "production";
-      const apiBase = paddleEnv === "sandbox"
-        ? "https://sandbox-api.paddle.com"
-        : "https://api.paddle.com";
+    if (subId && apiKey) {
+      const headers = {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      };
 
-      const res = await fetch(`${apiBase}/subscriptions/${subId}/cancel`, {
+      // Try immediate cancel first; fall back to end-of-period.
+      let res = await fetch(`${paddleApiBase()}/subscriptions/${subId}/cancel`, {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${process.env.PADDLE_API_KEY?.trim()}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ effective_from: "next_billing_period" }),
+        headers,
+        body: JSON.stringify({ effective_from: "immediately" }),
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        console.error("Paddle cancel error:", err);
-        // Continue anyway — still suspend locally
+        const firstErr = await res.json().catch(() => ({}));
+        console.warn("[cancel] immediate rejected, trying next_billing_period:", res.status, firstErr);
+
+        res = await fetch(`${paddleApiBase()}/subscriptions/${subId}/cancel`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ effective_from: "next_billing_period" }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          console.error("[cancel] both attempts failed:", res.status, err);
+          const detail = err?.error?.detail || firstErr?.error?.detail || err?.error?.code;
+          return NextResponse.json(
+            {
+              error: detail
+                ? `Paddle: ${detail}`
+                : "Could not cancel subscription with Paddle.",
+            },
+            { status: 502 }
+          );
+        }
       }
     }
 
-    // Suspend account locally
+    // Suspend account locally regardless — user wanted out.
     await prisma.user.update({
       where: { id: session.id },
       data: {
