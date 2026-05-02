@@ -153,10 +153,12 @@ export async function POST(req: NextRequest) {
     if (!updateRes.ok) {
       const err = await updateRes.json().catch(() => ({}));
       console.error("[change-plan] Paddle PATCH failed:", updateRes.status, err);
+      const detail = err?.error?.detail || err?.error?.code || err?.error?.type;
       return NextResponse.json(
         {
-          error: "Could not change plan. Please contact support.",
-          paddleError: err?.error?.detail || err?.error?.code || null,
+          error: detail
+            ? `Paddle rejected the change: ${detail}`
+            : "Could not change plan. Please contact support.",
         },
         { status: 502 }
       );

@@ -241,42 +241,49 @@ export default function BillingPage() {
   const handlePlanAction = async (plan: "starter" | "pro") => {
     if (!user) return;
 
+    // Active subscriber → switch plan via Paddle Subscription Update API.
+    // This is the ONLY reliable way Paddle Billing supports plan changes:
+    // it charges/credits the saved card with prorated difference and
+    // switches the plan instantly. Opening a 2nd Checkout fails because
+    // Paddle rejects duplicate active subscriptions per customer.
+    if (user.subscriptionStatus === "active") {
+      setChangingPlan(plan);
+      setChangePlanError("");
+      try {
+        const res = await fetch("/api/subscription/change-plan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setChangePlanError(data.error || "Could not change plan. Please contact support.");
+          return;
+        }
+        setUser((u) => (u ? { ...u, plan } : u));
+        setActivateSuccess(true);
+        await fetchUser();
+        await fetchCard({ retry: true });
+      } catch {
+        setChangePlanError("Network error. Try again.");
+      } finally {
+        setChangingPlan(null);
+      }
+      return;
+    }
+
+    // No active subscription → open Paddle Checkout fresh
     const priceId = plan === "pro"
       ? process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID
       : process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
     if (!priceId) {
       alert(`Payment is not configured (missing ${plan} price ID). Please contact support.`);
-      console.error("[Paddle] price ID missing for plan:", plan);
       return;
     }
     if (!paddle) {
       alert("Payment system is still loading. Please wait a moment and try again.");
       return;
     }
-
-    // If user already has an active subscription, Paddle won't allow a
-    // second one for the same customer. Cancel the current Paddle sub
-    // server-side first (account stays usable), then open Checkout for
-    // the new plan. The webhook activates the new sub on success.
-    if (user.subscriptionStatus === "active") {
-      setChangingPlan(plan);
-      setChangePlanError("");
-      try {
-        const res = await fetch("/api/subscription/cancel-paddle", { method: "POST" });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          setChangePlanError(data.error || "Could not start plan change.");
-          setChangingPlan(null);
-          return;
-        }
-      } catch {
-        setChangePlanError("Network error. Try again.");
-        setChangingPlan(null);
-        return;
-      }
-      setChangingPlan(null);
-    }
-
     pendingPlanRef.current = plan;
     checkoutIntentRef.current = "subscribe";
     setWaitTimedOut(false);
