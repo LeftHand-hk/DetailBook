@@ -45,7 +45,22 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const apiKey = process.env.PADDLE_API_KEY?.trim();
+  // Clean the key aggressively — common paste issues:
+  // surrounding quotes, leading/trailing whitespace, stray newlines.
+  const apiKey = process.env.PADDLE_API_KEY
+    ?.replace(/^["']|["']$/g, "")
+    ?.trim();
+  if (apiKey) {
+    console.log(
+      "[change-plan] paddle key shape",
+      JSON.stringify({
+        len: apiKey.length,
+        prefix: apiKey.slice(0, 14),
+        suffix: apiKey.slice(-4),
+        hasInternalWhitespace: /\s/.test(apiKey),
+      })
+    );
+  }
   if (!apiKey) {
     return NextResponse.json({ error: "Payment system not configured" }, { status: 503 });
   }
