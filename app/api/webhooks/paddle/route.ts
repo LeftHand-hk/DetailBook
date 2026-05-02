@@ -7,6 +7,28 @@ const PRICE_TO_PLAN: Record<string, string> = {
   [process.env.PADDLE_PRO_PRICE_ID || ""]: "pro",
 };
 
+function paddleApiBase() {
+  return process.env.NEXT_PUBLIC_PADDLE_ENV === "sandbox"
+    ? "https://sandbox-api.paddle.com"
+    : "https://api.paddle.com";
+}
+
+async function fetchPaddleCustomerEmail(customerId: string): Promise<string | null> {
+  const apiKey = process.env.PADDLE_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const r = await fetch(`${paddleApiBase()}/customers/${customerId}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      cache: "no-store",
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j?.data?.email || null;
+  } catch {
+    return null;
+  }
+}
+
 function getPlanFromItems(items: any[]): string | null {
   for (const item of items || []) {
     const priceId = item.price?.id || item.price_id;
@@ -15,20 +37,27 @@ function getPlanFromItems(items: any[]): string | null {
   return null; // unknown price — do NOT overwrite plan
 }
 
-async function verifyPaddleSignature(req: NextRequest, body: string): Promise<boolean> {
+async function verifyPaddleSignature(
+  req: NextRequest,
+  body: string
+): Promise<{ ok: boolean; reason?: string }> {
   const secret = process.env.PADDLE_WEBHOOK_SECRET;
-  if (!secret) return true; // skip in dev if not configured
+  if (!secret) {
+    console.warn("[Paddle webhook] PADDLE_WEBHOOK_SECRET is NOT set — accepting unsigned requests (dev mode).");
+    return { ok: true, reason: "no_secret_configured" };
+  }
 
   const signatureHeader = req.headers.get("paddle-signature");
-  if (!signatureHeader) return false;
+  if (!signatureHeader) {
+    return { ok: false, reason: "missing_paddle_signature_header" };
+  }
 
-  // Parse ts= and h1= from header
   const parts = Object.fromEntries(
     signatureHeader.split(";").map((p) => p.split("=") as [string, string])
   );
   const ts = parts["ts"];
   const h1 = parts["h1"];
-  if (!ts || !h1) return false;
+  if (!ts || !h1) return { ok: false, reason: "malformed_signature_header" };
 
   const signedPayload = `${ts}:${body}`;
   const encoder = new TextEncoder();
@@ -39,29 +68,57 @@ async function verifyPaddleSignature(req: NextRequest, body: string): Promise<bo
   const sig = await crypto.subtle.sign("HMAC", key, msgData);
   const computed = Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
 
-  return computed === h1;
+  if (computed !== h1) {
+    return { ok: false, reason: "signature_mismatch — secret in Netlify env does NOT match Paddle Dashboard destination secret" };
+  }
+  return { ok: true };
 }
 
 export async function POST(req: NextRequest) {
+  const startedAt = Date.now();
   const body = await req.text();
+  const sigHeader = req.headers.get("paddle-signature");
 
-  const valid = await verifyPaddleSignature(req, body);
-  if (!valid) {
-    console.error("Invalid Paddle webhook signature");
-    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+  console.log(
+    "[Paddle webhook] incoming POST",
+    JSON.stringify({
+      bodyLen: body.length,
+      hasSignature: Boolean(sigHeader),
+      hasSecret: Boolean(process.env.PADDLE_WEBHOOK_SECRET),
+      ua: req.headers.get("user-agent"),
+    })
+  );
+
+  const verification = await verifyPaddleSignature(req, body);
+  if (!verification.ok) {
+    console.error("[Paddle webhook] signature verification FAILED:", verification.reason);
+    return NextResponse.json({ error: "Invalid signature", reason: verification.reason }, { status: 401 });
   }
 
   let event: any;
   try {
     event = JSON.parse(body);
   } catch {
+    console.error("[Paddle webhook] invalid JSON body");
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
   const eventType: string = event.event_type || event.notification_type || "";
   const data = event.data || {};
 
-  console.log("Paddle webhook:", eventType, data.id);
+  console.log(
+    "[Paddle webhook] event",
+    JSON.stringify({
+      eventType,
+      id: data.id,
+      customerId: data.customer_id,
+      customUserId: data.custom_data?.userId,
+      status: data.status,
+      itemPriceIds: (data.items || []).map((i: any) => i.price?.id || i.price_id),
+      knownStarter: process.env.PADDLE_STARTER_PRICE_ID || "(unset)",
+      knownPro: process.env.PADDLE_PRO_PRICE_ID || "(unset)",
+    })
+  );
 
   try {
     switch (eventType) {
@@ -71,24 +128,59 @@ export async function POST(req: NextRequest) {
         const userId = customData.userId;
         const plan = getPlanFromItems(data.items);
 
-        // Build update — only include plan if we successfully mapped it
-        const updateData: Record<string, string> = {
+        const updateData: Record<string, any> = {
           paddleSubscriptionId: data.id,
           paddleCustomerId: data.customer_id,
           subscriptionStatus: "active",
           trialEndsAt: "",
+          suspended: false,
         };
         if (plan) updateData.plan = plan;
 
+        let updatedUserId: string | null = null;
+
         if (userId) {
-          await prisma.user.update({ where: { id: userId }, data: updateData });
-        } else if (data.customer_id) {
-          const existingUser = await prisma.user.findFirst({
+          try {
+            await prisma.user.update({ where: { id: userId }, data: updateData });
+            updatedUserId = userId;
+          } catch (e) {
+            console.warn("[Paddle webhook] update by custom_data.userId failed, trying customer_id:", e);
+          }
+        }
+
+        if (!updatedUserId && data.customer_id) {
+          let existingUser = await prisma.user.findFirst({
             where: { paddleCustomerId: data.customer_id },
           });
+
+          // Fallback: if customer was never linked, look up by email via Paddle
+          if (!existingUser) {
+            const email = await fetchPaddleCustomerEmail(data.customer_id);
+            if (email) {
+              existingUser = await prisma.user.findUnique({ where: { email } });
+              if (existingUser) {
+                console.log("[Paddle webhook] matched user by Paddle customer email:", email);
+              }
+            }
+          }
+
           if (existingUser) {
             await prisma.user.update({ where: { id: existingUser.id }, data: updateData });
+            updatedUserId = existingUser.id;
           }
+        }
+
+        if (!updatedUserId) {
+          console.error(
+            "[Paddle webhook] activation event received but NO user matched —",
+            JSON.stringify({
+              userIdFromCustomData: userId,
+              customerId: data.customer_id,
+              subId: data.id,
+            })
+          );
+        } else {
+          console.log("[Paddle webhook] activated user", updatedUserId, "plan=", plan || "(unchanged)");
         }
         break;
       }
@@ -130,9 +222,10 @@ export async function POST(req: NextRequest) {
         console.log("Unhandled Paddle event:", eventType);
     }
   } catch (err) {
-    console.error("Webhook handler error:", err);
+    console.error("[Paddle webhook] handler error:", err);
     return NextResponse.json({ error: "Handler error" }, { status: 500 });
   }
 
+  console.log("[Paddle webhook] handled in", Date.now() - startedAt, "ms");
   return NextResponse.json({ received: true });
 }

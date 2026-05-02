@@ -35,32 +35,48 @@ export async function GET() {
     const subJson = await subRes.json();
     const sub = subJson.data || {};
 
-    // 2. Card details live on the latest transaction's payment record,
-    //    NOT on the subscription itself in Paddle Billing.
+    // Paddle exposes card info in two places. Try them in order:
+    //   1) subscription.payment_information — set after first successful charge,
+    //      cheapest to read and almost always present for active subs
+    //   2) latest transaction's payments[].method_details.card — fallback for
+    //      edge cases where (1) hasn't been populated yet
     let card: any = null;
-    try {
-      const txRes = await fetch(
-        `${paddleApiBase()}/transactions?subscription_id=${subId}&status=completed,billed,paid&order_by=billed_at[DESC]&per_page=1`,
-        { headers: { Authorization: `Bearer ${apiKey}` }, cache: "no-store" }
-      );
-      if (txRes.ok) {
-        const txJson = await txRes.json();
-        const tx = (txJson.data && txJson.data[0]) || null;
-        const payments: any[] = tx?.payments || [];
-        // Find any payment with card method_details
-        for (const p of payments) {
-          const c = p?.method_details?.card;
-          if (c && (c.last4 || c.type)) {
-            card = c;
-            break;
+
+    const pi = sub.payment_information || sub.payment_method;
+    if (pi && (pi.last4 || pi.card_type || pi.type || pi.brand)) {
+      card = {
+        type: pi.card_type || pi.type || pi.brand,
+        last4: pi.last4,
+        expiry_month: pi.expiry_month ?? pi.exp_month,
+        expiry_year: pi.expiry_year ?? pi.exp_year,
+      };
+    }
+
+    if (!card) {
+      try {
+        const txRes = await fetch(
+          `${paddleApiBase()}/transactions?subscription_id=${subId}&status=completed,billed,paid&order_by=billed_at[DESC]&per_page=5`,
+          { headers: { Authorization: `Bearer ${apiKey}` }, cache: "no-store" }
+        );
+        if (txRes.ok) {
+          const txJson = await txRes.json();
+          const txs: any[] = txJson.data || [];
+          outer: for (const tx of txs) {
+            for (const p of tx?.payments || []) {
+              const c = p?.method_details?.card;
+              if (c && (c.last4 || c.type)) {
+                card = c;
+                break outer;
+              }
+            }
           }
+        } else {
+          const err = await txRes.json().catch(() => ({}));
+          console.error("Paddle GET transactions error:", err);
         }
-      } else {
-        const err = await txRes.json().catch(() => ({}));
-        console.error("Paddle GET transactions error:", err);
+      } catch (e) {
+        console.error("Paddle transactions fetch failed:", e);
       }
-    } catch (e) {
-      console.error("Paddle transactions fetch failed:", e);
     }
 
     return NextResponse.json({

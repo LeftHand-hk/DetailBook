@@ -60,13 +60,30 @@ export default function BillingPage() {
     }
   };
 
-  const fetchCard = async () => {
+  const fetchCard = async (opts?: { retry?: boolean }) => {
     try {
-      const res = await fetch("/api/subscription/payment-method");
+      const res = await fetch("/api/subscription/payment-method", { cache: "no-store" });
       if (!res.ok) return;
       const data = await res.json();
       setCard(data.card || null);
       setNextBilledAt(data.nextBilledAt || null);
+
+      // Card info can lag a few seconds behind subscription activation
+      // because Paddle populates payment_information AFTER the charge
+      // settles. Retry quietly a few times before giving up.
+      if (!data.card && opts?.retry) {
+        for (let attempt = 0; attempt < 6; attempt++) {
+          await new Promise((r) => setTimeout(r, 5000));
+          const r2 = await fetch("/api/subscription/payment-method", { cache: "no-store" });
+          if (!r2.ok) continue;
+          const d2 = await r2.json();
+          if (d2.card) {
+            setCard(d2.card);
+            setNextBilledAt(d2.nextBilledAt || null);
+            return;
+          }
+        }
+      }
     } catch {
       // ignore
     }
@@ -122,7 +139,7 @@ export default function BillingPage() {
         async eventCallback(event) {
           if (event.name === "checkout.completed") {
             if (checkoutIntentRef.current === "update-card") {
-              await fetchCard();
+              await fetchCard({ retry: true });
             } else {
               await waitForActivation();
             }
@@ -140,7 +157,7 @@ export default function BillingPage() {
   }, []);
 
   useEffect(() => {
-    if (user?.subscriptionStatus === "active") fetchCard();
+    if (user?.subscriptionStatus === "active") fetchCard({ retry: true });
   }, [user?.subscriptionStatus]);
 
   // After Paddle Checkout closes successfully, activation happens
