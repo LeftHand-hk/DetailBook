@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getUser, setUser, getPackages, setPackages, isLoggedIn, generateId, syncFromServer } from "@/lib/storage";
+import { trackEvent } from "@/lib/meta-pixel";
 import type { User, Package } from "@/types";
 import Logo from "@/components/Logo";
 import type { Paddle } from "@paddle/paddle-js";
@@ -52,6 +53,8 @@ export default function OnboardingPage() {
         token,
         async eventCallback(event) {
           if (event.name === "checkout.completed") {
+            const planValue = selectedPlanRef.current === "pro" ? 50 : 29;
+            trackEvent("Subscribe", { value: planValue, currency: "USD" });
             // Activation is server-side only. Poll for webhook briefly,
             // then ask the server to verify directly with Paddle's API.
             const phase1 = Date.now() + 15_000;

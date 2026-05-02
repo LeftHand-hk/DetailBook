@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import type { Paddle } from "@paddle/paddle-js";
+import { trackEvent } from "@/lib/meta-pixel";
 
 interface UserData {
   id: string;
@@ -145,6 +146,8 @@ export default function BillingPage() {
             if (checkoutIntentRef.current === "update-card") {
               await fetchCard({ retry: true });
             } else {
+              const planValue = pendingPlanRef.current === "pro" ? 50 : 29;
+              trackEvent("Subscribe", { value: planValue, currency: "USD" });
               // Run activation polling AND schedule a guaranteed reload.
               // The reload makes sure sidebar / plan-gated UI picks up
               // the new plan; activation polling makes sure the server

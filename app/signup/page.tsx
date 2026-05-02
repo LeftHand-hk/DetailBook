@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { login, syncFromServer } from "@/lib/storage";
+import { trackEvent } from "@/lib/meta-pixel";
 import Logo from "@/components/Logo";
 
 export default function SignupPage() {
@@ -98,6 +99,7 @@ export default function SignupPage() {
       }
       login();
       await syncFromServer();
+      trackEvent("CompleteRegistration");
       setLoading(false);
       router.push("/onboarding");
     } catch {

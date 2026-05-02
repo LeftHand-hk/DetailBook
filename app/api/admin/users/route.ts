@@ -158,16 +158,19 @@ export async function DELETE(request: NextRequest) {
     // booking.staffId doesn't fight the user-cascade on booking).
     // Notifications must be explicit too — relying on cascade alone
     // sometimes fails for users with many notifications.
+    // Interactive transaction (function form) is required because the
+    // array form of $transaction doesn't accept the timeout option.
+    const uid = userId;
     await prisma.$transaction(
-      [
-        prisma.notification.deleteMany({ where: { userId } }),
-        prisma.ticketMessage.deleteMany({ where: { ticket: { userId } } }),
-        prisma.supportTicket.deleteMany({ where: { userId } }),
-        prisma.booking.deleteMany({ where: { userId } }),
-        prisma.staff.deleteMany({ where: { userId } }),
-        prisma.package.deleteMany({ where: { userId } }),
-        prisma.user.delete({ where: { id: userId } }),
-      ],
+      async (tx) => {
+        await tx.notification.deleteMany({ where: { userId: uid } });
+        await tx.ticketMessage.deleteMany({ where: { ticket: { userId: uid } } });
+        await tx.supportTicket.deleteMany({ where: { userId: uid } });
+        await tx.booking.deleteMany({ where: { userId: uid } });
+        await tx.staff.deleteMany({ where: { userId: uid } });
+        await tx.package.deleteMany({ where: { userId: uid } });
+        await tx.user.delete({ where: { id: uid } });
+      },
       {
         // Default 5s is too tight for users with many bookings/notifications.
         timeout: 30_000,

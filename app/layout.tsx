@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import MetaPixel from "@/components/MetaPixel";
 
 export const metadata: Metadata = {
   title: "DetailBook - Scheduling & Booking for Mobile Auto Detailers",
@@ -14,6 +15,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-white text-gray-900 antialiased">
+        <MetaPixel />
         {children}
       </body>
     </html>

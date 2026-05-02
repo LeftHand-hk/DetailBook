@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import Logo, { LogoIcon } from "@/components/Logo";
 import { usePlatformName } from "@/components/PlatformName";
+import { trackEvent } from "@/lib/meta-pixel";
 
 const CheckIcon = () => (
   <svg className="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -104,7 +105,7 @@ export default function LandingPage() {
                 className="text-sm font-semibold text-white/70 hover:text-white px-4 py-2 rounded-xl hover:bg-white/10 transition-all duration-200">
                 Log In
               </Link>
-              <Link href="/signup"
+              <Link href="/signup" onClick={() => trackEvent("Lead")}
                 className="relative group flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-all duration-200 shadow-lg shadow-blue-600/30 hover:shadow-blue-500/40 hover:-translate-y-0.5">
                 Start Free Trial
                 <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -169,7 +170,7 @@ export default function LandingPage() {
                 className="block text-center text-white/80 font-semibold py-3 px-4 rounded-xl border border-white/10 hover:bg-white/[0.06] transition-colors text-sm">
                 Log In
               </Link>
-              <Link href="/signup" onClick={() => setMenuOpen(false)}
+              <Link href="/signup" onClick={() => { trackEvent("Lead"); setMenuOpen(false); }}
                 className="block text-center bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-3 px-4 rounded-xl hover:from-blue-500 hover:to-indigo-500 transition-all shadow-lg shadow-blue-600/20 text-sm">
                 Start Free Trial
               </Link>
@@ -243,7 +244,7 @@ export default function LandingPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-14 animate-fadeInUp delay-300">
-            <Link href="/signup"
+            <Link href="/signup" onClick={() => trackEvent("Lead")}
               className="group relative inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-black text-lg px-10 py-4 rounded-2xl transition-all duration-300 shadow-2xl shadow-blue-600/40 hover:shadow-blue-500/50 hover:-translate-y-1">
               <span>Start Free Trial</span>
               <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -501,7 +502,7 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link href="/signup"
+              <Link href="/signup" onClick={() => trackEvent("Lead")}
                 className="block w-full text-center bg-slate-700 hover:bg-slate-600 border border-slate-600 text-white font-bold py-3.5 rounded-xl transition-all duration-200 hover:-translate-y-0.5">
                 Start Free Trial
               </Link>
@@ -532,7 +533,7 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link href="/signup"
+              <Link href="/signup" onClick={() => trackEvent("Lead")}
                 className="block w-full text-center bg-white text-blue-700 hover:bg-blue-50 font-black py-3.5 rounded-xl transition-all duration-200 hover:-translate-y-0.5">
                 Start Free Trial
               </Link>
@@ -624,7 +625,7 @@ export default function LandingPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-            <Link href="/signup"
+            <Link href="/signup" onClick={() => trackEvent("Lead")}
               className="group inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-black text-lg px-10 py-4 rounded-2xl transition-all duration-300 shadow-2xl shadow-blue-600/40 hover:-translate-y-1">
               Start Your Free Trial
               <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
