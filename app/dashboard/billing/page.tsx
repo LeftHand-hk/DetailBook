@@ -135,29 +135,71 @@ export default function BillingPage() {
 
   // After Paddle Checkout closes successfully, the subscription is NOT
   // active yet — Paddle still has to send us the verified webhook.
-  // Poll /api/user until we see subscriptionStatus === "active".
+  // Poll /api/user briefly; if the webhook hasn't fired in 15s, fall
+  // back to /api/subscription/sync which queries Paddle's API directly
+  // and activates from the authoritative source.
   const waitForActivation = async () => {
     setWaitingForWebhook(true);
     setWaitTimedOut(false);
     setActivateSuccess(false);
-    const deadline = Date.now() + 60_000;
-    while (Date.now() < deadline) {
+
+    const succeed = (u: UserData) => {
+      setUser(u);
+      setActivateSuccess(true);
+      setWaitingForWebhook(false);
+    };
+
+    // Phase 1: 15s polling for webhook
+    const phase1Deadline = Date.now() + 15_000;
+    while (Date.now() < phase1Deadline) {
       try {
         const res = await fetch("/api/user", { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
-          if (data.user?.subscriptionStatus === "active") {
-            setUser(data.user);
-            setActivateSuccess(true);
-            setWaitingForWebhook(false);
-            return;
-          }
+          if (data.user?.subscriptionStatus === "active") return succeed(data.user);
         }
-      } catch {
-        // ignore — keep polling
-      }
+      } catch { /* keep polling */ }
       await new Promise((r) => setTimeout(r, 2000));
     }
+
+    // Phase 2: ask the server to verify with Paddle API directly
+    try {
+      const syncRes = await fetch("/api/subscription/sync", { method: "POST" });
+      if (syncRes.ok) {
+        const userRes = await fetch("/api/user", { cache: "no-store" });
+        if (userRes.ok) {
+          const data = await userRes.json();
+          if (data.user?.subscriptionStatus === "active") return succeed(data.user);
+        }
+      } else {
+        const err = await syncRes.json().catch(() => ({}));
+        console.warn("[Paddle sync] failed:", syncRes.status, err);
+      }
+    } catch (e) {
+      console.warn("[Paddle sync] threw:", e);
+    }
+
+    setWaitingForWebhook(false);
+    setWaitTimedOut(true);
+  };
+
+  // Manual trigger from the timed-out banner.
+  const retrySync = async () => {
+    setWaitingForWebhook(true);
+    setWaitTimedOut(false);
+    try {
+      await fetch("/api/subscription/sync", { method: "POST" });
+      const userRes = await fetch("/api/user", { cache: "no-store" });
+      if (userRes.ok) {
+        const data = await userRes.json();
+        if (data.user?.subscriptionStatus === "active") {
+          setUser(data.user);
+          setActivateSuccess(true);
+          setWaitingForWebhook(false);
+          return;
+        }
+      }
+    } catch { /* fall through */ }
     setWaitingForWebhook(false);
     setWaitTimedOut(true);
   };
@@ -297,9 +339,17 @@ export default function BillingPage() {
       {waitTimedOut && !isSubscribed && (
         <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5">
           <p className="font-semibold text-amber-900 mb-1">Payment confirmation is taking longer than expected.</p>
-          <p className="text-sm text-amber-800">
-            If your payment went through, your plan will activate automatically as soon as Paddle confirms it.
-            Refresh in a minute, or email <a href="mailto:info@detailbookapp.com" className="underline font-medium">info@detailbookapp.com</a> if it still hasn&apos;t activated.
+          <p className="text-sm text-amber-800 mb-3">
+            If your payment went through in Paddle, click the button below — we&apos;ll verify directly with Paddle and activate your plan.
+          </p>
+          <button
+            onClick={retrySync}
+            className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-colors"
+          >
+            I paid — verify with Paddle
+          </button>
+          <p className="text-xs text-amber-700 mt-3">
+            Still stuck? Email <a href="mailto:info@detailbookapp.com" className="underline font-medium">info@detailbookapp.com</a> with the Paddle invoice and we&apos;ll activate manually.
           </p>
         </div>
       )}

@@ -52,23 +52,28 @@ export default function OnboardingPage() {
         token,
         async eventCallback(event) {
           if (event.name === "checkout.completed") {
-            // Wait for the verified Paddle webhook to flip
-            // subscriptionStatus to "active" before sending the user
-            // into the dashboard. Activation is never client-driven.
-            const deadline = Date.now() + 60_000;
-            while (Date.now() < deadline) {
+            // Activation is server-side only. Poll for webhook briefly,
+            // then ask the server to verify directly with Paddle's API.
+            const phase1 = Date.now() + 15_000;
+            let activated = false;
+            while (Date.now() < phase1) {
               try {
                 const r = await fetch("/api/user", { cache: "no-store" });
                 if (r.ok) {
                   const d = await r.json();
-                  if (d.user?.subscriptionStatus === "active") break;
+                  if (d.user?.subscriptionStatus === "active") { activated = true; break; }
                 }
-              } catch {
-                // keep polling
-              }
+              } catch { /* keep polling */ }
               await new Promise((res) => setTimeout(res, 2000));
             }
+            if (!activated) {
+              try {
+                await fetch("/api/subscription/sync", { method: "POST" });
+              } catch { /* ignore — billing page has retry */ }
+            }
             router.push("/dashboard");
+          } else if (event.name === "checkout.error") {
+            console.error("[Paddle] checkout.error", event);
           }
         },
       }).then((instance) => { if (instance) setPaddle(instance); });
