@@ -34,7 +34,6 @@ export default function BillingPage() {
   const [updateCardError, setUpdateCardError] = useState("");
   const [changingPlan, setChangingPlan] = useState<"starter" | "pro" | null>(null);
   const [changePlanError, setChangePlanError] = useState("");
-  const [promoCode, setPromoCode] = useState("");
   const pendingPlanRef = useRef<"starter" | "pro">("starter");
   const checkoutIntentRef = useRef<"subscribe" | "update-card">("subscribe");
 
@@ -242,36 +241,6 @@ export default function BillingPage() {
   const handlePlanAction = async (plan: "starter" | "pro") => {
     if (!user) return;
 
-    // Existing subscriber → switch plan via Paddle Subscription API
-    // (no new checkout, charges the saved card with proration)
-    if (user.subscriptionStatus === "active") {
-      setChangingPlan(plan);
-      setChangePlanError("");
-      try {
-        const res = await fetch("/api/subscription/change-plan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ plan, discountCode: promoCode || undefined }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          setChangePlanError(data.error || "Could not change plan.");
-          return;
-        }
-        // Reflect new plan immediately, then refresh server state
-        setUser((u) => (u ? { ...u, plan } : u));
-        setActivateSuccess(true);
-        await fetchUser();
-        await fetchCard({ retry: true });
-      } catch {
-        setChangePlanError("Network error. Try again.");
-      } finally {
-        setChangingPlan(null);
-      }
-      return;
-    }
-
-    // New subscriber → open Paddle Checkout
     const priceId = plan === "pro"
       ? process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID
       : process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
@@ -284,6 +253,30 @@ export default function BillingPage() {
       alert("Payment system is still loading. Please wait a moment and try again.");
       return;
     }
+
+    // If user already has an active subscription, Paddle won't allow a
+    // second one for the same customer. Cancel the current Paddle sub
+    // server-side first (account stays usable), then open Checkout for
+    // the new plan. The webhook activates the new sub on success.
+    if (user.subscriptionStatus === "active") {
+      setChangingPlan(plan);
+      setChangePlanError("");
+      try {
+        const res = await fetch("/api/subscription/cancel-paddle", { method: "POST" });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setChangePlanError(data.error || "Could not start plan change.");
+          setChangingPlan(null);
+          return;
+        }
+      } catch {
+        setChangePlanError("Network error. Try again.");
+        setChangingPlan(null);
+        return;
+      }
+      setChangingPlan(null);
+    }
+
     pendingPlanRef.current = plan;
     checkoutIntentRef.current = "subscribe";
     setWaitTimedOut(false);
@@ -293,7 +286,6 @@ export default function BillingPage() {
         items: [{ priceId, quantity: 1 }],
         customer: { email: user.email },
         customData: { userId: user.id },
-        ...(promoCode ? { discountCode: promoCode } : {}),
       });
     } catch (err) {
       console.error("[Paddle] Checkout.open threw:", err);
@@ -557,16 +549,7 @@ export default function BillingPage() {
         <div className="mb-4 flex items-end justify-between gap-4 flex-wrap">
           <div>
             <h2 className="text-lg font-bold text-gray-900">Available plans</h2>
-            <p className="text-sm text-gray-500">Choose the plan that fits your business.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={promoCode}
-              onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-              placeholder="Promo code"
-              className="px-3 py-2 text-sm border border-gray-200 rounded-lg uppercase tracking-wide w-36 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
+            <p className="text-sm text-gray-500">Choose the plan that fits your business. You can apply a promo code in checkout.</p>
           </div>
         </div>
         {changePlanError && (
@@ -633,11 +616,11 @@ export default function BillingPage() {
                     }`}
                   >
                     {changingPlan === plan.id
-                      ? "Switching…"
+                      ? "Preparing checkout…"
                       : isSubscribed
                         ? user?.plan === "pro" && plan.id === "starter"
-                          ? `Downgrade to ${plan.name}`
-                          : `Upgrade to ${plan.name}`
+                          ? `Switch to ${plan.name}`
+                          : `Switch to ${plan.name}`
                         : `Subscribe to ${plan.name}`}
                   </button>
                 )}
