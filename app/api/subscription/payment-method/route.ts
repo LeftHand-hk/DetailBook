@@ -35,47 +35,62 @@ export async function GET() {
     const subJson = await subRes.json();
     const sub = subJson.data || {};
 
-    // Paddle exposes card info in two places. Try them in order:
-    //   1) subscription.payment_information — set after first successful charge,
-    //      cheapest to read and almost always present for active subs
-    //   2) latest transaction's payments[].method_details.card — fallback for
-    //      edge cases where (1) hasn't been populated yet
+    // Card data lives on transactions in Paddle Billing v2, not on the
+    // subscription object itself. Fetch the latest paid transactions
+    // (any status that implies a charge happened) and pull card details
+    // from payments[].method_details.
     let card: any = null;
 
-    const pi = sub.payment_information || sub.payment_method;
-    if (pi && (pi.last4 || pi.card_type || pi.type || pi.brand)) {
-      card = {
-        type: pi.card_type || pi.type || pi.brand,
-        last4: pi.last4,
-        expiry_month: pi.expiry_month ?? pi.exp_month,
-        expiry_year: pi.expiry_year ?? pi.exp_year,
-      };
-    }
-
-    if (!card) {
-      try {
-        const txRes = await fetch(
-          `${paddleApiBase()}/transactions?subscription_id=${subId}&status=completed,billed,paid&order_by=billed_at[DESC]&per_page=5`,
-          { headers: { Authorization: `Bearer ${apiKey}` }, cache: "no-store" }
-        );
-        if (txRes.ok) {
-          const txJson = await txRes.json();
-          const txs: any[] = txJson.data || [];
-          outer: for (const tx of txs) {
-            for (const p of tx?.payments || []) {
-              const c = p?.method_details?.card;
-              if (c && (c.last4 || c.type)) {
-                card = c;
-                break outer;
-              }
+    try {
+      const txRes = await fetch(
+        `${paddleApiBase()}/transactions?subscription_id=${subId}&order_by=billed_at[DESC]&per_page=10`,
+        { headers: { Authorization: `Bearer ${apiKey}` }, cache: "no-store" }
+      );
+      if (txRes.ok) {
+        const txJson = await txRes.json();
+        const txs: any[] = txJson.data || [];
+        outer: for (const tx of txs) {
+          for (const p of tx?.payments || []) {
+            const c = p?.method_details?.card;
+            if (c && (c.last4 || c.type)) {
+              card = c;
+              break outer;
             }
           }
-        } else {
-          const err = await txRes.json().catch(() => ({}));
-          console.error("Paddle GET transactions error:", err);
         }
-      } catch (e) {
-        console.error("Paddle transactions fetch failed:", e);
+        if (!card) {
+          console.log(
+            "[payment-method] no card on any transaction yet",
+            JSON.stringify({
+              subId,
+              txCount: txs.length,
+              txStatuses: txs.map((t) => t.status),
+              firstTxPayments: (txs[0]?.payments || []).map((p: any) => ({
+                method: p.method_details?.type,
+                hasCard: Boolean(p.method_details?.card),
+              })),
+            })
+          );
+        }
+      } else {
+        const err = await txRes.json().catch(() => ({}));
+        console.error("[payment-method] Paddle GET transactions error:", txRes.status, err);
+      }
+    } catch (e) {
+      console.error("[payment-method] transactions fetch failed:", e);
+    }
+
+    // Final fallback: payment_information on subscription (Paddle started
+    // populating this in newer responses)
+    if (!card) {
+      const pi = sub.payment_information || sub.payment_method;
+      if (pi && (pi.last4 || pi.card_type || pi.type || pi.brand)) {
+        card = {
+          type: pi.card_type || pi.type || pi.brand,
+          last4: pi.last4,
+          expiry_month: pi.expiry_month ?? pi.exp_month,
+          expiry_year: pi.expiry_year ?? pi.exp_year,
+        };
       }
     }
 
