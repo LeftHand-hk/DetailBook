@@ -35,13 +35,23 @@ export default function BillingPage() {
   const pendingPlanRef = useRef<"starter" | "pro">("starter");
   const checkoutIntentRef = useRef<"subscribe" | "update-card">("subscribe");
 
-  // Fetch user directly from API — not localStorage
+  // Fetch user directly from API — not localStorage. If the user is
+  // not yet active, kick a server-side Paddle API check in case they
+  // paid in a previous session and the webhook never landed.
   const fetchUser = async () => {
     try {
       const res = await fetch("/api/user");
       if (res.ok) {
         const data = await res.json();
         setUser(data.user);
+        if (data.user && data.user.subscriptionStatus !== "active") {
+          // Background sync — silent. Re-fetch user if it activated.
+          fetch("/api/subscription/sync", { method: "POST" })
+            .then((r) => (r.ok ? fetch("/api/user", { cache: "no-store" }) : null))
+            .then((r) => r && r.ok ? r.json() : null)
+            .then((d) => { if (d?.user?.subscriptionStatus === "active") setUser(d.user); })
+            .catch(() => { /* silent */ });
+        }
       }
     } catch {
       // ignore
@@ -133,11 +143,12 @@ export default function BillingPage() {
     if (user?.subscriptionStatus === "active") fetchCard();
   }, [user?.subscriptionStatus]);
 
-  // After Paddle Checkout closes successfully, the subscription is NOT
-  // active yet — Paddle still has to send us the verified webhook.
-  // Poll /api/user briefly; if the webhook hasn't fired in 15s, fall
-  // back to /api/subscription/sync which queries Paddle's API directly
-  // and activates from the authoritative source.
+  // After Paddle Checkout closes successfully, activation happens
+  // server-to-server: the server queries Paddle's API for THIS user's
+  // active subscription and activates only if Paddle confirms it.
+  // The user is never trusted — only Paddle is. Webhook is the
+  // primary path; this just makes activation immediate instead of
+  // waiting for webhook delivery.
   const waitForActivation = async () => {
     setWaitingForWebhook(true);
     setWaitTimedOut(false);
@@ -149,57 +160,45 @@ export default function BillingPage() {
       setWaitingForWebhook(false);
     };
 
-    // Phase 1: 15s polling for webhook
-    const phase1Deadline = Date.now() + 15_000;
-    while (Date.now() < phase1Deadline) {
+    // Try for up to 90s. Webhook may arrive any time; we also kick the
+    // server-side Paddle API check periodically. Both paths only set
+    // subscriptionStatus = "active" when Paddle itself confirms.
+    const deadline = Date.now() + 90_000;
+    let attempt = 0;
+    while (Date.now() < deadline) {
+      // Always read latest server state first (catches webhook arrivals).
       try {
         const res = await fetch("/api/user", { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
           if (data.user?.subscriptionStatus === "active") return succeed(data.user);
         }
-      } catch { /* keep polling */ }
+      } catch { /* ignore */ }
+
+      // Every 6s, ask the server to verify with Paddle's API.
+      // (First sync at attempt 1 — gives Paddle ~3s after checkout.)
+      if (attempt > 0 && attempt % 3 === 0) {
+        try {
+          const syncRes = await fetch("/api/subscription/sync", { method: "POST" });
+          if (syncRes.ok) {
+            const userRes = await fetch("/api/user", { cache: "no-store" });
+            if (userRes.ok) {
+              const data = await userRes.json();
+              if (data.user?.subscriptionStatus === "active") return succeed(data.user);
+            }
+          } else {
+            const body = await syncRes.json().catch(() => ({}));
+            console.warn("[Paddle sync]", syncRes.status, body);
+          }
+        } catch (e) {
+          console.warn("[Paddle sync] threw:", e);
+        }
+      }
+
+      attempt++;
       await new Promise((r) => setTimeout(r, 2000));
     }
 
-    // Phase 2: ask the server to verify with Paddle API directly
-    try {
-      const syncRes = await fetch("/api/subscription/sync", { method: "POST" });
-      if (syncRes.ok) {
-        const userRes = await fetch("/api/user", { cache: "no-store" });
-        if (userRes.ok) {
-          const data = await userRes.json();
-          if (data.user?.subscriptionStatus === "active") return succeed(data.user);
-        }
-      } else {
-        const err = await syncRes.json().catch(() => ({}));
-        console.warn("[Paddle sync] failed:", syncRes.status, err);
-      }
-    } catch (e) {
-      console.warn("[Paddle sync] threw:", e);
-    }
-
-    setWaitingForWebhook(false);
-    setWaitTimedOut(true);
-  };
-
-  // Manual trigger from the timed-out banner.
-  const retrySync = async () => {
-    setWaitingForWebhook(true);
-    setWaitTimedOut(false);
-    try {
-      await fetch("/api/subscription/sync", { method: "POST" });
-      const userRes = await fetch("/api/user", { cache: "no-store" });
-      if (userRes.ok) {
-        const data = await userRes.json();
-        if (data.user?.subscriptionStatus === "active") {
-          setUser(data.user);
-          setActivateSuccess(true);
-          setWaitingForWebhook(false);
-          return;
-        }
-      }
-    } catch { /* fall through */ }
     setWaitingForWebhook(false);
     setWaitTimedOut(true);
   };
@@ -335,21 +334,13 @@ export default function BillingPage() {
         </div>
       )}
 
-      {/* Banner: webhook didn't arrive in time */}
+      {/* Banner: still confirming after 90s — page will auto-activate
+          on next visit if Paddle eventually confirms. */}
       {waitTimedOut && !isSubscribed && (
         <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5">
-          <p className="font-semibold text-amber-900 mb-1">Payment confirmation is taking longer than expected.</p>
-          <p className="text-sm text-amber-800 mb-3">
-            If your payment went through in Paddle, click the button below — we&apos;ll verify directly with Paddle and activate your plan.
-          </p>
-          <button
-            onClick={retrySync}
-            className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-colors"
-          >
-            I paid — verify with Paddle
-          </button>
-          <p className="text-xs text-amber-700 mt-3">
-            Still stuck? Email <a href="mailto:info@detailbookapp.com" className="underline font-medium">info@detailbookapp.com</a> with the Paddle invoice and we&apos;ll activate manually.
+          <p className="font-semibold text-amber-900 mb-1">Still confirming with Paddle…</p>
+          <p className="text-sm text-amber-800">
+            Your payment is being verified. Your plan will activate automatically as soon as Paddle confirms it — usually within a minute. Refresh this page in a moment, or email <a href="mailto:info@detailbookapp.com" className="underline font-medium">info@detailbookapp.com</a> with your Paddle invoice if it still hasn&apos;t activated after a few minutes.
           </p>
         </div>
       )}
