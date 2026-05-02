@@ -74,28 +74,65 @@ export async function POST(req: NextRequest) {
 
     // Resolve discount code → discount ID via Paddle API.
     // Paddle's PATCH subscription accepts only the ID, not the code.
+    // We list with no status filter (Paddle's `code` filter is case-sensitive
+    // and `status=active` excludes "scheduled" codes that are valid right
+    // now), then match case-insensitively client-side.
     let discountId: string | null = null;
     if (discountCode) {
       try {
         const dRes = await fetch(
-          `${base}/discounts?code=${encodeURIComponent(discountCode)}&status=active`,
+          `${base}/discounts?per_page=200`,
           { headers: { Authorization: `Bearer ${apiKey}` }, cache: "no-store" }
         );
-        if (dRes.ok) {
-          const dJson = await dRes.json();
-          const found = (dJson.data || []).find(
-            (d: any) => d.code?.toUpperCase() === discountCode.toUpperCase()
-          );
-          if (found) discountId = found.id;
-        }
-        if (!discountId) {
+        if (!dRes.ok) {
+          const err = await dRes.json().catch(() => ({}));
+          console.error("[change-plan] Paddle GET /discounts failed:", dRes.status, err);
           return NextResponse.json(
-            { error: `Promo code "${discountCode}" is invalid or expired.` },
+            { error: "Could not verify promo code. Please try again." },
+            { status: 502 }
+          );
+        }
+        const dJson = await dRes.json();
+        const all: any[] = dJson.data || [];
+        const matchCode = discountCode.toUpperCase();
+        const candidates = all.filter(
+          (d) => (d.code || "").toUpperCase() === matchCode
+        );
+
+        console.log(
+          "[change-plan] discount lookup",
+          JSON.stringify({
+            queried: discountCode,
+            totalDiscounts: all.length,
+            matches: candidates.map((d) => ({ id: d.id, code: d.code, status: d.status })),
+          })
+        );
+
+        // Prefer an active discount; fall back to any non-archived/expired one
+        const usable = candidates.find((d) => d.status === "active")
+          || candidates.find((d) => !["archived", "expired"].includes(d.status));
+
+        if (!usable) {
+          if (candidates.length > 0) {
+            return NextResponse.json(
+              {
+                error: `Promo code "${discountCode}" exists but is not currently usable (status: ${candidates[0].status}).`,
+              },
+              { status: 400 }
+            );
+          }
+          return NextResponse.json(
+            { error: `Promo code "${discountCode}" was not found in this Paddle environment.` },
             { status: 400 }
           );
         }
+        discountId = usable.id;
       } catch (e) {
         console.error("[change-plan] discount lookup failed:", e);
+        return NextResponse.json(
+          { error: "Could not verify promo code. Please try again." },
+          { status: 502 }
+        );
       }
     }
 
