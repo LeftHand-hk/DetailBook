@@ -87,6 +87,23 @@ export async function POST(req: NextRequest) {
       "Content-Type": "application/json",
     };
 
+    // Check current sub status — Paddle restricts changes during trial.
+    // For trialing subs we must use proration_billing_mode: "do_not_bill"
+    // (no charge now; new plan price kicks in when trial ends).
+    let isTrialing = false;
+    try {
+      const subInfoRes = await fetch(`${base}/subscriptions/${subId}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        cache: "no-store",
+      });
+      if (subInfoRes.ok) {
+        const subInfo = await subInfoRes.json();
+        isTrialing = subInfo?.data?.status === "trialing";
+      }
+    } catch (e) {
+      console.warn("[change-plan] could not fetch sub status, assuming non-trial:", e);
+    }
+
     // Resolve discount code → discount ID via Paddle API.
     // Paddle's PATCH subscription accepts only the ID, not the code.
     // We list with no status filter (Paddle's `code` filter is case-sensitive
@@ -153,7 +170,7 @@ export async function POST(req: NextRequest) {
 
     const patchBody: any = {
       items: [{ price_id: targetPriceId, quantity: 1 }],
-      proration_billing_mode: "prorated_immediately",
+      proration_billing_mode: isTrialing ? "do_not_bill" : "prorated_immediately",
     };
     if (discountId) {
       patchBody.discount = { id: discountId, effective_from: "immediately" };
