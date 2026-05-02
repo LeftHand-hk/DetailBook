@@ -25,9 +25,8 @@ export default function BillingPage() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [cancelDone, setCancelDone] = useState(false);
-  const [checkoutOpened, setCheckoutOpened] = useState(false);
-  const [activating, setActivating] = useState(false);
-  const [activateError, setActivateError] = useState("");
+  const [waitingForWebhook, setWaitingForWebhook] = useState(false);
+  const [waitTimedOut, setWaitTimedOut] = useState(false);
   const [activateSuccess, setActivateSuccess] = useState(false);
   const [card, setCard] = useState<CardInfo | null>(null);
   const [nextBilledAt, setNextBilledAt] = useState<string | null>(null);
@@ -100,7 +99,7 @@ export default function BillingPage() {
             if (checkoutIntentRef.current === "update-card") {
               await fetchCard();
             } else {
-              await activatePlan(pendingPlanRef.current);
+              await waitForActivation();
             }
           }
         },
@@ -114,33 +113,33 @@ export default function BillingPage() {
     if (user?.subscriptionStatus === "active") fetchCard();
   }, [user?.subscriptionStatus]);
 
-  const activatePlan = async (plan: "starter" | "pro") => {
-    setActivating(true);
-    setActivateError("");
-    try {
-      const res = await fetch("/api/subscription/activate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        // Re-fetch user from API to get fresh data
-        const userRes = await fetch("/api/user");
-        if (userRes.ok) {
-          const userData = await userRes.json();
-          setUser(userData.user);
+  // After Paddle Checkout closes successfully, the subscription is NOT
+  // active yet — Paddle still has to send us the verified webhook.
+  // Poll /api/user until we see subscriptionStatus === "active".
+  const waitForActivation = async () => {
+    setWaitingForWebhook(true);
+    setWaitTimedOut(false);
+    setActivateSuccess(false);
+    const deadline = Date.now() + 60_000;
+    while (Date.now() < deadline) {
+      try {
+        const res = await fetch("/api/user", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user?.subscriptionStatus === "active") {
+            setUser(data.user);
+            setActivateSuccess(true);
+            setWaitingForWebhook(false);
+            return;
+          }
         }
-        setActivateSuccess(true);
-        setCheckoutOpened(false);
-      } else {
-        setActivateError(data.error || "Failed to activate plan. Please contact support.");
+      } catch {
+        // ignore — keep polling
       }
-    } catch {
-      setActivateError("Network error. Please try again.");
-    } finally {
-      setActivating(false);
+      await new Promise((r) => setTimeout(r, 2000));
     }
+    setWaitingForWebhook(false);
+    setWaitTimedOut(true);
   };
 
   const handleCancel = async () => {
@@ -170,8 +169,7 @@ export default function BillingPage() {
     }
     pendingPlanRef.current = plan;
     checkoutIntentRef.current = "subscribe";
-    setCheckoutOpened(true);
-    setActivateError("");
+    setWaitTimedOut(false);
     setActivateSuccess(false);
     paddle.Checkout.open({
       items: [{ priceId, quantity: 1 }],
@@ -252,21 +250,27 @@ export default function BillingPage() {
         <p className="text-gray-500 text-sm mt-1">Manage your subscription, payment method, and plan.</p>
       </div>
 
-      {/* Banner: payment completed → activate */}
-      {checkoutOpened && !isSubscribed && (
-        <div className="mb-6 bg-green-50 border border-green-200 rounded-2xl p-5">
-          <p className="font-semibold text-green-800 mb-1">Did you complete your payment?</p>
-          <p className="text-sm text-green-700 mb-4">
-            Click below to activate your <strong className="capitalize">{pendingPlanRef.current}</strong> plan immediately.
+      {/* Banner: waiting for Paddle webhook to confirm payment */}
+      {waitingForWebhook && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-2xl p-5 flex items-start gap-3">
+          <div className="w-5 h-5 mt-0.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+          <div>
+            <p className="font-semibold text-blue-900">Confirming your payment…</p>
+            <p className="text-sm text-blue-700 mt-1">
+              We&apos;re waiting for Paddle to confirm your subscription. This usually takes a few seconds.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Banner: webhook didn't arrive in time */}
+      {waitTimedOut && !isSubscribed && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5">
+          <p className="font-semibold text-amber-900 mb-1">Payment confirmation is taking longer than expected.</p>
+          <p className="text-sm text-amber-800">
+            If your payment went through, your plan will activate automatically as soon as Paddle confirms it.
+            Refresh in a minute, or email <a href="mailto:info@detailbookapp.com" className="underline font-medium">info@detailbookapp.com</a> if it still hasn&apos;t activated.
           </p>
-          <button
-            onClick={() => activatePlan(pendingPlanRef.current)}
-            disabled={activating}
-            className="bg-green-600 text-white font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-green-700 disabled:opacity-50 transition-colors"
-          >
-            {activating ? "Activating..." : "Yes, I paid — Activate My Plan"}
-          </button>
-          {activateError && <p className="mt-3 text-sm text-red-600 font-medium">{activateError}</p>}
         </div>
       )}
 

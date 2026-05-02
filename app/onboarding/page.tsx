@@ -52,15 +52,21 @@ export default function OnboardingPage() {
         token,
         async eventCallback(event) {
           if (event.name === "checkout.completed") {
-            // Activate the plan and save business info only after payment succeeds
-            try {
-              await fetch("/api/subscription/activate", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ plan: selectedPlanRef.current }),
-              });
-            } catch {
-              // ignore — webhook will catch it
+            // Wait for the verified Paddle webhook to flip
+            // subscriptionStatus to "active" before sending the user
+            // into the dashboard. Activation is never client-driven.
+            const deadline = Date.now() + 60_000;
+            while (Date.now() < deadline) {
+              try {
+                const r = await fetch("/api/user", { cache: "no-store" });
+                if (r.ok) {
+                  const d = await r.json();
+                  if (d.user?.subscriptionStatus === "active") break;
+                }
+              } catch {
+                // keep polling
+              }
+              await new Promise((res) => setTimeout(res, 2000));
             }
             router.push("/dashboard");
           }

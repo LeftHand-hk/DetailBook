@@ -1,32 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { getSessionUser } from "@/lib/auth";
+import { NextResponse } from "next/server";
 
-export async function POST(req: NextRequest) {
-  const session = await getSessionUser();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  try {
-    const body = await req.json();
-    const { plan } = body;
-
-    if (!plan || !["starter", "pro"].includes(plan)) {
-      return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
-    }
-
-    await prisma.user.update({
-      where: { id: session.id },
-      data: {
-        plan,
-        subscriptionStatus: "active",
-        suspended: false,
-        trialEndsAt: "",
-      },
-    });
-
-    return NextResponse.json({ success: true, plan });
-  } catch (err) {
-    console.error("Activate subscription error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
+// Subscription activation is now handled exclusively by the verified
+// Paddle webhook at /api/webhooks/paddle (subscription.created /
+// subscription.activated events). Client-trusted activation is unsafe
+// because it lets a logged-in user flip their own plan to "active"
+// without ever paying.
+export async function POST() {
+  return NextResponse.json(
+    { error: "Activation is handled automatically after payment." },
+    { status: 410 }
+  );
 }
