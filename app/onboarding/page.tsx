@@ -757,12 +757,16 @@ export default function OnboardingPage() {
                   {/* Pro */}
                   <button
                     type="button"
-                    disabled
-                    className="text-left rounded-2xl border-2 p-5 relative border-blue-300 bg-gradient-to-b from-blue-500 to-indigo-600 opacity-60 cursor-not-allowed"
+                    onClick={() => setSelectedPlan("pro")}
+                    className={`text-left rounded-2xl border-2 p-5 relative transition-all ${
+                      selectedPlan === "pro"
+                        ? "border-blue-500 bg-gradient-to-b from-blue-600 to-indigo-700 shadow-lg shadow-blue-200"
+                        : "border-blue-300 bg-gradient-to-b from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
+                    }`}
                   >
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                       <span className="bg-gradient-to-r from-amber-400 to-orange-500 text-slate-900 text-[10px] font-black px-3 py-1 rounded-full shadow-md">
-                        COMING SOON
+                        RECOMMENDED
                       </span>
                     </div>
                     <div className="flex items-center justify-between mb-3">
@@ -785,13 +789,12 @@ export default function OnboardingPage() {
                     <ul className="space-y-2">
                       {[
                         "Everything in Starter",
-                        "Unlimited service packages",
-                        "SMS + Email reminders",
+                        "SMS reminders",
                         "Multiple staff & calendars",
-                        "Priority support",
+                        "Google Calendar sync",
                         "Advanced analytics",
-                        "Custom branding",
-                        "Automated deposit refunds",
+                        "Review request automation",
+                        "Priority support",
                       ].map((f) => (
                         <li key={f} className="flex items-center gap-2 text-xs text-white">
                           <svg className="w-3.5 h-3.5 text-blue-200 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
