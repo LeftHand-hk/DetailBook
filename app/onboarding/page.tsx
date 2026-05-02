@@ -242,15 +242,25 @@ export default function OnboardingPage() {
     const priceId = selectedPlan === "pro"
       ? process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID
       : process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
-    if (!priceId || !paddle) {
-      alert("Payment system loading, please try again.");
+    if (!priceId) {
+      alert(`Payment is not configured (missing ${selectedPlan} price ID). Please contact support.`);
+      console.error("[Paddle] price ID missing for plan:", selectedPlan);
       return;
     }
-    paddle.Checkout.open({
-      items: [{ priceId, quantity: 1 }],
-      customer: { email: user.email },
-      customData: { userId: (user as any).id },
-    });
+    if (!paddle) {
+      alert("Payment system is still loading. Please wait a moment and try again.");
+      return;
+    }
+    try {
+      paddle.Checkout.open({
+        items: [{ priceId, quantity: 1 }],
+        customer: { email: user.email },
+        customData: { userId: (user as any).id },
+      });
+    } catch (err) {
+      console.error("[Paddle] Checkout.open threw:", err);
+      alert("Could not open checkout. Please refresh the page and try again.");
+    }
   };
 
   const bookingUrl = user

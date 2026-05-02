@@ -89,10 +89,25 @@ export default function BillingPage() {
     fetchUser();
 
     const token = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN;
-    if (!token) return;
+    const env = process.env.NEXT_PUBLIC_PADDLE_ENV;
+    const starterPrice = process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
+    const proPrice = process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID;
+    if (!token) {
+      console.error("[Paddle] NEXT_PUBLIC_PADDLE_CLIENT_TOKEN is missing — checkout will not load.");
+      return;
+    }
+    if (!starterPrice || !proPrice) {
+      console.error("[Paddle] Price IDs missing:", { starterPrice, proPrice });
+    }
+    if (token.startsWith("test_") && env !== "sandbox") {
+      console.warn("[Paddle] sandbox token but NEXT_PUBLIC_PADDLE_ENV is not 'sandbox' — checkout will fail.");
+    }
+    if (token.startsWith("live_") && env === "sandbox") {
+      console.warn("[Paddle] live token but NEXT_PUBLIC_PADDLE_ENV='sandbox' — checkout will fail.");
+    }
     import("@paddle/paddle-js").then(({ initializePaddle }) => {
       initializePaddle({
-        environment: (process.env.NEXT_PUBLIC_PADDLE_ENV as "sandbox" | "production") || "production",
+        environment: (env as "sandbox" | "production") || "production",
         token,
         async eventCallback(event) {
           if (event.name === "checkout.completed") {
@@ -101,10 +116,15 @@ export default function BillingPage() {
             } else {
               await waitForActivation();
             }
+          } else if (event.name === "checkout.error") {
+            console.error("[Paddle] checkout.error", event);
           }
         },
       }).then((instance) => {
         if (instance) setPaddle(instance);
+        else console.error("[Paddle] initializePaddle returned no instance — token / env likely invalid.");
+      }).catch((err) => {
+        console.error("[Paddle] initializePaddle threw:", err);
       });
     });
   }, []);
@@ -163,19 +183,29 @@ export default function BillingPage() {
     const priceId = plan === "pro"
       ? process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID
       : process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
-    if (!priceId || !paddle) {
-      alert("Payment system loading, please try again.");
+    if (!priceId) {
+      alert(`Payment is not configured (missing ${plan} price ID). Please contact support.`);
+      console.error("[Paddle] price ID missing for plan:", plan);
+      return;
+    }
+    if (!paddle) {
+      alert("Payment system is still loading. Please wait a moment and try again.");
       return;
     }
     pendingPlanRef.current = plan;
     checkoutIntentRef.current = "subscribe";
     setWaitTimedOut(false);
     setActivateSuccess(false);
-    paddle.Checkout.open({
-      items: [{ priceId, quantity: 1 }],
-      customer: { email: user.email },
-      customData: { userId: user.id },
-    });
+    try {
+      paddle.Checkout.open({
+        items: [{ priceId, quantity: 1 }],
+        customer: { email: user.email },
+        customData: { userId: user.id },
+      });
+    } catch (err) {
+      console.error("[Paddle] Checkout.open threw:", err);
+      alert("Could not open checkout. Please refresh the page and try again.");
+    }
   };
 
   const isPro = user?.plan === "pro";
