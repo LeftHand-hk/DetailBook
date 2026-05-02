@@ -539,7 +539,7 @@ export default function BillingPage() {
                 Your subscription is active but we haven&apos;t received card details from Paddle yet. This usually takes a minute after the first charge.
               </p>
               <button
-                onClick={fetchCard}
+                onClick={() => fetchCard({ retry: true })}
                 className="mt-3 text-sm font-semibold text-amber-800 hover:text-amber-900 underline underline-offset-2"
               >
                 Refresh
