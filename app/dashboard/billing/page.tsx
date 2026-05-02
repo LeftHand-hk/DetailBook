@@ -143,12 +143,20 @@ export default function BillingPage() {
             if (checkoutIntentRef.current === "update-card") {
               await fetchCard({ retry: true });
             } else {
-              await waitForActivation();
-              // Reload so sidebar / plan-gated UI reflects the new plan.
-              // State updates alone don't cascade to other layout chunks.
-              if (typeof window !== "undefined") {
-                window.location.reload();
-              }
+              // Run activation polling AND schedule a guaranteed reload.
+              // The reload makes sure sidebar / plan-gated UI picks up
+              // the new plan; activation polling makes sure the server
+              // has confirmed the sub before we reload.
+              waitForActivation().finally(() => {
+                if (typeof window !== "undefined") {
+                  setTimeout(() => window.location.reload(), 500);
+                }
+              });
+              // Hard fallback: even if waitForActivation hangs for some
+              // reason, reload after 12s so the user is never stuck.
+              setTimeout(() => {
+                if (typeof window !== "undefined") window.location.reload();
+              }, 12000);
             }
           } else if (event.name === "checkout.error") {
             console.error("[Paddle] checkout.error full event:", JSON.stringify(event, null, 2));
