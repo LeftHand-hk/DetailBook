@@ -132,6 +132,8 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  // Declared outside try so the catch block can include it in error logs.
+  let userId: string | null = null;
   try {
     const admin = await getAdminSession();
     if (!admin) {
@@ -139,7 +141,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
+    userId = searchParams.get("userId");
 
     if (!userId) {
       return NextResponse.json({ error: "userId is required" }, { status: 400 });
@@ -152,19 +154,37 @@ export async function DELETE(request: NextRequest) {
 
     // Delete children explicitly first to avoid race between
     // user→booking Cascade and staff→booking SetNull triggers.
-    await prisma.$transaction([
-      prisma.ticketMessage.deleteMany({ where: { ticket: { userId } } }),
-      prisma.supportTicket.deleteMany({ where: { userId } }),
-      prisma.booking.deleteMany({ where: { userId } }),
-      prisma.staff.deleteMany({ where: { userId } }),
-      prisma.package.deleteMany({ where: { userId } }),
-      prisma.user.delete({ where: { id: userId } }),
-    ]);
+    // Order matters: bookings BEFORE staff (so staff's SetNull on
+    // booking.staffId doesn't fight the user-cascade on booking).
+    // Notifications must be explicit too — relying on cascade alone
+    // sometimes fails for users with many notifications.
+    await prisma.$transaction(
+      [
+        prisma.notification.deleteMany({ where: { userId } }),
+        prisma.ticketMessage.deleteMany({ where: { ticket: { userId } } }),
+        prisma.supportTicket.deleteMany({ where: { userId } }),
+        prisma.booking.deleteMany({ where: { userId } }),
+        prisma.staff.deleteMany({ where: { userId } }),
+        prisma.package.deleteMany({ where: { userId } }),
+        prisma.user.delete({ where: { id: userId } }),
+      ],
+      {
+        // Default 5s is too tight for users with many bookings/notifications.
+        timeout: 30_000,
+        maxWait: 10_000,
+      }
+    );
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("DELETE /api/admin/users error:", error);
+    // Surface Prisma's actual error code so we can diagnose flaky deletes.
+    const code = (error as any)?.code;
+    const meta = (error as any)?.meta;
+    console.error("DELETE /api/admin/users error:", { userId, code, meta, error });
     const message = error instanceof Error ? error.message : "Failed to delete user";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: message, code, meta },
+      { status: 500 }
+    );
   }
 }
