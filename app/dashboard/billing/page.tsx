@@ -9,6 +9,7 @@ interface UserData {
   plan: string;
   subscriptionStatus?: string;
   trialEndsAt?: string;
+  suspended?: boolean;
 }
 
 interface CardInfo {
@@ -251,7 +252,10 @@ export default function BillingPage() {
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setCancelDone(true);
-        setTimeout(() => window.location.href = "/login", 3000);
+        // Reload billing page — layout will keep them confined here
+        // because user.suspended is now true. They can reactivate from
+        // the same page without logging out.
+        setTimeout(() => window.location.reload(), 2000);
       } else {
         alert(data.error || "Could not cancel subscription. Please contact support.");
       }
@@ -422,6 +426,24 @@ export default function BillingPage() {
           <p className="font-semibold text-blue-800">
             Plan activated! You are now on the <span className="capitalize">{user?.plan}</span> plan.
           </p>
+        </div>
+      )}
+
+      {/* Banner: subscription canceled — user is locked out of dashboard
+          until they pick a plan and pay below. Their data is preserved. */}
+      {user?.suspended && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-2xl p-5 flex items-start gap-4">
+          <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+            <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <p className="font-bold text-red-900">Your subscription is canceled.</p>
+            <p className="text-sm text-red-800 mt-1">
+              Your account is paused — bookings, calendar, and dashboard access are disabled. Your data is safe. Choose a plan below to reactivate immediately.
+            </p>
+          </div>
         </div>
       )}
 
@@ -706,7 +728,7 @@ export default function BillingPage() {
               </svg>
             </div>
             <h3 className="text-lg font-bold text-gray-900 mb-2">Subscription Canceled</h3>
-            <p className="text-sm text-gray-500">Your account has been disabled. Redirecting to login...</p>
+            <p className="text-sm text-gray-500">Your account is paused. You can reactivate any time from this page.</p>
           </div>
         </div>
       )}
@@ -722,7 +744,7 @@ export default function BillingPage() {
             </div>
             <h3 className="text-lg font-bold text-gray-900 text-center mb-2">Cancel Subscription?</h3>
             <p className="text-sm text-gray-500 text-center mb-6">
-              Your account will be <strong>disabled</strong> immediately. You will be logged out and will need to resubscribe to regain access.
+              Your account will be <strong>paused</strong> immediately and you&apos;ll lose access to bookings, calendar, and dashboard. Your data stays safe — you can reactivate any time.
             </p>
             <div className="flex gap-3">
               <button

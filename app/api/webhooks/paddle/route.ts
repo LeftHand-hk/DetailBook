@@ -138,9 +138,14 @@ export async function POST(req: NextRequest) {
         if (plan) updateData.plan = plan;
 
         let updatedUserId: string | null = null;
+        // Track whether this user is reactivating (was previously canceled).
+        // If so we end Paddle's trial below so they're billed immediately.
+        let wasSuspended = false;
 
         if (userId) {
           try {
+            const before = await prisma.user.findUnique({ where: { id: userId } });
+            wasSuspended = before?.suspended === true;
             await prisma.user.update({ where: { id: userId }, data: updateData });
             updatedUserId = userId;
           } catch (e) {
@@ -165,6 +170,7 @@ export async function POST(req: NextRequest) {
           }
 
           if (existingUser) {
+            wasSuspended = existingUser.suspended === true;
             await prisma.user.update({ where: { id: existingUser.id }, data: updateData });
             updatedUserId = existingUser.id;
           }
@@ -181,6 +187,30 @@ export async function POST(req: NextRequest) {
           );
         } else {
           console.log("[Paddle webhook] activated user", updatedUserId, "plan=", plan || "(unchanged)");
+        }
+
+        // Reactivation: if a previously-canceled user just resubscribed
+        // and Paddle put them in a trial, end the trial immediately so
+        // they're billed now (no second free trial). New users keep their
+        // trial as configured on the Paddle price.
+        if (wasSuspended && data.status === "trialing") {
+          try {
+            const apiKey = process.env.PADDLE_API_KEY?.replace(/^["']|["']$/g, "")?.trim();
+            if (apiKey) {
+              const res = await fetch(`${paddleApiBase()}/subscriptions/${data.id}/activate`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${apiKey}` },
+              });
+              if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                console.warn("[Paddle webhook] reactivation /activate failed:", res.status, err);
+              } else {
+                console.log("[Paddle webhook] ended Paddle trial for reactivated user", updatedUserId);
+              }
+            }
+          } catch (e) {
+            console.warn("[Paddle webhook] reactivation /activate threw:", e);
+          }
         }
         break;
       }

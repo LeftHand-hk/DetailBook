@@ -139,12 +139,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     syncFromServer()
       .then(() => {
         const freshUser = getUser();
-        if (freshUser) setUserState(freshUser);
+        if (freshUser) {
+          setUserState(freshUser);
+          // Suspended users are confined to /billing until they
+          // reactivate. Avoid redirect loops by allowing /dashboard/billing.
+          if ((freshUser as any).suspended === true && pathname !== "/dashboard/billing") {
+            router.replace("/dashboard/billing");
+          }
+        }
       })
       .catch(() => {
         // Server sync failed; local data remains as fallback
       });
-  }, [router]);
+  }, [router, pathname]);
 
   const handleLogout = () => {
     logout();
