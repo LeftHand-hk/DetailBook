@@ -35,6 +35,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
   }
 
+  const discountCode: string | undefined = body.discountCode?.trim() || undefined;
+
   const targetPriceId = PLAN_TO_PRICE[targetPlan];
   if (!targetPriceId) {
     return NextResponse.json(
@@ -70,16 +72,45 @@ export async function POST(req: NextRequest) {
       "Content-Type": "application/json",
     };
 
-    // PATCH the subscription with the new price.
-    // proration_billing_mode: "prorated_immediately" charges/credits the
-    // difference now and switches the plan instantly — best UX for upgrades.
+    // Resolve discount code → discount ID via Paddle API.
+    // Paddle's PATCH subscription accepts only the ID, not the code.
+    let discountId: string | null = null;
+    if (discountCode) {
+      try {
+        const dRes = await fetch(
+          `${base}/discounts?code=${encodeURIComponent(discountCode)}&status=active`,
+          { headers: { Authorization: `Bearer ${apiKey}` }, cache: "no-store" }
+        );
+        if (dRes.ok) {
+          const dJson = await dRes.json();
+          const found = (dJson.data || []).find(
+            (d: any) => d.code?.toUpperCase() === discountCode.toUpperCase()
+          );
+          if (found) discountId = found.id;
+        }
+        if (!discountId) {
+          return NextResponse.json(
+            { error: `Promo code "${discountCode}" is invalid or expired.` },
+            { status: 400 }
+          );
+        }
+      } catch (e) {
+        console.error("[change-plan] discount lookup failed:", e);
+      }
+    }
+
+    const patchBody: any = {
+      items: [{ price_id: targetPriceId, quantity: 1 }],
+      proration_billing_mode: "prorated_immediately",
+    };
+    if (discountId) {
+      patchBody.discount = { id: discountId, effective_from: "immediately" };
+    }
+
     const updateRes = await fetch(`${base}/subscriptions/${subId}`, {
       method: "PATCH",
       headers,
-      body: JSON.stringify({
-        items: [{ price_id: targetPriceId, quantity: 1 }],
-        proration_billing_mode: "prorated_immediately",
-      }),
+      body: JSON.stringify(patchBody),
     });
 
     if (!updateRes.ok) {

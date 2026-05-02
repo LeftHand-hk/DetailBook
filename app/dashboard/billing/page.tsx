@@ -34,6 +34,7 @@ export default function BillingPage() {
   const [updateCardError, setUpdateCardError] = useState("");
   const [changingPlan, setChangingPlan] = useState<"starter" | "pro" | null>(null);
   const [changePlanError, setChangePlanError] = useState("");
+  const [promoCode, setPromoCode] = useState("");
   const pendingPlanRef = useRef<"starter" | "pro">("starter");
   const checkoutIntentRef = useRef<"subscribe" | "update-card">("subscribe");
 
@@ -250,7 +251,7 @@ export default function BillingPage() {
         const res = await fetch("/api/subscription/change-plan", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ plan }),
+          body: JSON.stringify({ plan, discountCode: promoCode || undefined }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -292,6 +293,7 @@ export default function BillingPage() {
         items: [{ priceId, quantity: 1 }],
         customer: { email: user.email },
         customData: { userId: user.id },
+        ...(promoCode ? { discountCode: promoCode } : {}),
       });
     } catch (err) {
       console.error("[Paddle] Checkout.open threw:", err);
@@ -552,9 +554,20 @@ export default function BillingPage() {
 
       {/* === Plans === */}
       <div className="mb-8">
-        <div className="mb-4">
-          <h2 className="text-lg font-bold text-gray-900">Available plans</h2>
-          <p className="text-sm text-gray-500">Choose the plan that fits your business.</p>
+        <div className="mb-4 flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Available plans</h2>
+            <p className="text-sm text-gray-500">Choose the plan that fits your business.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={promoCode}
+              onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+              placeholder="Promo code"
+              className="px-3 py-2 text-sm border border-gray-200 rounded-lg uppercase tracking-wide w-36 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
         </div>
         {changePlanError && (
           <div className="mb-3 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
