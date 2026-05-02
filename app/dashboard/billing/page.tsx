@@ -32,6 +32,8 @@ export default function BillingPage() {
   const [nextBilledAt, setNextBilledAt] = useState<string | null>(null);
   const [updatingCard, setUpdatingCard] = useState(false);
   const [updateCardError, setUpdateCardError] = useState("");
+  const [changingPlan, setChangingPlan] = useState<"starter" | "pro" | null>(null);
+  const [changePlanError, setChangePlanError] = useState("");
   const pendingPlanRef = useRef<"starter" | "pro">("starter");
   const checkoutIntentRef = useRef<"subscribe" | "update-card">("subscribe");
 
@@ -236,8 +238,39 @@ export default function BillingPage() {
     }
   };
 
-  const openCheckout = (plan: "starter" | "pro") => {
+  const handlePlanAction = async (plan: "starter" | "pro") => {
     if (!user) return;
+
+    // Existing subscriber → switch plan via Paddle Subscription API
+    // (no new checkout, charges the saved card with proration)
+    if (user.subscriptionStatus === "active") {
+      setChangingPlan(plan);
+      setChangePlanError("");
+      try {
+        const res = await fetch("/api/subscription/change-plan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setChangePlanError(data.error || "Could not change plan.");
+          return;
+        }
+        // Reflect new plan immediately, then refresh server state
+        setUser((u) => (u ? { ...u, plan } : u));
+        setActivateSuccess(true);
+        await fetchUser();
+        await fetchCard({ retry: true });
+      } catch {
+        setChangePlanError("Network error. Try again.");
+      } finally {
+        setChangingPlan(null);
+      }
+      return;
+    }
+
+    // New subscriber → open Paddle Checkout
     const priceId = plan === "pro"
       ? process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID
       : process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
@@ -523,6 +556,11 @@ export default function BillingPage() {
           <h2 className="text-lg font-bold text-gray-900">Available plans</h2>
           <p className="text-sm text-gray-500">Choose the plan that fits your business.</p>
         </div>
+        {changePlanError && (
+          <div className="mb-3 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
+            {changePlanError}
+          </div>
+        )}
         <div className="grid sm:grid-cols-2 gap-4">
           {plans.map((plan) => {
             const isCurrent = user?.plan === plan.id;
@@ -571,20 +609,23 @@ export default function BillingPage() {
                   <div className="w-full text-center font-bold py-3 rounded-xl text-sm bg-gray-100 text-gray-500">
                     Current plan
                   </div>
-                ) : user?.plan === "pro" && plan.id === "starter" ? (
-                  <div className="w-full text-center text-gray-400 text-sm py-3 border border-gray-100 rounded-xl">
-                    Downgrade not available
-                  </div>
                 ) : (
                   <button
-                    onClick={() => openCheckout(plan.id)}
-                    className={`w-full font-bold py-3 rounded-xl text-sm transition-colors ${
+                    onClick={() => handlePlanAction(plan.id)}
+                    disabled={changingPlan !== null}
+                    className={`w-full font-bold py-3 rounded-xl text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                       isPopular
                         ? "bg-blue-600 text-white hover:bg-blue-700"
                         : "bg-gray-900 text-white hover:bg-gray-800"
                     }`}
                   >
-                    {`Subscribe to ${plan.name}`}
+                    {changingPlan === plan.id
+                      ? "Switching…"
+                      : isSubscribed
+                        ? user?.plan === "pro" && plan.id === "starter"
+                          ? `Downgrade to ${plan.name}`
+                          : `Upgrade to ${plan.name}`
+                        : `Subscribe to ${plan.name}`}
                   </button>
                 )}
               </div>

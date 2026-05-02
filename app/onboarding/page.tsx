@@ -241,9 +241,32 @@ export default function OnboardingPage() {
   };
 
   // ── Pay Now path — open Paddle first, activate only after payment ──────────
-  const handlePayNow = () => {
+  const handlePayNow = async () => {
     if (!selectedPlan || !user) return;
     selectedPlanRef.current = selectedPlan;
+
+    // If user already has an active Paddle subscription (rare here, but
+    // possible if they re-entered onboarding) — switch plans via API
+    // instead of opening a second checkout (Paddle would reject it).
+    if ((user as any).subscriptionStatus === "active") {
+      try {
+        const res = await fetch("/api/subscription/change-plan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan: selectedPlan }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || "Could not change plan. Please contact support.");
+          return;
+        }
+        router.push("/dashboard");
+      } catch {
+        alert("Network error. Please try again.");
+      }
+      return;
+    }
+
     const priceId = selectedPlan === "pro"
       ? process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID
       : process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
