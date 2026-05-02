@@ -350,7 +350,7 @@ export default function DashboardPage() {
                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                 <h3 className="text-white font-extrabold text-lg">Unlock Pro Features</h3>
               </div>
-              <p className="text-blue-100 text-sm mb-3">Get powerful tools to grow your business faster — analytics, SMS reminders, automated review tracking, and more.</p>
+              <p className="text-blue-100 text-sm mb-3">Get powerful tools to grow your business faster — analytics, SMS reminders, multi-staff calendars, and more.</p>
               <p className="text-blue-200 text-xs">Currently on Starter ($29/mo)</p>
             </div>
             <Link

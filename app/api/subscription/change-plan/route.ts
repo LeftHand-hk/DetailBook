@@ -77,10 +77,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (user.plan === targetPlan) {
-      return NextResponse.json({ error: "You are already on this plan." }, { status: 400 });
-    }
-
     const base = paddleApiBase();
     const headers = {
       Authorization: `Bearer ${apiKey}`,
@@ -168,32 +164,71 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const patchBody: any = {
-      items: [{ price_id: targetPriceId, quantity: 1 }],
-      proration_billing_mode: isTrialing ? "do_not_bill" : "prorated_immediately",
-    };
-    if (discountId) {
-      patchBody.discount = { id: discountId, effective_from: "immediately" };
+    const isPlanChange = user.plan !== targetPlan;
+
+    // Skip PATCH entirely if user is already on the target plan AND
+    // there's no discount to apply (e.g. trialing user clicking
+    // "Subscribe" on their current plan — we just need to activate).
+    if (isPlanChange || discountId) {
+      const patchBody: any = {};
+      if (isPlanChange) {
+        patchBody.items = [{ price_id: targetPriceId, quantity: 1 }];
+        patchBody.proration_billing_mode = isTrialing ? "do_not_bill" : "prorated_immediately";
+      }
+      if (discountId) {
+        // Paddle restriction: discounts on trialing subs MUST use
+        // next_billing_period — they kick in when trial ends. We
+        // activate right after, which IS that next billing.
+        patchBody.discount = {
+          id: discountId,
+          effective_from: isTrialing ? "next_billing_period" : "immediately",
+        };
+      }
+
+      const updateRes = await fetch(`${base}/subscriptions/${subId}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify(patchBody),
+      });
+
+      if (!updateRes.ok) {
+        const err = await updateRes.json().catch(() => ({}));
+        console.error("[change-plan] Paddle PATCH failed:", updateRes.status, err);
+        const detail = err?.error?.detail || err?.error?.code || err?.error?.type;
+        return NextResponse.json(
+          {
+            error: detail
+              ? `Paddle rejected the change: ${detail}`
+              : "Could not change plan. Please contact support.",
+          },
+          { status: 502 }
+        );
+      }
     }
 
-    const updateRes = await fetch(`${base}/subscriptions/${subId}`, {
-      method: "PATCH",
-      headers,
-      body: JSON.stringify(patchBody),
-    });
-
-    if (!updateRes.ok) {
-      const err = await updateRes.json().catch(() => ({}));
-      console.error("[change-plan] Paddle PATCH failed:", updateRes.status, err);
-      const detail = err?.error?.detail || err?.error?.code || err?.error?.type;
-      return NextResponse.json(
-        {
-          error: detail
-            ? `Paddle rejected the change: ${detail}`
-            : "Could not change plan. Please contact support.",
-        },
-        { status: 502 }
-      );
+    // If the user was trialing, end their trial NOW so they're billed
+    // immediately on the (possibly new) plan. This also makes the
+    // scheduled discount/plan change kick in right away — Paddle
+    // treats /activate as starting the next billing cycle.
+    if (isTrialing) {
+      const activateRes = await fetch(`${base}/subscriptions/${subId}/activate`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!activateRes.ok) {
+        const err = await activateRes.json().catch(() => ({}));
+        console.error("[change-plan] activate failed:", activateRes.status, err);
+        const detail = err?.error?.detail || err?.error?.code;
+        return NextResponse.json(
+          {
+            error: detail
+              ? `Paddle could not end trial: ${detail}`
+              : "Could not start billing. Please contact support.",
+          },
+          { status: 502 }
+        );
+      }
+      console.log("[change-plan] ended trial for user", user.id, "sub", subId);
     }
 
     // Verify with Paddle: the PATCH may have either applied the change
@@ -235,11 +270,17 @@ export async function POST(req: NextRequest) {
     }
 
     // Mirror locally so the UI flips immediately. Webhook will reconcile
-    // any drift later. We only mirror if Paddle PATCH succeeded — but
-    // we don't block on the verification GET (it's defensive logging).
+    // any drift later. If we ended a trial above, also clear the trial
+    // marker and flip status to active so the dashboard stops showing
+    // the trial banner.
+    const localUpdate: Record<string, any> = { plan: targetPlan };
+    if (isTrialing) {
+      localUpdate.trialEndsAt = "";
+      localUpdate.subscriptionStatus = "active";
+    }
     await prisma.user.update({
       where: { id: user.id },
-      data: { plan: targetPlan },
+      data: localUpdate,
     });
 
     return NextResponse.json({

@@ -370,7 +370,6 @@ export default function BillingPage() {
         "Multiple staff & calendars",
         "Google Calendar sync",
         "Advanced analytics",
-        "Review request automation",
         "Priority support",
       ],
     },
@@ -467,11 +466,14 @@ export default function BillingPage() {
               <span className="text-2xl font-extrabold text-gray-900 capitalize">{user?.plan || "Starter"}</span>
               <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
                 isSubscribed ? "bg-green-50 text-green-700 border border-green-200" :
+                trialDaysLeft !== null && trialDaysLeft <= 3 ? "bg-red-50 text-red-700 border border-red-200" :
                 trialDaysLeft !== null ? "bg-amber-50 text-amber-700 border border-amber-200" :
                 "bg-gray-100 text-gray-600 border border-gray-200"
               }`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${
-                  isSubscribed ? "bg-green-500" : trialDaysLeft !== null ? "bg-amber-500" : "bg-gray-400"
+                  isSubscribed ? "bg-green-500" :
+                  trialDaysLeft !== null && trialDaysLeft <= 3 ? "bg-red-500" :
+                  trialDaysLeft !== null ? "bg-amber-500" : "bg-gray-400"
                 }`} />
                 {isSubscribed ? "Active" : trialDaysLeft !== null ? `Trial · ${trialDaysLeft}d left` : "Inactive"}
               </span>
@@ -486,8 +488,10 @@ export default function BillingPage() {
               </p>
             )}
             {!isSubscribed && trialDaysLeft !== null && (
-              <p className="text-sm text-amber-700 mt-3">
-                Subscribe before your trial ends to avoid losing access.
+              <p className={`text-sm mt-3 ${trialDaysLeft <= 3 ? "text-red-700 font-semibold" : "text-amber-700"}`}>
+                {trialDaysLeft <= 3
+                  ? "Your trial ends very soon — subscribe now to keep your booking page live."
+                  : "Subscribe before your trial ends to avoid losing access."}
               </p>
             )}
           </div>

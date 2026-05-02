@@ -189,11 +189,14 @@ export async function POST(req: NextRequest) {
           console.log("[Paddle webhook] activated user", updatedUserId, "plan=", plan || "(unchanged)");
         }
 
-        // Reactivation: if a previously-canceled user just resubscribed
-        // and Paddle put them in a trial, end the trial immediately so
-        // they're billed now (no second free trial). New users keep their
-        // trial as configured on the Paddle price.
-        if (wasSuspended && data.status === "trialing") {
+        // Always end Paddle's trial immediately when a subscription is
+        // created via our checkout. Reasoning: users already get a
+        // 15-day in-app trial (managed by us, no card required). Once
+        // they reach checkout and enter a card, they intend to pay —
+        // Paddle's price-config trial would just be a second free
+        // window, which is not what we want. /activate triggers the
+        // first billing right now.
+        if (data.status === "trialing") {
           try {
             const apiKey = process.env.PADDLE_API_KEY?.replace(/^["']|["']$/g, "")?.trim();
             if (apiKey) {
@@ -203,13 +206,16 @@ export async function POST(req: NextRequest) {
               });
               if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
-                console.warn("[Paddle webhook] reactivation /activate failed:", res.status, err);
+                console.warn("[Paddle webhook] /activate failed:", res.status, err);
               } else {
-                console.log("[Paddle webhook] ended Paddle trial for reactivated user", updatedUserId);
+                console.log(
+                  "[Paddle webhook] ended Paddle trial",
+                  JSON.stringify({ userId: updatedUserId, wasSuspended })
+                );
               }
             }
           } catch (e) {
-            console.warn("[Paddle webhook] reactivation /activate threw:", e);
+            console.warn("[Paddle webhook] /activate threw:", e);
           }
         }
         break;

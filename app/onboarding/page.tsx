@@ -832,7 +832,6 @@ export default function OnboardingPage() {
                         "Multiple staff & calendars",
                         "Google Calendar sync",
                         "Advanced analytics",
-                        "Review request automation",
                         "Priority support",
                       ].map((f) => (
                         <li key={f} className="flex items-center gap-2 text-xs text-white">
