@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { getUser, setUser, getPackages, setPackages, isLoggedIn, generateId, syncFromServer } from "@/lib/storage";
 import { trackEvent } from "@/lib/meta-pixel";
 import type { User, Package } from "@/types";
@@ -36,17 +36,21 @@ const US_STATES = [
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [step, setStep]           = useState(0);
 
   // Fire CompleteRegistration exactly once when the user lands here straight
   // from /signup. We rely on the ?signup=true query param (set by the signup
   // form's redirect) and strip it immediately so a refresh / re-mount can't
-  // double-count. Meta dedupes on event_id too, but stripping is defence in
-  // depth in case the SPA re-renders.
+  // double-count.
+  //
+  // Reading from window.location.search instead of useSearchParams() — the
+  // hook forces the entire page into a Suspense boundary at build time
+  // (Next.js 14 prerender requirement), and we only need a one-shot read
+  // on mount, not a reactive subscription.
   useEffect(() => {
-    if (searchParams?.get("signup") !== "true") return;
     if (typeof window === "undefined" || typeof window.fbq !== "function") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("signup") !== "true") return;
 
     window.fbq("track", "CompleteRegistration", {
       content_name: "DetailBook Trial Signup",
@@ -58,7 +62,7 @@ export default function OnboardingPage() {
     const url = new URL(window.location.href);
     url.searchParams.delete("signup");
     window.history.replaceState({}, "", url.pathname + url.search + url.hash);
-  }, [searchParams]);
+  }, []);
   const [user, setUserState]      = useState<User | null>(null);
   const [copied, setCopied]       = useState(false);
   const [saving, setSaving]       = useState(false);
