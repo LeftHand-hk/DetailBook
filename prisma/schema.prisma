@@ -92,6 +92,12 @@ model User {
   // active vs inactive accounts.
   lastLoginAt DateTime?
 
+  // Captured at signup from request headers (Netlify edge adds
+  // x-country / x-nf-client-connection-ip). Used by admin to know
+  // which country an account signed up from. Never shown to the user.
+  signupIp      String?
+  signupCountry String?  // ISO-3166 alpha-2 (e.g. "US", "DE", "AL")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

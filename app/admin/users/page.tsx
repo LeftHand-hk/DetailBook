@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { countryFlag } from "@/lib/geo";
 
 interface AdminUser {
   id: string;
@@ -17,6 +18,8 @@ interface AdminUser {
   createdAt: string;
   updatedAt: string;
   lastLoginAt: string | null;
+  signupIp: string | null;
+  signupCountry: string | null;
   packageCount: number;
   bookingCount: number;
 }
@@ -380,6 +383,7 @@ export default function AdminUsersPage() {
                     <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-500">Usage</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-500">Last login</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-500">Country</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-500">Created</th>
                     <th className="text-right px-4 py-3 font-medium text-gray-500">Actions</th>
                   </tr>
@@ -465,6 +469,23 @@ export default function AdminUsersPage() {
                               </div>
                             );
                           })()}
+                        </td>
+                        <td className="px-4 py-3">
+                          {user.signupCountry ? (
+                            <div
+                              className="flex items-center gap-1.5"
+                              title={user.signupIp ? `IP: ${user.signupIp}` : undefined}
+                            >
+                              <span className="text-base leading-none" aria-hidden="true">
+                                {countryFlag(user.signupCountry)}
+                              </span>
+                              <span className="text-xs font-medium text-gray-700">
+                                {user.signupCountry}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-300">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-gray-500 text-xs">
                           {new Date(user.createdAt).toLocaleDateString()}

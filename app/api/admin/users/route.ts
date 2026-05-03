@@ -37,6 +37,8 @@ export async function GET() {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       lastLoginAt: user.lastLoginAt,
+      signupIp: user.signupIp,
+      signupCountry: user.signupCountry,
       packageCount: user._count.packages,
       bookingCount: user._count.bookings,
     }));

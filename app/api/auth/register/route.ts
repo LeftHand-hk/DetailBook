@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { hashPassword, signToken } from "@/lib/auth";
 import { isValidEmail, validatePassword } from "@/lib/validation";
+import { getClientIp, getClientCountry } from "@/lib/geo";
 
 function generateSlug(businessName: string): string {
   return businessName
@@ -100,6 +101,12 @@ export async function POST(request: NextRequest) {
       }
     })();
 
+    // Capture the visitor's IP and country from edge headers — used by
+    // admin to know which country an account signed up from. Both will be
+    // null in local dev where no proxy populates these headers.
+    const signupIp = getClientIp(request);
+    const signupCountry = getClientCountry(request);
+
     const user = await prisma.user.create({
       data: {
         email: normalizedEmail,
@@ -113,6 +120,8 @@ export async function POST(request: NextRequest) {
         trialEndsAt: trialEndsAt.toISOString(),
         promoCodeUsed: promoData?.code || null,
         promoDiscount: promoData?.discountValue || null,
+        signupIp,
+        signupCountry,
         ...(safeTimezone ? { timezone: safeTimezone } : {}),
       },
     });
