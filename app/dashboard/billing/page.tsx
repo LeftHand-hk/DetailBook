@@ -147,7 +147,15 @@ export default function BillingPage() {
               await fetchCard({ retry: true });
             } else {
               const planValue = pendingPlanRef.current === "pro" ? 50 : 29;
-              trackEvent("Subscribe", { value: planValue, currency: "USD" });
+              // predicted_ltv: rough ~10-month retention estimate, used by
+              // Meta value-optimised campaigns as a bid signal. Tune as we
+              // see real cohort data.
+              const predictedLtv = planValue * 10;
+              trackEvent("Subscribe", {
+                value: planValue,
+                currency: "USD",
+                predicted_ltv: predictedLtv,
+              });
               // Run activation polling AND schedule a guaranteed reload.
               // The reload makes sure sidebar / plan-gated UI picks up
               // the new plan; activation polling makes sure the server

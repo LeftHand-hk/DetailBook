@@ -29,6 +29,20 @@ export default function LandingPage() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Fire ViewContent("Pricing Page") when the visitor lands directly on the
+  // #pricing anchor (e.g. from a nav click or shared link). Once per page
+  // load — guarded by a sessionStorage flag so SPA navigation doesn't repeat.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.hash !== "#pricing") return;
+    if (sessionStorage.getItem("db_pixel_pricing_view") === "1") return;
+    trackEvent("ViewContent", {
+      content_name: "Pricing Page",
+      content_category: "lead",
+    });
+    sessionStorage.setItem("db_pixel_pricing_view", "1");
+  }, []);
+
   const features = [
     { icon: "📅", title: "Online Booking Page", desc: "Your own branded booking link. Customers book appointments 24/7 — no phone calls needed." },
     { icon: "💳", title: "Deposit Collection", desc: "Require a deposit at booking to eliminate no-shows and protect your time and revenue." },

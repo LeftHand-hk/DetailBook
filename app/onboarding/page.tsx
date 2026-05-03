@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getUser, setUser, getPackages, setPackages, isLoggedIn, generateId, syncFromServer } from "@/lib/storage";
 import { trackEvent } from "@/lib/meta-pixel";
 import type { User, Package } from "@/types";
@@ -36,7 +36,29 @@ const US_STATES = [
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep]           = useState(0);
+
+  // Fire CompleteRegistration exactly once when the user lands here straight
+  // from /signup. We rely on the ?signup=true query param (set by the signup
+  // form's redirect) and strip it immediately so a refresh / re-mount can't
+  // double-count. Meta dedupes on event_id too, but stripping is defence in
+  // depth in case the SPA re-renders.
+  useEffect(() => {
+    if (searchParams?.get("signup") !== "true") return;
+    if (typeof window === "undefined" || typeof window.fbq !== "function") return;
+
+    window.fbq("track", "CompleteRegistration", {
+      content_name: "DetailBook Trial Signup",
+      status: true,
+      value: 0,
+      currency: "USD",
+    });
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("signup");
+    window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+  }, [searchParams]);
   const [user, setUserState]      = useState<User | null>(null);
   const [copied, setCopied]       = useState(false);
   const [saving, setSaving]       = useState(false);
@@ -54,7 +76,15 @@ export default function OnboardingPage() {
         async eventCallback(event) {
           if (event.name === "checkout.completed") {
             const planValue = selectedPlanRef.current === "pro" ? 50 : 29;
-            trackEvent("Subscribe", { value: planValue, currency: "USD" });
+            // predicted_ltv estimates ~10 months of retention. Tune as we
+            // accumulate real cohort retention data; Meta uses this as a
+            // bid signal for value-optimised campaigns.
+            const predictedLtv = planValue * 10;
+            trackEvent("Subscribe", {
+              value: planValue,
+              currency: "USD",
+              predicted_ltv: predictedLtv,
+            });
             // Activation is server-side only. Poll for webhook briefly,
             // then ask the server to verify directly with Paddle's API.
             const phase1 = Date.now() + 15_000;

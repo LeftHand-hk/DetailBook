@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { login, syncFromServer } from "@/lib/storage";
 import { trackEvent } from "@/lib/meta-pixel";
@@ -9,6 +9,16 @@ import Logo from "@/components/Logo";
 
 export default function SignupPage() {
   const router = useRouter();
+
+  // Fire ViewContent the first time the signup page mounts so Meta can
+  // attribute upper-funnel intent. The pixel auto-fires PageView; this is
+  // the more specific funnel-stage signal Meta optimises against.
+  useEffect(() => {
+    trackEvent("ViewContent", {
+      content_name: "Signup Page",
+      content_category: "lead",
+    });
+  }, []);
   const [form, setForm] = useState({
     businessName: "",
     name: "",
@@ -99,9 +109,11 @@ export default function SignupPage() {
       }
       login();
       await syncFromServer();
-      trackEvent("CompleteRegistration");
       setLoading(false);
-      router.push("/onboarding");
+      // CompleteRegistration fires on /onboarding via the ?signup=true flag
+      // so the pixel runs after navigation completes (avoids the event being
+      // dropped if the user closes the tab mid-redirect).
+      router.push("/onboarding?signup=true");
     } catch {
       setError("Something went wrong. Please try again.");
       setLoading(false);
