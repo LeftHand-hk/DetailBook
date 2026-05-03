@@ -21,22 +21,31 @@ interface AdminUser {
   bookingCount: number;
 }
 
-const KOSOVO_TZ = "Europe/Pristina";
+// Kosovo isn't its own zone in IANA tzdata — it shares Europe/Belgrade
+// (CET/CEST, UTC+1/+2 with the same DST rules). Older browser engines
+// don't recognise the newer "Europe/Pristina" alias, so we use the
+// canonical zone for compatibility.
+const KOSOVO_TZ = "Europe/Belgrade";
 
 // Format an ISO timestamp in Kosovo time (e.g. "12 May 2026, 14:23").
 function formatKosovo(iso: string | null): string {
   if (!iso) return "Never";
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "Never";
-  return d.toLocaleString("en-GB", {
-    timeZone: KOSOVO_TZ,
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+  try {
+    return d.toLocaleString("en-GB", {
+      timeZone: KOSOVO_TZ,
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  } catch {
+    // Last-resort fallback if the runtime somehow lacks the zone.
+    return d.toLocaleString("en-GB");
+  }
 }
 
 // Activity bucket relative to "now" — drives the colour pip and short label.
