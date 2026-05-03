@@ -2,9 +2,36 @@ import type { Metadata } from "next";
 import "./globals.css";
 import MetaPixel from "@/components/MetaPixel";
 
+const SITE_URL = "https://detailbook.app";
+
 export const metadata: Metadata = {
-  title: "DetailBook - Scheduling & Booking for Mobile Auto Detailers",
-  description: "The #1 booking tool for mobile auto detailers. Stop no-shows, collect deposits, automate reminders.",
+  metadataBase: new URL(SITE_URL),
+  title: "DetailBook — Booking & Scheduling Built for Auto Detailers",
+  description:
+    "Booking tool built for auto detailers. Stop no-shows with required deposits, send SMS reminders, and run shop or mobile jobs from one calendar.",
+  openGraph: {
+    type: "website",
+    url: SITE_URL,
+    siteName: "DetailBook",
+    title: "DetailBook — Booking & Scheduling Built for Auto Detailers",
+    description:
+      "Stop no-shows. Collect deposits, automate SMS reminders, and manage shop + mobile jobs from one calendar.",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "DetailBook — Booking software for auto detailers",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "DetailBook — Booking & Scheduling Built for Auto Detailers",
+    description:
+      "Stop no-shows. Collect deposits, automate SMS reminders, and manage shop + mobile jobs from one calendar.",
+    images: ["/og-image.png"],
+  },
   verification: {
     other: {
       "facebook-domain-verification": "z24dohio7eelb6vlmqxobr9ubliiny",

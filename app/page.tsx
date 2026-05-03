@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import Logo, { LogoIcon } from "@/components/Logo";
+import Logo from "@/components/Logo";
 import { usePlatformName } from "@/components/PlatformName";
 import { trackEvent } from "@/lib/meta-pixel";
 
@@ -40,22 +40,11 @@ export default function LandingPage() {
 
   const faqs = [
     { q: "Do I need a credit card to start?", a: "No! You can start your 15-day free trial without entering any payment info. We'll remind you before the trial ends." },
-    { q: "Can my customers pay the deposit online?", a: "Yes! On both Starter and Pro, you can enable deposits and customers pay them automatically through your booking page via Stripe when they book." },
+    { q: "Can my customers pay the deposit online?", a: "Yes. On both Starter and Pro, customers can pay the deposit straight from your booking page. We support card payments via Stripe, plus PayPal, Cash App, Square, bank transfer, and pay-cash-on-arrival — turn on whichever methods fit your business." },
     { q: "What happens if I exceed 5 packages on Starter?", a: "You'll be prompted to upgrade to Pro. All your existing packages stay active — you just can't add more until you upgrade." },
     { q: "Can I cancel anytime?", a: "Absolutely. No long-term contracts. Cancel any time from your Settings page. You keep access until the end of your billing period." },
     { q: "Does DetailBook work on mobile?", a: "Yes! Both your dashboard and your customer-facing booking page are fully optimized for mobile devices." },
     { q: "Can I use my own domain for the booking page?", a: "On the Pro plan, you can connect a custom domain (e.g., book.yourbusiness.com). Starter gets a detailbook.app/book/your-name URL." },
-  ];
-
-  const comparisonData = [
-    { feature: "Mobile-first design",  db: true,  orbis: false, urable: false, jobber: false, square: true  },
-    { feature: "Built for detailers",  db: true,  orbis: true,  urable: true,  jobber: false, square: false },
-    { feature: "Deposit collection",   db: true,  orbis: true,  urable: true,  jobber: true,  square: true  },
-    { feature: "SMS reminders",        db: true,  orbis: true,  urable: true,  jobber: true,  square: false },
-    { feature: "Package builder",      db: true,  orbis: true,  urable: true,  jobber: false, square: false },
-    { feature: "Starts at $29/mo",     db: true,  orbis: false, urable: false, jobber: false, square: true  },
-    { feature: "No setup fees",        db: true,  orbis: false, urable: false, jobber: true,  square: true  },
-    { feature: "15-day free trial",    db: true,  orbis: false, urable: false, jobber: false, square: false },
   ];
 
   const navLinks = ["Features","Pricing","FAQ"];
@@ -77,10 +66,6 @@ export default function LandingPage() {
             {/* Logo */}
             <div className="flex items-center gap-3">
               <Logo href="/" size="sm" />
-              <span className="hidden sm:flex items-center gap-1 bg-green-500/20 border border-green-500/30 text-green-400 text-xs font-bold px-2 py-0.5 rounded-full">
-                <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-                LIVE
-              </span>
             </div>
 
             {/* Desktop Nav */}
@@ -212,8 +197,8 @@ export default function LandingPage() {
           <div className="absolute top-2/3 left-0 right-0 h-px bg-gradient-to-r from-transparent via-indigo-500/60 to-transparent" />
         </div>
 
-        {/* Scattered dot particles */}
-        <div className="absolute inset-0 pointer-events-none">
+        {/* Scattered dot particles — hidden on mobile to keep above-the-fold light */}
+        <div className="absolute inset-0 pointer-events-none hidden sm:block">
           {[
             { top:"15%", left:"8%",  delay:"0s",   size:"w-1 h-1" },
             { top:"25%", left:"92%", delay:"0.5s", size:"w-1.5 h-1.5" },
@@ -227,23 +212,23 @@ export default function LandingPage() {
           ))}
         </div>
 
-        <div className="relative z-10 max-w-5xl mx-auto px-4 text-center pt-32 pb-16">
+        <div className="relative z-10 max-w-5xl mx-auto px-4 text-center pt-24 sm:pt-32 pb-12 sm:pb-16">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 glass border border-blue-500/30 text-blue-300 text-sm font-semibold px-4 py-2 rounded-full mb-8 animate-fadeInUp">
+          <div className="inline-flex items-center gap-2 glass border border-blue-500/30 text-blue-300 text-xs sm:text-sm font-semibold px-3 sm:px-4 py-1.5 sm:py-2 rounded-full mb-5 sm:mb-8 animate-fadeInUp">
             <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
-            New — Purpose-built for auto detailers
+            Purpose-built for auto detailers
           </div>
 
-          <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black leading-[1.05] mb-6 animate-fadeInUp delay-100">
-            The <span className="bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent animate-gradientShift">#1 Booking Tool</span><br />
-            for Auto Detailers
+          <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black leading-[1.05] mb-4 sm:mb-6 animate-fadeInUp delay-100">
+            Booking Software<br />
+            <span className="bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent animate-gradientShift">Built for Auto Detailers</span>
           </h1>
 
-          <p className="text-lg sm:text-xl text-white/60 max-w-2xl mx-auto mb-10 leading-relaxed animate-fadeInUp delay-200">
-            Stop losing money to no-shows. Collect deposits automatically, send SMS reminders, and manage your entire schedule — built for detailing shops and mobile services alike.
+          <p className="text-base sm:text-xl text-white/60 max-w-2xl mx-auto mb-7 sm:mb-10 leading-relaxed animate-fadeInUp delay-200">
+            Stop losing money to no-shows. Collect deposits, send SMS reminders, and manage your entire schedule — for shops and mobile detailers alike.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-14 animate-fadeInUp delay-300">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-10 sm:mb-14 animate-fadeInUp delay-300">
             <Link href="/signup" onClick={() => trackEvent("Lead")}
               className="group relative inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-black text-lg px-10 py-4 rounded-2xl transition-all duration-300 shadow-2xl shadow-blue-600/40 hover:shadow-blue-500/50 hover:-translate-y-1">
               <span>Start Free Trial</span>
@@ -333,13 +318,6 @@ export default function LandingPage() {
       <section className="bg-slate-900 border-y border-white/5 py-6 px-4">
         <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-center gap-x-10 gap-y-4 text-center">
           <div className="flex items-center gap-2">
-            <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-            <p className="text-white/80 text-sm font-semibold">Built for detailers</p>
-          </div>
-          <div className="hidden sm:block w-px h-6 bg-white/10" />
-          <div className="flex items-center gap-2">
             <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -358,6 +336,13 @@ export default function LandingPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
             <p className="text-white/80 text-sm font-semibold">Shop + Mobile scheduling</p>
+          </div>
+          <div className="hidden sm:block w-px h-6 bg-white/10" />
+          <div className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 6h18M3 14h18M3 18h18" />
+            </svg>
+            <p className="text-white/80 text-sm font-semibold">Cancel anytime</p>
           </div>
         </div>
       </section>
@@ -421,45 +406,53 @@ export default function LandingPage() {
       </section>
 
       {/* ═══════════════════════════════════════════════
-          COMPARISON TABLE
+          WHY DETAILBOOK — DEFENSIBLE PILLARS
       ═══════════════════════════════════════════════ */}
       <section className="bg-white py-24 px-4">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">See Why Detailers Choose {platformName}</h2>
-            <p className="text-gray-500 text-xl">How we stack up against the competition</p>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">Why Detailers Choose {platformName}</h2>
+            <p className="text-gray-500 text-xl">Built around the way detailing shops and mobile pros actually work.</p>
           </div>
-          <div className="overflow-x-auto rounded-2xl border border-gray-100 shadow-sm">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left py-4 px-5 text-gray-600 font-bold text-sm w-1/3">Feature</th>
-                  <th className="text-center py-4 px-4 w-1/6 bg-blue-600 rounded-t-lg">
-                    <div className="flex items-center justify-center gap-1.5 text-white font-black text-sm">
-                      <LogoIcon size={20} />
-                      {platformName}
-                    </div>
-                  </th>
-                  {["OrbisX","Urable","Jobber","Square"].map((n) => (
-                    <th key={n} className="text-center py-4 px-4 text-gray-400 font-semibold text-sm w-1/6">{n}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {comparisonData.map((row, i) => (
-                  <tr key={i} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${i % 2 === 0 ? "" : "bg-gray-50/30"}`}>
-                    <td className="py-4 px-5 text-gray-700 font-semibold text-sm">{row.feature}</td>
-                    <td className="py-4 px-4 text-center bg-blue-50">
-                      <div className="flex justify-center">{row.db ? <CheckIcon /> : <XIcon />}</div>
-                    </td>
-                    <td className="py-4 px-4 text-center"><div className="flex justify-center">{row.orbis  ? <CheckIcon /> : <XIcon />}</div></td>
-                    <td className="py-4 px-4 text-center"><div className="flex justify-center">{row.urable ? <CheckIcon /> : <XIcon />}</div></td>
-                    <td className="py-4 px-4 text-center"><div className="flex justify-center">{row.jobber ? <CheckIcon /> : <XIcon />}</div></td>
-                    <td className="py-4 px-4 text-center"><div className="flex justify-center">{row.square ? <CheckIcon /> : <XIcon />}</div></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              {
+                icon: "🎯",
+                title: "Made only for auto detailers",
+                desc: "Not a generic booking tool. Every feature — vehicle types, package builder, deposits — is shaped around detailing workflows.",
+              },
+              {
+                icon: "💸",
+                title: "Starts at $29/month",
+                desc: "Detailing-specific software starts at one of the lowest entry prices in the category. No setup fees, no per-booking cuts.",
+              },
+              {
+                icon: "🛡️",
+                title: "Deposits stop no-shows",
+                desc: "Require a deposit at booking so customers commit before they take a slot. Protect your day from cancellations.",
+              },
+              {
+                icon: "🚐",
+                title: "Shop or mobile, one calendar",
+                desc: "Run your bay, your truck, or both. Drive-time aware scheduling keeps mobile jobs from colliding.",
+              },
+              {
+                icon: "📲",
+                title: "SMS + email reminders",
+                desc: "Automated text and email reminders cut last-minute no-shows without you lifting a finger.",
+              },
+              {
+                icon: "🆓",
+                title: "15-day free trial, no card",
+                desc: "Try the full platform with no credit card. Cancel any time, keep your data.",
+              },
+            ].map((pillar, i) => (
+              <div key={i} className="bg-gray-50 border border-gray-100 rounded-2xl p-6 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+                <div className="text-4xl mb-3">{pillar.icon}</div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">{pillar.title}</h3>
+                <p className="text-gray-500 text-sm leading-relaxed">{pillar.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -472,9 +465,24 @@ export default function LandingPage() {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-[80%] bg-blue-700/10 rounded-full blur-3xl" />
         </div>
         <div className="relative max-w-4xl mx-auto">
-          <div className="text-center mb-12">
+          <div className="text-center mb-8">
             <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-4">Simple, Transparent Pricing</h2>
             <p className="text-gray-400 text-xl">Start free for 15 days. No credit card required.</p>
+          </div>
+
+          {/* Grandfather pricing notice */}
+          <div className="max-w-2xl mx-auto mb-10">
+            <div className="flex items-start sm:items-center gap-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl px-5 py-4">
+              <div className="w-9 h-9 flex-shrink-0 bg-amber-500/20 border border-amber-400/30 rounded-xl flex items-center justify-center">
+                <svg className="w-5 h-5 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <p className="text-amber-100 text-sm leading-snug">
+                <span className="font-bold text-amber-200">Early-bird pricing.</span>{" "}
+                Sign up now and lock in today&apos;s rate forever — even when our prices go up later.
+              </p>
+            </div>
           </div>
 
           {/* Equal-height grid */}
@@ -713,11 +721,6 @@ export default function LandingPage() {
           <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
             <div className="flex items-center gap-3">
               <p className="text-gray-600">© {new Date().getFullYear()} {platformName}. All rights reserved.</p>
-              <span className="hidden sm:block text-gray-700">·</span>
-              <div className="hidden sm:flex items-center gap-1.5 text-gray-600">
-                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                All systems operational
-              </div>
             </div>
             <div className="flex items-center gap-5">
               <Link href="/privacy" className="text-gray-600 hover:text-white transition-colors">Privacy Policy</Link>
