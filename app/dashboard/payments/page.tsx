@@ -541,7 +541,7 @@ export default function PaymentsPage() {
         </MethodCard>
       </div>
 
-      <DashboardHelp page="settings" />
+      <DashboardHelp page="payments" />
     </div>
   );
 }

@@ -33,7 +33,7 @@ export default function DashboardPage() {
       .then((r) => r.ok ? r.json() : [])
       .then((data: Package[]) => setPackages(data))
       .catch(() => setPackages(getPackages()));
-    setDismissedGuide(localStorage.getItem("detailbook_guide_dismissed") === "true");
+    setDismissedGuide(localStorage.getItem("detailbook_guide_dismissed_v2") === "true");
 
     fetch("/api/bookings")
       .then((r) => r.ok ? r.json() : [])
@@ -54,7 +54,7 @@ export default function DashboardPage() {
 
   const dismissGuide = () => {
     setDismissedGuide(true);
-    localStorage.setItem("detailbook_guide_dismissed", "true");
+    localStorage.setItem("detailbook_guide_dismissed_v2", "true");
   };
 
   const isPro = user?.plan === "pro";
@@ -89,21 +89,24 @@ export default function DashboardPage() {
   };
 
   const starterGuideSteps = [
-    { icon: "📦", title: "1. Create Your Service Packages", desc: "Go to Packages and add the services you offer (e.g. Full Detail, Interior Clean, Ceramic Coating). Set prices, duration, and deposit amounts.", action: { label: "Go to Packages", href: "/dashboard/packages" } },
-    { icon: "⚙️", title: "2. Set Up Your Business Profile", desc: "Add your business name, logo, phone number, service areas, and business hours in Settings. This info shows on your public booking page.", action: { label: "Go to Settings", href: "/dashboard/settings" } },
-    { icon: "🔗", title: "3. Share Your Booking Link", desc: "Copy your unique booking link and share it with customers via text, social media, or your website. Customers can book and pay deposits online.", action: { label: "Copy Link", onClick: handleCopyLink } },
-    { icon: "📋", title: "4. Manage Your Bookings", desc: "When bookings come in, you'll see them here and in the Bookings tab. Confirm, complete, or cancel appointments. Track deposits and payments.", action: { label: "View Bookings", href: "/dashboard/bookings" } },
-    { icon: "💳", title: "5. Subscribe Before Trial Ends", desc: "Your 15-day free trial includes the Starter plan. Subscribe before it ends to keep your booking page live and continue receiving appointments.", action: { label: "Subscribe Now", href: "/dashboard/billing" } },
+    { icon: "📦", title: "1. Add your service packages", desc: "Open Packages and create what you offer (Full Detail, Interior Clean, Ceramic Coating, etc.). For each one set the price, how long it takes, the vehicle types it covers and the deposit you want upfront.", action: { label: "Go to Packages", href: "/dashboard/packages" } },
+    { icon: "💳", title: "2. Turn on a payment method", desc: "Open Payments and switch on at least one option — Stripe is the simplest for online card payments. Without this, customers can't pay deposits and bookings won't go through.", action: { label: "Set up Payments", href: "/dashboard/payments" } },
+    { icon: "🎨", title: "3. Build your booking page", desc: "Open Booking Page to add your logo, business name, bio, banner, service areas and accent colour. This is the page customers see when they click your link.", action: { label: "Customise Page", href: "/dashboard/booking-page" } },
+    { icon: "⚙️", title: "4. Set your business hours", desc: "Open Settings and pick the days and hours you work. Customers can only book inside these times.", action: { label: "Go to Settings", href: "/dashboard/settings" } },
+    { icon: "🔗", title: "5. Share your booking link", desc: "Copy your unique link and put it in your Instagram bio, Google profile, ads or texts. That's how customers reach your booking page.", action: { label: "Copy Link", onClick: handleCopyLink } },
+    { icon: "📋", title: "6. Manage incoming bookings", desc: "New bookings show up in the Bookings tab and on the Calendar. Confirm them, mark them complete when finished, and check the deposit was paid.", action: { label: "View Bookings", href: "/dashboard/bookings" } },
+    { icon: "🚀", title: "7. Subscribe before your trial ends", desc: "Your free trial includes everything on Starter. Add a card before it expires so your booking page stays live and you keep getting appointments.", action: { label: "Subscribe Now", href: "/dashboard/billing" } },
   ];
 
   const proGuideSteps = [
-    { icon: "📦", title: "1. Create Your Service Packages", desc: "Go to Packages and add the services you offer. Set prices, duration, deposit amounts, and which vehicle types each service applies to.", action: { label: "Go to Packages", href: "/dashboard/packages" } },
-    { icon: "⚙️", title: "2. Set Up Your Business Profile", desc: "Add your business name, logo, phone number, service areas, and business hours in Settings. This info shows on your public booking page.", action: { label: "Go to Settings", href: "/dashboard/settings" } },
-    { icon: "👥", title: "3. Add Your Staff", desc: "Add team members, set their roles, and give them their own login. Customers can choose a specific staff member when booking.", action: { label: "Manage Staff", href: "/dashboard/staff" } },
-    { icon: "🔗", title: "4. Share Your Booking Link", desc: "Copy your unique booking link and share it with customers via text, social media, or your website. Customers can book and pay deposits online.", action: { label: "Copy Link", onClick: handleCopyLink } },
-    { icon: "📋", title: "5. Manage Your Bookings", desc: "When bookings come in, you'll see them here and in the Bookings tab. Confirm, complete, or cancel appointments. Track deposits and payments.", action: { label: "View Bookings", href: "/dashboard/bookings" } },
-    { icon: "💬", title: "6. Customize Your Messages", desc: "Go to Messages to customize confirmation texts, reminders, and follow-up messages sent to your customers automatically.", action: { label: "Edit Templates", href: "/dashboard/messages" } },
-    { icon: "📊", title: "7. Track Analytics", desc: "Monitor your revenue trends, top services, and customer data in the Analytics tab. Use this to grow your business strategically.", action: { label: "View Analytics", href: "/dashboard/analytics" } },
+    { icon: "📦", title: "1. Add your service packages", desc: "Open Packages and create your services. Set prices, durations, deposit amounts and the vehicle types each service applies to.", action: { label: "Go to Packages", href: "/dashboard/packages" } },
+    { icon: "💳", title: "2. Turn on a payment method", desc: "Open Payments and switch on at least one option — Stripe for instant card payments, or PayPal / Cash App / Bank transfer if customers pay you off-platform and upload proof. Without this, deposits can't be collected.", action: { label: "Set up Payments", href: "/dashboard/payments" } },
+    { icon: "🎨", title: "3. Build your booking page", desc: "Open Booking Page to add your logo, business name, bio, banner, accent colour and which sections to show. This is the page customers see.", action: { label: "Customise Page", href: "/dashboard/booking-page" } },
+    { icon: "⚙️", title: "4. Set your business hours", desc: "Open Settings and pick the days and hours you work. Customers can only book inside these times.", action: { label: "Go to Settings", href: "/dashboard/settings" } },
+    { icon: "👥", title: "5. Add your staff", desc: "Open Staff to invite team members. Each gets their own login and customers can pick a specific person when booking.", action: { label: "Manage Staff", href: "/dashboard/staff" } },
+    { icon: "💬", title: "6. Edit your message templates", desc: "Open Messages to customise the booking confirmation, the 2-hour reminder and the follow-up — all sent automatically by email and SMS.", action: { label: "Edit Templates", href: "/dashboard/messages" } },
+    { icon: "🔗", title: "7. Share your booking link", desc: "Copy your unique link and share it in your Instagram bio, Google profile, ads or texts.", action: { label: "Copy Link", onClick: handleCopyLink } },
+    { icon: "📊", title: "8. Track what's working", desc: "Open Analytics to see your revenue trends, busiest days and top services. Use the data to decide what to promote.", action: { label: "View Analytics", href: "/dashboard/analytics" } },
   ];
 
   const guideSteps = isPro ? proGuideSteps : starterGuideSteps;

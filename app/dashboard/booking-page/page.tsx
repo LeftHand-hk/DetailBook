@@ -848,7 +848,7 @@ export default function BookingPagePage() {
       </div>
 
       {/* ── Help ── */}
-      <DashboardHelp page="settings" />
+      <DashboardHelp page="booking-page" />
     </div>
   );
 }
