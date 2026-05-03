@@ -32,6 +32,12 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
       }
 
+      // Stamp the login time so admins can spot inactive accounts.
+      // Fire-and-forget — failure here must not block the login response.
+      prisma.user
+        .update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
+        .catch((e) => console.error("Failed to update lastLoginAt on login:", e));
+
       const token = signToken({ id: user.id, email: user.email });
       const { password: _, ...userWithoutPassword } = user;
       const response = NextResponse.json({ user: userWithoutPassword });

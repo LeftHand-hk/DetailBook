@@ -87,6 +87,11 @@ model User {
   smsRemindersEnabled   Boolean @default(true)
   emailRemindersEnabled Boolean @default(true)
 
+  // Updated on login and on every authenticated session check
+  // (/api/auth/me). Used by the admin dashboard to surface
+  // active vs inactive accounts.
+  lastLoginAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -99,6 +104,7 @@ model User {
   @@index([email])
   @@index([slug])
   @@index([createdAt])
+  @@index([lastLoginAt])
 }
 
 model Notification {

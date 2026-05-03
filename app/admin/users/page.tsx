@@ -16,8 +16,72 @@ interface AdminUser {
   suspended: boolean;
   createdAt: string;
   updatedAt: string;
+  lastLoginAt: string | null;
   packageCount: number;
   bookingCount: number;
+}
+
+const KOSOVO_TZ = "Europe/Pristina";
+
+// Format an ISO timestamp in Kosovo time (e.g. "12 May 2026, 14:23").
+function formatKosovo(iso: string | null): string {
+  if (!iso) return "Never";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "Never";
+  return d.toLocaleString("en-GB", {
+    timeZone: KOSOVO_TZ,
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+// Activity bucket relative to "now" — drives the colour pip and short label.
+type Activity = "online" | "today" | "week" | "month" | "stale" | "never";
+
+function getActivity(iso: string | null): Activity {
+  if (!iso) return "never";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "never";
+  const diff = Date.now() - d.getTime();
+  const min = 60 * 1000;
+  const hour = 60 * min;
+  const day = 24 * hour;
+  // /api/auth/me refreshes lastLoginAt at most once per 5 min, so we treat
+  // anything within the last ~10 min as "online right now".
+  if (diff < 10 * min) return "online";
+  if (diff < day) return "today";
+  if (diff < 7 * day) return "week";
+  if (diff < 30 * day) return "month";
+  return "stale";
+}
+
+const ACTIVITY_STYLES: Record<Activity, { dot: string; label: string; text: string }> = {
+  online: { dot: "bg-green-500", label: "Online", text: "text-green-700" },
+  today:  { dot: "bg-green-400", label: "Today",  text: "text-green-700" },
+  week:   { dot: "bg-blue-400",  label: "This week", text: "text-blue-700" },
+  month:  { dot: "bg-amber-400", label: "This month", text: "text-amber-700" },
+  stale:  { dot: "bg-gray-300",  label: "Inactive", text: "text-gray-500" },
+  never:  { dot: "bg-gray-200",  label: "Never logged in", text: "text-gray-400" },
+};
+
+function relativeFromNow(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  const diff = Date.now() - d.getTime();
+  const min = 60 * 1000;
+  const hour = 60 * min;
+  const day = 24 * hour;
+  if (diff < min) return "just now";
+  if (diff < hour) return `${Math.floor(diff / min)}m ago`;
+  if (diff < day) return `${Math.floor(diff / hour)}h ago`;
+  if (diff < 30 * day) return `${Math.floor(diff / day)}d ago`;
+  if (diff < 365 * day) return `${Math.floor(diff / (30 * day))}mo ago`;
+  return `${Math.floor(diff / (365 * day))}y ago`;
 }
 
 function Toggle({ value, onChange, disabled }: { value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
@@ -230,6 +294,10 @@ export default function AdminUsersPage() {
   const starterCount = users.filter((u) => u.plan === "starter").length;
   const proCount = users.filter((u) => u.plan === "pro").length;
   const suspendedCount = users.filter((u) => u.suspended).length;
+  const activeNowCount = users.filter((u) => {
+    const a = getActivity(u.lastLoginAt);
+    return a === "online" || a === "today";
+  }).length;
 
   if (!loaded) return <div className="p-8 text-gray-400">Loading...</div>;
 
@@ -257,9 +325,10 @@ export default function AdminUsersPage() {
         )}
 
         {/* Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
           {[
             { label: "Total Users", value: totalUsers },
+            { label: "Active Today", value: activeNowCount },
             { label: "On Trial", value: trialCount },
             { label: "Starter Plan", value: starterCount },
             { label: "Pro Plan", value: proCount },
@@ -301,6 +370,7 @@ export default function AdminUsersPage() {
                     <th className="text-left px-4 py-3 font-medium text-gray-500">Plan</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-500">Usage</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-500">Last login</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-500">Created</th>
                     <th className="text-right px-4 py-3 font-medium text-gray-500">Actions</th>
                   </tr>
@@ -359,6 +429,33 @@ export default function AdminUsersPage() {
                           <div className="text-xs">
                             {user.packageCount} pkgs · {user.bookingCount} bookings
                           </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {(() => {
+                            const a = getActivity(user.lastLoginAt);
+                            const s = ACTIVITY_STYLES[a];
+                            return (
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${s.dot} ${a === "online" ? "animate-pulse" : ""}`}
+                                  title={s.label}
+                                />
+                                <div className="min-w-0">
+                                  <div className={`text-xs font-medium ${s.text}`}>
+                                    {a === "never" ? "Never" : relativeFromNow(user.lastLoginAt)}
+                                  </div>
+                                  {user.lastLoginAt && (
+                                    <div
+                                      className="text-[11px] text-gray-400"
+                                      title={`${formatKosovo(user.lastLoginAt)} (Europe/Pristina)`}
+                                    >
+                                      {formatKosovo(user.lastLoginAt)}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3 text-gray-500 text-xs">
                           {new Date(user.createdAt).toLocaleDateString()}

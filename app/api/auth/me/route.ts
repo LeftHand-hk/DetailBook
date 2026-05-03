@@ -28,6 +28,17 @@ export async function GET() {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    // Refresh lastLoginAt at most once every 5 minutes so the admin's
+    // "active in last X" indicator stays accurate without writing to the
+    // DB on every dashboard mount.
+    const now = Date.now();
+    const last = user.lastLoginAt ? user.lastLoginAt.getTime() : 0;
+    if (now - last > 5 * 60 * 1000) {
+      prisma.user
+        .update({ where: { id: user.id }, data: { lastLoginAt: new Date(now) } })
+        .catch((e) => console.error("Failed to refresh lastLoginAt:", e));
+    }
+
     const { password: _, ...userWithoutPassword } = user;
 
     return NextResponse.json({ user: userWithoutPassword });
