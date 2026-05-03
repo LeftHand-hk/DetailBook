@@ -44,16 +44,10 @@ export default function MetaPixel() {
           fbq('init', '${META_PIXEL_ID}');
         }`}
       </Script>
-      <noscript>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          height="1"
-          width="1"
-          style={{ display: "none" }}
-          src={`https://www.facebook.com/tr?id=${META_PIXEL_ID}&ev=PageView&noscript=1`}
-          alt=""
-        />
-      </noscript>
+      {/* No <noscript> fallback: under Next.js App Router the noscript img
+          was firing in modern JS-enabled browsers too, producing a duplicate
+          PageView in Meta Pixel Helper. Sub-1% of visitors run without JS,
+          and they never convert anyway, so dropping the fallback is fine. */}
     </>
   );
 }
