@@ -2,40 +2,29 @@
 
 import Script from "next/script";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { META_PIXEL_ID } from "@/lib/meta-pixel";
 
-// Renders the Meta Pixel base code and tracks PageView once per route.
+// Renders the Meta Pixel base script and tracks PageView exactly once per
+// pathname. Two-source-of-truth bugs caused duplicates before:
+// - Inline `fbq('track','PageView')` AND a React effect both firing on
+//   initial load.
+// - A per-instance ref ("isFirstRender") resetting on StrictMode remount,
+//   defeating the skip.
 //
-// Why this looks the way it does:
-// - Always rendered (no conditional return). Conditionally returning null
-//   based on usePathname caused the <Script> to remount on hydration and
-//   on /admin → public navigation, which re-ran the inline init+track body
-//   and produced the "2 PageView" duplicate seen in Meta Pixel Helper.
-// - The inline script guards init + PageView behind a window flag so that
-//   even if Next.js re-executes the inline body for any reason (StrictMode,
-//   hydration mismatch, fast-refresh) we only ever fire ONE initial PageView.
-// - The IIFE itself has `if(f.fbq)return` so fbevents.js is also only loaded
-//   once per tab.
-// - Route-change PageViews use a useEffect that skips the first render —
-//   the initial one is already covered by the inline script — so SPA
-//   navigations get exactly one PageView per new route, never two.
-// - Admin pages skip both the initial track (URL check inside the inline
-//   script) and route-change tracks (pathname check in the effect). The
-//   pixel is still loaded in admin tabs but no events fire there.
+// Now: PageView lives only in the effect, deduped against the last tracked
+// pathname stored on `window`. The flag survives any React remount, so we
+// fire exactly one PageView per real route change.
 export default function MetaPixel() {
   const pathname = usePathname();
-  const isFirstRender = useRef(true);
 
   useEffect(() => {
-    // The first render's PageView is owned by the inline base script.
-    // Skipping here is what prevents the duplicate Meta Pixel Helper saw.
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
+    if (typeof window === "undefined") return;
+    if (typeof window.fbq !== "function") return;
     if (pathname?.startsWith("/admin")) return;
-    if (typeof window === "undefined" || typeof window.fbq !== "function") return;
+    if (window.__detailbookPixelLastPath === pathname) return;
+
+    window.__detailbookPixelLastPath = pathname ?? null;
     window.fbq("track", "PageView");
   }, [pathname]);
 
@@ -53,9 +42,6 @@ export default function MetaPixel() {
         if (!window.__detailbookPixelInitialized) {
           window.__detailbookPixelInitialized = true;
           fbq('init', '${META_PIXEL_ID}');
-          if (!window.location.pathname.startsWith('/admin')) {
-            fbq('track', 'PageView');
-          }
         }`}
       </Script>
       <noscript>
