@@ -16,21 +16,12 @@ export const metadata: Metadata = {
     title: "DetailBook — Booking & Scheduling Built for Auto Detailers",
     description:
       "Stop no-shows. Collect deposits, automate SMS reminders, and manage shop + mobile jobs from one calendar.",
-    images: [
-      {
-        url: "/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "DetailBook — Booking software for auto detailers",
-      },
-    ],
   },
   twitter: {
-    card: "summary_large_image",
+    card: "summary",
     title: "DetailBook — Booking & Scheduling Built for Auto Detailers",
     description:
       "Stop no-shows. Collect deposits, automate SMS reminders, and manage shop + mobile jobs from one calendar.",
-    images: ["/og-image.png"],
   },
   verification: {
     other: {
