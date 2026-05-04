@@ -286,13 +286,14 @@ export default function BillingPage() {
     setChangePlanError("");
 
     try {
-      // If user has an active Paddle subscription (paid OR trialing
-      // with linked sub), use PATCH /subscriptions to switch plans.
-      // This keeps the same subscription on the same card — no second
-      // checkout, no risk of being left with no plan if the user
-      // closes a checkout window.
-      const hasLinkedSub = Boolean((user as any).subscriptionStatus) &&
-        user.subscriptionStatus !== "canceled";
+      // Only route through PATCH /subscriptions when we actually hold a
+      // Paddle subscription ID. subscriptionStatus alone isn't enough —
+      // the admin panel sets it to "trial" when extending a trial, which
+      // is purely an internal marker with no Paddle sub behind it.
+      // Without a paddleSubscriptionId the change-plan endpoint will
+      // (correctly) reject the request, so first-time subscribers must
+      // go through Paddle Checkout.
+      const hasLinkedSub = Boolean((user as any).paddleSubscriptionId);
 
       const trimmedCode = discountCode.trim();
 

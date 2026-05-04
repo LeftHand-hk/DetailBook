@@ -287,7 +287,7 @@ export async function POST(request: NextRequest) {
                 ${notes ? `<tr><td style="padding:6px 0;color:#6b7280;">Notes</td><td style="padding:6px 0;font-weight:600;color:#111827;">${eNotes}</td></tr>` : ""}
               </table>
             </div>
-            ${safeProof ? `<div style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:8px;padding:12px 14px;margin:0 0 16px;">
+            ${safeProof && safeProof.startsWith("data:image/") ? `<div style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:8px;padding:12px 14px;margin:0 0 16px;">
               <p style="margin:0;font-size:13px;color:#92400E;"><strong>Payment proof attached.</strong> Review in your dashboard before confirming the booking.</p>
             </div>` : ""}
             <a href="https://detailbookapp.com/dashboard/bookings" style="display:inline-block;background:#2563EB;color:white;font-weight:600;font-size:14px;padding:10px 20px;border-radius:8px;text-decoration:none;">View in Dashboard</a>
