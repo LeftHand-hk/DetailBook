@@ -1,4 +1,8 @@
-export const META_PIXEL_ID = "1295839309192322";
+// Pixel ID is read from NEXT_PUBLIC_META_PIXEL_ID at build time so we can
+// rotate the ID (or point staging at a separate pixel) without a code change.
+// Falls back to the production ID so existing deploys keep working.
+export const META_PIXEL_ID =
+  process.env.NEXT_PUBLIC_META_PIXEL_ID || "1295839309192322";
 
 declare global {
   interface Window {

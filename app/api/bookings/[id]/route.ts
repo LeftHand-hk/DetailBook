@@ -114,8 +114,10 @@ export async function PUT(
     }
 
     // Send confirmation email + SMS when status changes to "confirmed".
-    // Fire-and-forget so the dashboard doesn't wait on SMTP/Twilio (which can
-    // take seconds and block the optimistic UI update from being acknowledged).
+    // Awaited (not fire-and-forget) because on serverless hosts like Netlify
+    // the runtime is frozen the moment we return the response, killing any
+    // in-flight SMTP/Twilio promises.
+    const pendingSends: Promise<unknown>[] = [];
     if (didTransitionToConfirmed) {
       const user = (updated as any).user;
       const formattedDate = new Date(updated.date + "T00:00:00").toLocaleDateString("en-US", {
@@ -150,19 +152,27 @@ export async function PUT(
         const emailTemplate = (user?.emailTemplates as any)?.bookingConfirmation || DEFAULT_EMAIL;
         const customerText = render(emailTemplate);
         const customerHtml = `<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9fafb;border-radius:8px;color:#111827;font-size:14px;line-height:1.6;white-space:pre-wrap;">${customerText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`;
-        sendEmail({ to: updated.customerEmail, subject: `Booking Confirmed – ${updated.serviceName} on ${formattedDate}`, html: customerHtml, text: customerText })
-          .then((r) => console.log("[CONFIRM EMAIL] Result:", r))
-          .catch((err) => console.error("[CONFIRM EMAIL] threw:", err));
+        pendingSends.push(
+          sendEmail({ to: updated.customerEmail, subject: `Booking Confirmed – ${updated.serviceName} on ${formattedDate}`, html: customerHtml, text: customerText })
+            .then((r) => console.log("[CONFIRM EMAIL] Result:", r))
+            .catch((err) => console.error("[CONFIRM EMAIL] threw:", err)),
+        );
       }
 
       // Confirmation SMS to customer (Pro only)
       if (user?.plan === "pro" && user?.smsConfirmations && updated.customerPhone) {
         const smsTemplate = (user?.smsTemplates as any)?.bookingConfirmation || DEFAULT_SMS;
         const smsBody = render(smsTemplate);
-        sendSms(updated.customerPhone, smsBody)
-          .then((r) => console.log("[CONFIRM SMS] Result:", r))
-          .catch((err) => console.error("[CONFIRM SMS] threw:", err));
+        pendingSends.push(
+          sendSms(updated.customerPhone, smsBody)
+            .then((r) => console.log("[CONFIRM SMS] Result:", r))
+            .catch((err) => console.error("[CONFIRM SMS] threw:", err)),
+        );
       }
+    }
+
+    if (pendingSends.length > 0) {
+      await Promise.allSettled(pendingSends);
     }
 
     const { user: _user, ...updatedWithoutUser } = updated as any;

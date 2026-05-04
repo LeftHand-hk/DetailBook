@@ -72,21 +72,29 @@ function paragraphsToHtml(paragraphs: string[]): string {
     .join("");
 }
 
-// Linkify a single dashboard URL inside an HTML chunk. We do this
-// after escaping so the URL becomes a real <a> instead of being
-// rendered as plain text.
+// Linkify dashboard URLs inside an HTML chunk. Two-pass marker swap
+// so the shorter `/dashboard` URL never matches inside the just-built
+// `<a href="…/dashboard/billing">` of the longer URL.
 function linkifyDashboard(html: string): string {
-  const urlPlain = `${APP_URL}/dashboard`;
-  const urlBilling = `${APP_URL}/dashboard/billing`;
-  return html
-    .replace(
-      escapeHtml(urlBilling),
-      `<a href="${urlBilling}" style="color:#2563eb;text-decoration:underline;">${urlBilling}</a>`,
-    )
-    .replace(
-      escapeHtml(urlPlain),
-      `<a href="${urlPlain}" style="color:#2563eb;text-decoration:underline;">${urlPlain}</a>`,
-    );
+  const urls = [
+    `${APP_URL}/dashboard/billing`,
+    `${APP_URL}/dashboard`,
+  ].sort((a, b) => b.length - a.length);
+
+  let out = html;
+  // Pass 1: replace every URL with a unique placeholder.
+  urls.forEach((url, i) => {
+    const marker = `\u0000LINK${i}\u0000`;
+    out = out.split(url).join(marker);
+  });
+  // Pass 2: swap placeholders for real anchor tags. Markers don't
+  // contain URL substrings, so this can't re-trigger pass 1 logic.
+  urls.forEach((url, i) => {
+    const marker = `\u0000LINK${i}\u0000`;
+    const anchor = `<a href="${url}" style="color:#2563eb;text-decoration:underline;">${url}</a>`;
+    out = out.split(marker).join(anchor);
+  });
+  return out;
 }
 
 // ─── Templates ────────────────────────────────────────────────────────

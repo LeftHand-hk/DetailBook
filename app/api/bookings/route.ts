@@ -257,6 +257,12 @@ export async function POST(request: NextRequest) {
     const eCustomMessage = escapeHtml((user as any).customMessage || "");
     const ePhoneOrEmail = escapeHtml(user.phone || user.email || "");
 
+    // Collect all email/SMS sends and await them at the end. On Netlify (and
+    // any serverless host) the Node runtime is frozen the moment we return
+    // the response, which silently kills any in-flight fire-and-forget
+    // promises — that's why a fast `.then().catch()` send was unreliable.
+    const pendingSends: Promise<unknown>[] = [];
+
     // 1. Notification email to business owner (only if emailReminders enabled, default true)
     if (user.email && user.emailReminders !== false) {
       const ownerHtml = `
@@ -287,7 +293,10 @@ export async function POST(request: NextRequest) {
             <a href="https://detailbookapp.com/dashboard/bookings" style="display:inline-block;background:#2563EB;color:white;font-weight:600;font-size:14px;padding:10px 20px;border-radius:8px;text-decoration:none;">View in Dashboard</a>
           </div>
         </div>`;
-      sendEmail({ to: user.email, subject: `New Booking: ${customerName} - ${serviceName} on ${formattedDate}`, html: ownerHtml }).catch(() => {});
+      pendingSends.push(
+        sendEmail({ to: user.email, subject: `New Booking: ${customerName} - ${serviceName} on ${formattedDate}`, html: ownerHtml })
+          .catch((err) => console.error("[booking owner email] threw:", err)),
+      );
     }
 
     // If the booking is created already "confirmed" (card payment paid),
@@ -320,17 +329,21 @@ export async function POST(request: NextRequest) {
         const emailTemplate = ((user as any).emailTemplates as any)?.bookingConfirmation || DEFAULT_EMAIL;
         const customerText = render(emailTemplate);
         const customerHtml = `<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9fafb;border-radius:8px;color:#111827;font-size:14px;line-height:1.6;white-space:pre-wrap;">${customerText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`;
-        sendEmail({ to: booking.customerEmail, subject: `Booking Confirmed – ${booking.serviceName} on ${formattedDate}`, html: customerHtml, text: customerText })
-          .then((r) => console.log("[CONFIRM POST EMAIL] Result:", r))
-          .catch((err) => console.error("[CONFIRM POST EMAIL] threw:", err));
+        pendingSends.push(
+          sendEmail({ to: booking.customerEmail, subject: `Booking Confirmed – ${booking.serviceName} on ${formattedDate}`, html: customerHtml, text: customerText })
+            .then((r) => console.log("[CONFIRM POST EMAIL] Result:", r))
+            .catch((err) => console.error("[CONFIRM POST EMAIL] threw:", err)),
+        );
       }
 
       if ((user as any).plan === "pro" && (user as any).smsConfirmations && booking.customerPhone) {
         const smsTemplate = ((user as any).smsTemplates as any)?.bookingConfirmation || DEFAULT_SMS;
         const smsBody = render(smsTemplate);
-        sendSms(booking.customerPhone, smsBody)
-          .then((r) => console.log("[CONFIRM POST SMS] Result:", r))
-          .catch((err) => console.error("[CONFIRM POST SMS] threw:", err));
+        pendingSends.push(
+          sendSms(booking.customerPhone, smsBody)
+            .then((r) => console.log("[CONFIRM POST SMS] Result:", r))
+            .catch((err) => console.error("[CONFIRM POST SMS] threw:", err)),
+        );
       } else {
         console.log("[CONFIRM POST SMS] Skipped — gate not met:", {
           plan: (user as any).plan,
@@ -338,6 +351,12 @@ export async function POST(request: NextRequest) {
           hasCustomerPhone: !!booking.customerPhone,
         });
       }
+    }
+
+    // Await all queued email/SMS sends before responding so the serverless
+    // runtime doesn't terminate the function with sends still in-flight.
+    if (pendingSends.length > 0) {
+      await Promise.allSettled(pendingSends);
     }
 
     return NextResponse.json(booking, { status: 201 });
