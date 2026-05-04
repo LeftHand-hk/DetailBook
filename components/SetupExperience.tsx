@@ -659,7 +659,7 @@ function ServicesBody({ done, onSaved }: { done: boolean; onSaved: () => Promise
   const [error, setError] = useState("");
   const [addedCount, setAddedCount] = useState(0);
 
-  const useTemplate = (t: typeof SERVICE_TEMPLATES[number]) => {
+  const applyTemplate = (t: typeof SERVICE_TEMPLATES[number]) => {
     setForm({ name: t.name, description: t.description, price: t.price, duration: t.duration });
     setError("");
   };
@@ -705,7 +705,7 @@ function ServicesBody({ done, onSaved }: { done: boolean; onSaved: () => Promise
           {SERVICE_TEMPLATES.map((t) => (
             <button
               key={t.name}
-              onClick={() => useTemplate(t)}
+              onClick={() => applyTemplate(t)}
               className="text-left bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50/40 rounded-lg p-3 transition-all"
             >
               <p className="text-xs font-bold text-gray-900">{t.name}</p>
