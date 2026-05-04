@@ -510,7 +510,12 @@ export default function BookingsPage() {
           pmRaw === "square" ? "Square" :
           pmRaw === "paypal" ? "PayPal" :
           pmRaw === "cash" ? "Cash" : pmRaw;
-        const proof = (selected as any).paymentProof as string | undefined;
+        // Only treat the value as a renderable image when it's an uploaded
+        // screenshot (base64 data URL). stripe:/square: references are
+        // payment IDs, not images — rendering them as <img src> produces
+        // a broken-image placeholder.
+        const rawProof = (selected as any).paymentProof as string | undefined;
+        const proof = rawProof && rawProof.startsWith("data:image/") ? rawProof : null;
 
         const allStatusOptions = [
           { key: "confirmed", label: "Confirm", active: "bg-green-600 text-white", idle: "bg-green-50 text-green-700 hover:bg-green-100" },
