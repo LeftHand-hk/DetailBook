@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { getUser, setUser } from "@/lib/storage";
 import type { User } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
+import SetupHint from "@/components/SetupHint";
 
 const INPUT_CLASS =
   "w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all placeholder-gray-300";
@@ -216,6 +217,7 @@ export default function PaymentsPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-5 pb-16">
+      <SetupHint step="deposits" />
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>

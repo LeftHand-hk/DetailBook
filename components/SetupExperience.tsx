@@ -308,11 +308,13 @@ function SetupPanel({
 }) {
   const [expandedStep, setExpandedStep] = useState<StepId | null>(null);
 
-  // Auto-expand the first incomplete required step when panel opens.
+  // Auto-expand the first incomplete step in display order, including
+  // optional ones — users want to walk through every step in sequence
+  // (e.g. deposits before share link) and decide for themselves whether
+  // to skip.
   useEffect(() => {
     if (!open) return;
-    const firstIncomplete = status.steps.find((s) => !s.done && !s.optional)
-      || status.steps.find((s) => !s.done);
+    const firstIncomplete = status.steps.find((s) => !s.done);
     setExpandedStep(firstIncomplete?.id ?? null);
   }, [open, status]);
 
@@ -502,9 +504,9 @@ function StepBody({
     case "working_hours":
       return <WorkingHoursBody done={step.done} onSaved={onRefresh} />;
     case "services":
-      return <ServicesBody done={step.done} onSaved={onRefresh} />;
+      return <ServicesBody done={step.done} onSaved={onRefresh} router={router} onClosePanel={onClosePanel} />;
     case "deposits":
-      return <DepositsBody done={step.done} onSaved={onRefresh} onMarkDone={onMarkDone} />;
+      return <DepositsBody done={step.done} onSaved={onRefresh} onMarkDone={onMarkDone} router={router} onClosePanel={onClosePanel} />;
     case "share_link":
       return <ShareLinkBody done={step.done} onMarkDone={onMarkDone} />;
   }
@@ -653,7 +655,14 @@ function WorkingHoursBody({ done, onSaved }: { done: boolean; onSaved: () => Pro
 
 // ── Step 3: Services ─────────────────────────────────────────────────────────
 
-function ServicesBody({ done, onSaved }: { done: boolean; onSaved: () => Promise<Status | null> }) {
+function ServicesBody({
+  done, onSaved, router, onClosePanel,
+}: {
+  done: boolean;
+  onSaved: () => Promise<Status | null>;
+  router: Router;
+  onClosePanel: () => void;
+}) {
   const [form, setForm] = useState({ name: "", description: "", price: "", duration: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -697,8 +706,26 @@ function ServicesBody({ done, onSaved }: { done: boolean; onSaved: () => Promise
     }
   };
 
+  const openFullPage = () => {
+    onClosePanel();
+    router.push("/dashboard/packages?setup=services");
+  };
+
   return (
     <div className="space-y-4">
+      <button
+        onClick={openFullPage}
+        className="w-full flex items-center justify-between gap-2 bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50/40 rounded-lg px-3 py-2.5 text-left transition-all group"
+      >
+        <div>
+          <p className="text-xs font-semibold text-gray-900">Manage packages on full page</p>
+          <p className="text-[11px] text-gray-500 mt-0.5">Edit, reorder, and add advanced options.</p>
+        </div>
+        <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+
       <div>
         <p className="text-xs font-semibold text-gray-700 mb-2">Quick-add a popular service</p>
         <div className="grid grid-cols-2 gap-2">
@@ -779,8 +806,14 @@ function ServicesBody({ done, onSaved }: { done: boolean; onSaved: () => Promise
 // ── Step 4: Deposits ─────────────────────────────────────────────────────────
 
 function DepositsBody({
-  done, onSaved, onMarkDone,
-}: { done: boolean; onSaved: () => Promise<Status | null>; onMarkDone: () => void }) {
+  done, onSaved, onMarkDone, router, onClosePanel,
+}: {
+  done: boolean;
+  onSaved: () => Promise<Status | null>;
+  onMarkDone: () => void;
+  router: Router;
+  onClosePanel: () => void;
+}) {
   const u = (typeof window !== "undefined" ? getUser() : null) as any;
   const [enabled, setEnabled] = useState<boolean>(Boolean(u?.requireDeposit));
   const [percent, setPercent] = useState<number>(u?.depositPercentage || 20);
@@ -802,8 +835,26 @@ function DepositsBody({
     }
   };
 
+  const openFullPage = () => {
+    onClosePanel();
+    router.push("/dashboard/payments?setup=deposits");
+  };
+
   return (
     <div className="space-y-3 text-sm">
+      <button
+        onClick={openFullPage}
+        className="w-full flex items-center justify-between gap-2 bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50/40 rounded-lg px-3 py-2.5 text-left transition-all group"
+      >
+        <div>
+          <p className="text-xs font-semibold text-gray-900">Open payment settings page</p>
+          <p className="text-[11px] text-gray-500 mt-0.5">Configure payment methods and refund rules.</p>
+        </div>
+        <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+
       <div className="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between">
         <div>
           <p className="text-sm font-semibold text-gray-900">Require deposit at booking</p>
