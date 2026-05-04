@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { hashPassword, signToken } from "@/lib/auth";
 import { isValidEmail, validatePassword } from "@/lib/validation";
 import { getClientIp, getClientCountry } from "@/lib/geo";
+import { sendWelcomeEmail } from "@/lib/welcome-emails";
 
 function generateSlug(businessName: string): string {
   return businessName
@@ -127,6 +128,14 @@ export async function POST(request: NextRequest) {
     });
 
     const token = signToken({ id: user.id, email: user.email });
+
+    // Fire welcome email #1 in the background so signup stays fast.
+    // The hourly cron also re-tries any user where welcomeEmailsSent === 0
+    // and createdAt is older than the cron interval, so a transient SMTP
+    // failure here just delays the email by an hour, not forever.
+    sendWelcomeEmail(user.id, 1).catch((err) => {
+      console.error("[register] welcome email #1 failed:", err);
+    });
 
     const { password: _, ...userWithoutPassword } = user;
 

@@ -27,15 +27,15 @@ export default function DashboardPage() {
     setUser(getUser());
     setMounted(true);
 
-    fetch("/api/packages")
-      .then((r) => r.ok ? r.json() : [])
-      .then((data: Package[]) => setPackages(data))
-      .catch(() => setPackages(getPackages()));
+    Promise.all([
+      fetch("/api/packages").then((r) => (r.ok ? r.json() : [])).catch(() => null),
+      fetch("/api/bookings").then((r) => (r.ok ? r.json() : [])).catch(() => null),
+    ]).then(([pkgData, bkData]) => {
+      if (pkgData) setPackages(pkgData as Package[]);
+      else setPackages(getPackages());
 
-    fetch("/api/bookings")
-      .then((r) => r.ok ? r.json() : [])
-      .then((data: any[]) => {
-        const mapped: Booking[] = data.map((b: any) => ({
+      if (bkData) {
+        const mapped: Booking[] = (bkData as any[]).map((b: any) => ({
           ...b,
           vehicle: b.vehicle || {
             make: b.vehicleMake || "",
@@ -45,8 +45,10 @@ export default function DashboardPage() {
           },
         }));
         setBookings(mapped);
-      })
-      .catch(() => setBookings(getBookings()));
+      } else {
+        setBookings(getBookings());
+      }
+    });
   }, []);
 
   const isPro = user?.plan === "pro";
@@ -111,7 +113,7 @@ export default function DashboardPage() {
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
 
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 animate-fadeInUp">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900">
@@ -157,8 +159,7 @@ export default function DashboardPage() {
             { label: "Completion", value: empty ? "—" : `${completionRate}%`, sub: empty ? "Will appear after first job" : `${completedCount} of ${bookings.length} jobs` },
           ];
         })().map((stat, i) => (
-          <div key={i} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm animate-fadeInUp"
-            style={{ animationDelay: `${i * 80}ms`, animationFillMode: "both" }}>
+          <div key={i} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{stat.label}</p>
             <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900 mt-2">{stat.value}</p>
             <p className="text-xs text-gray-500 font-medium mt-1">{stat.sub}</p>
@@ -170,7 +171,7 @@ export default function DashboardPage() {
       <div className="grid lg:grid-cols-3 gap-5 mb-6">
 
         {/* Recent Bookings (2/3) */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fadeInUp delay-200">
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
             <h2 className="font-bold text-gray-900 text-sm">Recent Bookings</h2>
             <Link href="/dashboard/bookings" className="text-xs text-blue-600 hover:text-blue-700 font-semibold">
@@ -231,7 +232,7 @@ export default function DashboardPage() {
         <div className="space-y-5">
 
           {/* Upcoming Jobs */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fadeInUp delay-300">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <h2 className="font-bold text-gray-900 text-sm">Upcoming</h2>
               <Link href="/dashboard/calendar" className="text-xs text-blue-600 font-semibold hover:text-blue-700">Calendar →</Link>
@@ -266,7 +267,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Revenue Chart */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 animate-fadeInUp delay-400">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <div className="flex items-center justify-between mb-1">
               <h2 className="font-bold text-gray-900 text-sm">Revenue</h2>
               <span className="text-xs text-gray-400 font-medium">Last 7 days</span>
@@ -296,7 +297,7 @@ export default function DashboardPage() {
 
       {/* ── Pro Upgrade (only for Starter users) ── */}
       {!isPro && (
-        <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 sm:p-8 mb-6 animate-fadeInUp delay-500 shadow-lg shadow-blue-600/20">
+        <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 sm:p-8 mb-6 shadow-lg shadow-blue-600/20">
           <div className="absolute -right-12 -top-12 w-48 h-48 bg-white/10 rounded-full" />
           <div className="absolute -left-8 -bottom-8 w-32 h-32 bg-white/5 rounded-full" />
           <div className="relative grid sm:grid-cols-[1fr_auto] gap-6 items-center">

@@ -102,8 +102,7 @@ export default function ReviewsPage() {
         ].map((stat, i) => (
           <div
             key={stat.label}
-            className={`relative overflow-hidden rounded-2xl p-5 text-white bg-gradient-to-br ${stat.color} shadow-lg animate-fadeInUp`}
-            style={{ animationDelay: `${i * 100}ms`, opacity: 0 }}
+            className={`relative overflow-hidden rounded-2xl p-5 text-white bg-gradient-to-br ${stat.color} shadow-lg`}
           >
             <div className="absolute -right-4 -top-4 w-20 h-20 bg-white/10 rounded-full" />
             <div className="relative">
@@ -115,7 +114,7 @@ export default function ReviewsPage() {
         ))}
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fadeInUp" style={{ animationDelay: "200ms", opacity: 0 }}>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100">
           <h3 className="font-bold text-gray-900 text-sm">Recent Reviews</h3>
           <p className="text-xs text-gray-400 mt-0.5">Customer feedback shows up here as it comes in.</p>

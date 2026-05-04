@@ -42,6 +42,34 @@ export default function AdminSettingsPage() {
   const [smsSending, setSmsSending] = useState(false);
   const [smsResult, setSmsResult] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // Welcome email test
+  const [welcomeTo, setWelcomeTo] = useState("");
+  const [welcomeNum, setWelcomeNum] = useState<1 | 2 | 3>(1);
+  const [welcomeSending, setWelcomeSending] = useState(false);
+  const [welcomeResult, setWelcomeResult] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const handleSendTestWelcome = async () => {
+    setWelcomeSending(true);
+    setWelcomeResult(null);
+    try {
+      const res = await fetch("/api/admin/welcome-email-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: welcomeTo, num: welcomeNum }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setWelcomeResult({ ok: false, text: data.error || `Failed (HTTP ${res.status})` });
+      } else {
+        setWelcomeResult({ ok: true, text: `Sent welcome email #${welcomeNum} to ${data.sentTo}` });
+      }
+    } catch (e) {
+      setWelcomeResult({ ok: false, text: e instanceof Error ? e.message : "Network error" });
+    } finally {
+      setWelcomeSending(false);
+    }
+  };
+
   const handleSendTestSms = async () => {
     setSmsSending(true);
     setSmsResult(null);
@@ -199,6 +227,58 @@ export default function AdminSettingsPage() {
             {smsResult && (
               <span className={`text-sm ${smsResult.ok ? "text-green-700" : "text-red-700"}`}>
                 {smsResult.ok ? "✓ " : "✗ "}{smsResult.text}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Welcome Email Test */}
+        <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Send Test Welcome Email</h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Sends one of the 3 onboarding emails to any address through SMTP. Uses the most recent
+              real signup as the variable source so subject and copy look like a real send. Does not
+              affect that user&apos;s tracking or counters.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Recipient email</label>
+            <input
+              type="email"
+              value={welcomeTo}
+              onChange={(e) => setWelcomeTo(e.target.value)}
+              placeholder="you@example.com"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Which email</label>
+            <select
+              value={welcomeNum}
+              onChange={(e) => setWelcomeNum(Number(e.target.value) as 1 | 2 | 3)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+            >
+              <option value={1}>1 — Welcome (Day 0)</option>
+              <option value={2}>2 — Where to share your link (Day 5)</option>
+              <option value={3}>3 — Trial ends in 2 days (Day 13)</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleSendTestWelcome}
+              disabled={welcomeSending || !welcomeTo.trim()}
+              className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {welcomeSending ? "Sending…" : "Send test email"}
+            </button>
+            {welcomeResult && (
+              <span className={`text-sm ${welcomeResult.ok ? "text-green-700" : "text-red-700"}`}>
+                {welcomeResult.ok ? "✓ " : "✗ "}{welcomeResult.text}
               </span>
             )}
           </div>

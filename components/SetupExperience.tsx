@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { getUser } from "@/lib/storage";
 
 type StepId =
@@ -74,7 +74,6 @@ const STORAGE_KEY = "detailbook_setup_seen_initial";
 
 export default function SetupExperience() {
   const router = useRouter();
-  const pathname = usePathname();
   const [status, setStatus] = useState<Status | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [showCompleteFlash, setShowCompleteFlash] = useState(false);
@@ -94,7 +93,7 @@ export default function SetupExperience() {
 
   useEffect(() => {
     fetchStatus();
-  }, [fetchStatus, pathname]);
+  }, [fetchStatus]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -257,10 +256,10 @@ function SetupBanner({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-900">
-                Setup complete — start sharing your booking link!
+                You&apos;re ready! Share your link to start getting bookings.
               </p>
               <p className="text-xs text-gray-600 mt-0.5">
-                {showCompleteFlash ? "This banner will hide automatically." : "Great work."}
+                {showCompleteFlash ? "This will hide on its own in a few seconds." : "Nice work."}
               </p>
             </div>
           </>
@@ -272,11 +271,11 @@ function SetupBanner({
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline gap-3 flex-wrap">
                 <p className="text-sm font-semibold text-gray-900">
-                  Get your booking page ready
+                  Finish setting up your booking page
                 </p>
                 <p className="text-xs text-gray-500">
-                  {status.completed} of {status.total} complete
-                  {status.remainingMin > 0 && ` · ~${status.remainingMin} min remaining`}
+                  {status.completed} of {status.total} done
+                  {status.remainingMin > 0 && ` · about ${status.remainingMin} min left`}
                 </p>
               </div>
               <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden max-w-md">
@@ -290,7 +289,7 @@ function SetupBanner({
               onClick={onContinue}
               className="flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
             >
-              Continue setup
+              {status.completed === 0 ? "Start" : "Continue"}
             </button>
           </>
         )}
@@ -378,9 +377,9 @@ function SetupPanel({
         {/* Header */}
         <div className="flex-shrink-0 px-5 py-4 border-b border-gray-200 flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold text-gray-900">Setup checklist</h2>
+            <h2 className="text-base font-bold text-gray-900">Let&apos;s get you ready</h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              {status.completed} of {status.total} complete · {status.percent}%
+              {status.completed} of {status.total} done · {status.percent}%
             </p>
           </div>
           <button
@@ -633,7 +632,7 @@ function WorkingHoursBody({ done, onSaved }: { done: boolean; onSaved: () => Pro
         onClick={applyMondayToAll}
         className="text-xs font-semibold text-blue-600 hover:text-blue-700"
       >
-        Apply Monday hours to all days
+        Use Monday&apos;s hours for every day
       </button>
 
       <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
@@ -764,8 +763,8 @@ function ServicesBody({
         className="w-full flex items-center justify-between gap-2 bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50/40 rounded-lg px-3 py-2.5 text-left transition-all group"
       >
         <div>
-          <p className="text-xs font-semibold text-gray-900">Manage packages on full page</p>
-          <p className="text-[11px] text-gray-500 mt-0.5">Edit, reorder, and add advanced options.</p>
+          <p className="text-xs font-semibold text-gray-900">Open the full packages page</p>
+          <p className="text-[11px] text-gray-500 mt-0.5">More room to add, edit, and reorder.</p>
         </div>
         <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -773,7 +772,7 @@ function ServicesBody({
       </button>
 
       <div>
-        <p className="text-xs font-semibold text-gray-700 mb-2">Quick-add a popular service</p>
+        <p className="text-xs font-semibold text-gray-700 mb-2">Tap one to start with a common service</p>
         <div className="grid grid-cols-2 gap-2">
           {SERVICE_TEMPLATES.map((t) => (
             <button
@@ -832,7 +831,7 @@ function ServicesBody({
           disabled={saving}
           className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold py-2 rounded-lg transition-colors"
         >
-          {saving ? "Adding..." : "Add service"}
+          {saving ? "Adding..." : "Add this service"}
         </button>
         {(addedCount > 0 || done) && (
           <p className="text-xs text-green-600 font-semibold flex items-center gap-1">
@@ -897,8 +896,8 @@ function DepositsBody({
         className="w-full flex items-center justify-between gap-2 bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50/40 rounded-lg px-3 py-2.5 text-left transition-all group"
       >
         <div>
-          <p className="text-xs font-semibold text-gray-900">Open payment settings page</p>
-          <p className="text-[11px] text-gray-500 mt-0.5">Configure payment methods and refund rules.</p>
+          <p className="text-xs font-semibold text-gray-900">Open the payment settings page</p>
+          <p className="text-[11px] text-gray-500 mt-0.5">Pick how you want to get paid.</p>
         </div>
         <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -907,8 +906,8 @@ function DepositsBody({
 
       <div className="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold text-gray-900">Require deposit at booking</p>
-          <p className="text-xs text-gray-500 mt-0.5">Reduces no-shows and locks in commitment.</p>
+          <p className="text-sm font-semibold text-gray-900">Ask for a deposit when booking</p>
+          <p className="text-xs text-gray-500 mt-0.5">People show up when they&apos;ve already paid something.</p>
         </div>
         <button
           role="switch"
@@ -932,10 +931,9 @@ function DepositsBody({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-blue-900">Set deposit amount per package</p>
+            <p className="text-xs font-semibold text-blue-900">Now set the deposit on each service</p>
             <p className="text-[11px] text-blue-800 mt-0.5">
-              The deposit amount is configured on each service package, so you can charge different
-              deposits for different services.
+              Each service can have its own deposit amount — open packages to set it.
             </p>
             <button
               onClick={openPackages}
@@ -960,7 +958,7 @@ function DepositsBody({
             onClick={onMarkDone}
             className="text-xs font-semibold text-gray-500 hover:text-gray-700"
           >
-            Skip for now
+            Do this later
           </button>
         )}
         {savedAt && (
@@ -1050,20 +1048,23 @@ function ShareLinkBody({
         </div>
       </div>
 
-      <ul className="text-xs text-gray-600 space-y-1.5 pt-1">
-        <li className="flex items-start gap-2">
-          <span className="text-gray-400 mt-0.5">•</span>
-          Add this link to your Instagram bio
-        </li>
-        <li className="flex items-start gap-2">
-          <span className="text-gray-400 mt-0.5">•</span>
-          Reply to customer DMs with the link
-        </li>
-        <li className="flex items-start gap-2">
-          <span className="text-gray-400 mt-0.5">•</span>
-          Print a QR code for your shop or van
-        </li>
-      </ul>
+      <div>
+        <p className="text-xs font-semibold text-gray-700 mb-1.5">Where to put your link</p>
+        <ul className="text-xs text-gray-600 space-y-1.5">
+          <li className="flex items-start gap-2">
+            <span className="text-gray-400 mt-0.5">•</span>
+            Paste it in your Instagram bio
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-gray-400 mt-0.5">•</span>
+            Reply to customer texts and DMs with it
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-gray-400 mt-0.5">•</span>
+            Print a QR code for your shop or van
+          </li>
+        </ul>
+      </div>
 
       <div className="border-t border-gray-200 pt-3 mt-2">
         <button

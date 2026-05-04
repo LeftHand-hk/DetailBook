@@ -108,6 +108,19 @@ model User {
   onboardingCompletedAt DateTime?
   onboardingProgress    Json?
 
+  // Welcome email sequence (3 emails over 13 days). `welcomeEmailsSent`
+  // tracks how many emails in the sequence have gone out (0–3).
+  // `welcomeEmailLastSentAt` is the timestamp of the most recent send and
+  // is what the hourly cron uses to decide when the next email is due.
+  // `welcomeEmailsPaused` is flipped true when the user clicks the
+  // unsubscribe link at the bottom of any email; once paused, no further
+  // emails in the sequence are sent. `welcomeUnsubToken` is a per-user
+  // token embedded in the unsubscribe URL so we don't need login.
+  welcomeEmailsSent       Int       @default(0)
+  welcomeEmailLastSentAt  DateTime?
+  welcomeEmailsPaused     Boolean   @default(false)
+  welcomeUnsubToken       String?   @unique
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

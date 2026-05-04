@@ -270,7 +270,7 @@ export default function MessagesPage() {
       <div className="grid lg:grid-cols-4 gap-5">
         {/* Template Selector Sidebar */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fadeInUp" style={{ animationDelay: "100ms", opacity: 0 }}>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100">
               <h3 className="font-bold text-gray-900 text-xs uppercase tracking-wider">Templates</h3>
             </div>
@@ -317,7 +317,7 @@ export default function MessagesPage() {
           </div>
 
           {/* Enable/Disable per notification */}
-          <div className="mt-4 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fadeInUp" style={{ animationDelay: "150ms", opacity: 0 }}>
+          <div className="mt-4 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100">
               <h3 className="font-bold text-gray-900 text-xs uppercase tracking-wider">On / Off</h3>
             </div>
@@ -351,7 +351,7 @@ export default function MessagesPage() {
           </div>
 
           {/* Variables Reference */}
-          <div className="mt-4 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fadeInUp" style={{ animationDelay: "200ms", opacity: 0 }}>
+          <div className="mt-4 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100">
               <h3 className="font-bold text-gray-900 text-xs uppercase tracking-wider">Variables</h3>
             </div>
@@ -371,7 +371,7 @@ export default function MessagesPage() {
         {/* Template Editor */}
         <div className="lg:col-span-3">
           {isLocked ? (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fadeInUp" style={{ animationDelay: "150ms", opacity: 0 }}>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center">
                   {currentTemplate.icon}
@@ -415,7 +415,7 @@ export default function MessagesPage() {
               </div>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fadeInUp" style={{ animationDelay: "150ms", opacity: 0 }}>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
                   {currentTemplate.icon}

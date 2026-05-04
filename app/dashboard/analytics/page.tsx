@@ -281,8 +281,7 @@ export default function AnalyticsPage() {
               { label: "Completion", value: `${completionRate}%`, sub: "Rate", color: "from-amber-500 to-orange-600" },
             ].map((stat, i) => (
               <div key={stat.label + stat.sub}
-                className={`relative overflow-hidden rounded-2xl p-5 text-white bg-gradient-to-br ${stat.color} shadow-lg animate-fadeInUp`}
-                style={{ animationDelay: `${i * 80}ms`, animationFillMode: "both" }}>
+                className={`relative overflow-hidden rounded-2xl p-5 text-white bg-gradient-to-br ${stat.color} shadow-lg`}>
                 <div className="absolute -right-4 -top-4 w-20 h-20 bg-white/10 rounded-full" />
                 <div className="relative">
                   <p className="text-white/60 text-xs font-semibold uppercase tracking-wider">{stat.label}</p>
@@ -294,10 +293,9 @@ export default function AnalyticsPage() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-5">
-            {chartAreas.map((chart, i) => (
+            {chartAreas.map((chart) => (
               <div key={chart.title}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fadeInUp"
-                style={{ animationDelay: `${(i + 4) * 80}ms`, animationFillMode: "both" }}>
+                className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
                   <div className="flex items-center gap-3">
                     <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${chart.gradient} flex items-center justify-center`}>{chart.icon}</div>
@@ -361,7 +359,7 @@ export default function AnalyticsPage() {
             ))}
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fadeInUp" style={{ animationDelay: "200ms", animationFillMode: "both" }}>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <h2 className="font-bold text-gray-900">All Customers</h2>
               <span className="text-xs text-gray-400 font-medium">{customers.length} total</span>

@@ -146,7 +146,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       .catch(() => {
         // Server sync failed; local data remains as fallback
       });
-  }, [router, pathname]);
+    // Run once on mount only — pathname changes shouldn't re-sync.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLogout = () => {
     logout();
