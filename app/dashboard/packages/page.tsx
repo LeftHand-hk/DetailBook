@@ -6,6 +6,14 @@ import { getPackages, setPackages, getUser, generateId } from "@/lib/storage";
 import type { Package, User } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
 import SetupHint from "@/components/SetupHint";
+import EmptyState, { EmptyIcons } from "@/components/EmptyState";
+
+const QUICK_TEMPLATES = [
+  { name: "Basic Wash", description: "Exterior wash, tire shine, and quick interior wipe-down.", price: "45", duration: "30", deposit: "" },
+  { name: "Full Detail", description: "Complete interior and exterior detail with premium products.", price: "150", duration: "120", deposit: "" },
+  { name: "Ceramic Coating", description: "Long-lasting ceramic protection with paint prep and decontamination.", price: "400", duration: "240", deposit: "" },
+  { name: "Paint Correction", description: "Multi-stage polish to remove swirls, scratches, and oxidation.", price: "300", duration: "180", deposit: "" },
+];
 
 const STARTER_LIMIT = 5;
 
@@ -54,6 +62,12 @@ export default function PackagesPage() {
   const openAdd = () => {
     setEditing(null);
     setForm(EMPTY_FORM);
+    setShowModal(true);
+  };
+
+  const openWithTemplate = (t: typeof QUICK_TEMPLATES[number]) => {
+    setEditing(null);
+    setForm({ ...t });
     setShowModal(true);
   };
 
@@ -218,16 +232,48 @@ export default function PackagesPage() {
 
       {/* Package Grid */}
       {packages.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-16 text-center">
-          <div className="text-6xl mb-4">📦</div>
-          <h3 className="text-lg font-bold text-gray-900 mb-2">No packages yet</h3>
-          <p className="text-gray-500 mb-6">Create your first service package to get started.</p>
-          <button
-            onClick={openAdd}
-            className="bg-blue-600 text-white font-semibold px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors"
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
+          <EmptyState
+            icon={EmptyIcons.Package}
+            title="Add your first service"
+            description="Create the services you offer so customers can book them. Most detailers add 3–5 packages to start."
+            action={
+              <button
+                onClick={openAdd}
+                className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
+              >
+                Add Service
+              </button>
+            }
           >
-            Add Your First Package
-          </button>
+            <div className="max-w-2xl mx-auto">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 text-left">
+                Quick start templates
+              </p>
+              <div className="grid sm:grid-cols-2 gap-2">
+                {QUICK_TEMPLATES.map((t) => (
+                  <button
+                    key={t.name}
+                    onClick={() => openWithTemplate(t)}
+                    className="text-left bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50/40 rounded-lg p-3 transition-all flex items-center justify-between gap-3 group"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{t.name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        ${t.price} · {parseInt(t.duration, 10) >= 60 ? `${parseInt(t.duration, 10) / 60} hour${parseInt(t.duration, 10) >= 120 ? "s" : ""}` : `${t.duration} min`}
+                      </p>
+                    </div>
+                    <span className="flex-shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 group-hover:text-blue-700">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </EmptyState>
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getUser, getBookings } from "@/lib/storage";
 import type { User, Booking } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
+import EmptyState, { EmptyIcons } from "@/components/EmptyState";
 
 export default function AnalyticsPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -260,7 +261,17 @@ export default function AnalyticsPage() {
       </div>
 
       {/* ── Analytics Tab ── */}
-      {activeTab === "analytics" && (
+      {activeTab === "analytics" && bookings.length === 0 && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
+          <EmptyState
+            icon={EmptyIcons.TrendingUp}
+            title="Revenue insights coming soon"
+            description="Once you start receiving bookings, you'll see revenue trends, top services, and customer insights here."
+          />
+        </div>
+      )}
+
+      {activeTab === "analytics" && bookings.length > 0 && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {[
@@ -337,20 +348,15 @@ export default function AnalyticsPage() {
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {[
-              { label: "Total Customers", value: String(customers.length), icon: "👥", color: "from-blue-500 to-blue-700" },
-              { label: "Repeat Customers", value: String(repeatCustomers), icon: "🔄", color: "from-emerald-500 to-emerald-700" },
-              { label: "Avg. Lifetime Value", value: `$${avgLifetimeValue}`, icon: "💰", color: "from-purple-500 to-purple-700" },
-              { label: "New This Month", value: String(customers.filter(c => c.lastVisit.startsWith(new Date().toISOString().slice(0, 7))).length), icon: "✨", color: "from-amber-500 to-orange-600" },
-            ].map((stat, i) => (
-              <div key={stat.label}
-                className={`relative overflow-hidden rounded-2xl p-5 text-white bg-gradient-to-br ${stat.color} shadow-lg animate-fadeInUp`}
-                style={{ animationDelay: `${i * 80}ms`, animationFillMode: "both" }}>
-                <div className="absolute -right-4 -top-4 w-20 h-20 bg-white/10 rounded-full" />
-                <div className="relative">
-                  <span className="text-2xl mb-2 block">{stat.icon}</span>
-                  <p className="text-2xl font-extrabold">{stat.value}</p>
-                  <p className="text-white/70 text-xs mt-0.5">{stat.label}</p>
-                </div>
+              { label: "Total Customers", value: customers.length === 0 ? "—" : String(customers.length), sub: "All-time" },
+              { label: "Repeat Customers", value: customers.length === 0 ? "—" : String(repeatCustomers), sub: "Booked more than once" },
+              { label: "Avg. Lifetime Value", value: customers.length === 0 ? "—" : `$${avgLifetimeValue}`, sub: "Per customer" },
+              { label: "New This Month", value: customers.length === 0 ? "—" : String(customers.filter(c => c.lastVisit.startsWith(new Date().toISOString().slice(0, 7))).length), sub: "First-time bookers" },
+            ].map((stat) => (
+              <div key={stat.label} className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{stat.label}</p>
+                <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900 mt-2">{stat.value}</p>
+                <p className="text-xs text-gray-500 font-medium mt-1">{stat.sub}</p>
               </div>
             ))}
           </div>
@@ -362,17 +368,11 @@ export default function AnalyticsPage() {
             </div>
 
             {customers.length === 0 ? (
-              <div className="px-6 py-16 text-center">
-                <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <p className="text-gray-900 font-semibold text-sm mb-1">Customer tracking is active</p>
-                <p className="text-gray-500 text-sm max-w-sm mx-auto">
-                  Your customer database will populate as bookings come in. Each booking automatically creates or updates a customer profile.
-                </p>
-              </div>
+              <EmptyState
+                icon={EmptyIcons.Users}
+                title="No customers yet"
+                description="Your customers will be added automatically when they book through your link."
+              />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">

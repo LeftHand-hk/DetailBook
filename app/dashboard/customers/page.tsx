@@ -5,15 +5,26 @@ import Link from "next/link";
 import { getUser } from "@/lib/storage";
 import type { User } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
+import EmptyState, { EmptyIcons } from "@/components/EmptyState";
 
 export default function CustomersPage() {
   const [user, setUser] = useState<User | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => {
     setUser(getUser());
     setMounted(true);
   }, []);
+
+  const copyBookingLink = async () => {
+    if (!user?.slug) return;
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/book/${user.slug}`);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch { /* clipboard not available */ }
+  };
 
   if (!mounted) {
     return (
@@ -97,75 +108,40 @@ export default function CustomersPage() {
       {/* Stats row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
-          { label: "Total Customers", value: "0", icon: "👥", color: "from-blue-500 to-blue-700" },
-          { label: "Repeat Customers", value: "0", icon: "🔄", color: "from-emerald-500 to-emerald-700" },
-          { label: "Avg. Lifetime Value", value: "$0", icon: "💰", color: "from-purple-500 to-purple-700" },
-          { label: "New This Month", value: "0", icon: "✨", color: "from-amber-500 to-orange-600" },
-        ].map((stat, i) => (
+          { label: "Total Customers", value: "—", sub: "Updates as bookings come in" },
+          { label: "Repeat Customers", value: "—", sub: "Booked more than once" },
+          { label: "Avg. Lifetime Value", value: "—", sub: "Per customer" },
+          { label: "New This Month", value: "—", sub: "First-time bookers" },
+        ].map((stat) => (
           <div
             key={stat.label}
-            className={`relative overflow-hidden rounded-2xl p-5 text-white bg-gradient-to-br ${stat.color} shadow-lg animate-fadeInUp`}
-            style={{ animationDelay: `${i * 100}ms`, opacity: 0 }}
+            className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm"
           >
-            <div className="absolute -right-4 -top-4 w-20 h-20 bg-white/10 rounded-full" />
-            <div className="relative">
-              <span className="text-2xl mb-2 block">{stat.icon}</span>
-              <p className="text-2xl font-extrabold">{stat.value}</p>
-              <p className="text-white/70 text-xs mt-0.5">{stat.label}</p>
-            </div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{stat.label}</p>
+            <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900 mt-2">{stat.value}</p>
+            <p className="text-xs text-gray-500 font-medium mt-1">{stat.sub}</p>
           </div>
         ))}
       </div>
 
       {/* Customer Table */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fadeInUp" style={{ animationDelay: "200ms", opacity: 0 }}>
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 className="font-bold text-gray-900">All Customers</h2>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search customers..."
-                className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-48"
-                disabled
-              />
-            </div>
-          </div>
         </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50/70">
-                <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-6 py-3">Customer</th>
-                <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 py-3 hidden sm:table-cell">Phone</th>
-                <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 py-3 hidden md:table-cell">Vehicle</th>
-                <th className="text-center text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 py-3">Bookings</th>
-                <th className="text-right text-xs font-semibold text-gray-400 uppercase tracking-wider px-6 py-3">Total Spent</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td colSpan={5} className="px-6 py-16 text-center">
-                  <div className="flex flex-col items-center">
-                    <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mb-4">
-                      <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                      </svg>
-                    </div>
-                    <p className="text-gray-900 font-semibold text-sm mb-1">Customer tracking is active</p>
-                    <p className="text-gray-500 text-sm max-w-sm">
-                      Your customer database will populate as bookings come in. Each new booking automatically creates or updates a customer profile.
-                    </p>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <EmptyState
+          icon={EmptyIcons.Users}
+          title="No customers yet"
+          description="Your customers will be added automatically when they book through your link."
+          action={
+            <button
+              onClick={copyBookingLink}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
+            >
+              {copiedLink ? "Copied!" : "Copy Booking Link"}
+            </button>
+          }
+        />
       </div>
       <DashboardHelp page="customers" />
     </div>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { getUser, getBookings, getPackages } from "@/lib/storage";
 import type { User, Booking, Package } from "@/types";
+import EmptyState, { EmptyIcons } from "@/components/EmptyState";
 
 const statusColors: Record<string, string> = {
   confirmed: "bg-green-100 text-green-700 border border-green-200",
@@ -18,12 +19,9 @@ export default function DashboardPage() {
     if (typeof window === "undefined") return [];
     try { return getBookings() || []; } catch { return []; }
   });
-  const [packages, setPackages] = useState<Package[]>([]);
+  const [, setPackages] = useState<Package[]>([]);
   const [copied, setCopied] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [showGuide, setShowGuide] = useState(false);
-  const [dismissedGuide, setDismissedGuide] = useState(false);
-  const [guideStep, setGuideStep] = useState(0);
 
   useEffect(() => {
     setUser(getUser());
@@ -33,7 +31,6 @@ export default function DashboardPage() {
       .then((r) => r.ok ? r.json() : [])
       .then((data: Package[]) => setPackages(data))
       .catch(() => setPackages(getPackages()));
-    setDismissedGuide(localStorage.getItem("detailbook_guide_dismissed_v2") === "true");
 
     fetch("/api/bookings")
       .then((r) => r.ok ? r.json() : [])
@@ -51,11 +48,6 @@ export default function DashboardPage() {
       })
       .catch(() => setBookings(getBookings()));
   }, []);
-
-  const dismissGuide = () => {
-    setDismissedGuide(true);
-    localStorage.setItem("detailbook_guide_dismissed_v2", "true");
-  };
 
   const isPro = user?.plan === "pro";
   const today = new Date().toISOString().split("T")[0];
@@ -87,29 +79,6 @@ export default function DashboardPage() {
       setTimeout(() => setCopied(false), 2000);
     }
   };
-
-  const starterGuideSteps = [
-    { icon: "📦", title: "1. Add your service packages", desc: "Open Packages and create what you offer (Full Detail, Interior Clean, Ceramic Coating, etc.). For each one set the price, how long it takes, the vehicle types it covers and the deposit you want upfront.", action: { label: "Go to Packages", href: "/dashboard/packages" } },
-    { icon: "💳", title: "2. Turn on a payment method", desc: "Open Payments and switch on at least one option — Stripe is the simplest for online card payments. Without this, customers can't pay deposits and bookings won't go through.", action: { label: "Set up Payments", href: "/dashboard/payments" } },
-    { icon: "🎨", title: "3. Build your booking page", desc: "Open Booking Page to add your logo, business name, bio, banner, service areas and accent colour. This is the page customers see when they click your link.", action: { label: "Customise Page", href: "/dashboard/booking-page" } },
-    { icon: "⚙️", title: "4. Set your business hours", desc: "Open Settings and pick the days and hours you work. Customers can only book inside these times.", action: { label: "Go to Settings", href: "/dashboard/settings" } },
-    { icon: "🔗", title: "5. Share your booking link", desc: "Copy your unique link and put it in your Instagram bio, Google profile, ads or texts. That's how customers reach your booking page.", action: { label: "Copy Link", onClick: handleCopyLink } },
-    { icon: "📋", title: "6. Manage incoming bookings", desc: "New bookings show up in the Bookings tab and on the Calendar. Confirm them, mark them complete when finished, and check the deposit was paid.", action: { label: "View Bookings", href: "/dashboard/bookings" } },
-    { icon: "🚀", title: "7. Subscribe before your trial ends", desc: "Your free trial includes everything on Starter. Add a card before it expires so your booking page stays live and you keep getting appointments.", action: { label: "Subscribe Now", href: "/dashboard/billing" } },
-  ];
-
-  const proGuideSteps = [
-    { icon: "📦", title: "1. Add your service packages", desc: "Open Packages and create your services. Set prices, durations, deposit amounts and the vehicle types each service applies to.", action: { label: "Go to Packages", href: "/dashboard/packages" } },
-    { icon: "💳", title: "2. Turn on a payment method", desc: "Open Payments and switch on at least one option — Stripe for instant card payments, or PayPal / Cash App / Bank transfer if customers pay you off-platform and upload proof. Without this, deposits can't be collected.", action: { label: "Set up Payments", href: "/dashboard/payments" } },
-    { icon: "🎨", title: "3. Build your booking page", desc: "Open Booking Page to add your logo, business name, bio, banner, accent colour and which sections to show. This is the page customers see.", action: { label: "Customise Page", href: "/dashboard/booking-page" } },
-    { icon: "⚙️", title: "4. Set your business hours", desc: "Open Settings and pick the days and hours you work. Customers can only book inside these times.", action: { label: "Go to Settings", href: "/dashboard/settings" } },
-    { icon: "👥", title: "5. Add your staff", desc: "Open Staff to invite team members. Each gets their own login and customers can pick a specific person when booking.", action: { label: "Manage Staff", href: "/dashboard/staff" } },
-    { icon: "💬", title: "6. Edit your message templates", desc: "Open Messages to customise the booking confirmation, the 2-hour reminder and the follow-up — all sent automatically by email and SMS.", action: { label: "Edit Templates", href: "/dashboard/messages" } },
-    { icon: "🔗", title: "7. Share your booking link", desc: "Copy your unique link and share it in your Instagram bio, Google profile, ads or texts.", action: { label: "Copy Link", onClick: handleCopyLink } },
-    { icon: "📊", title: "8. Track what's working", desc: "Open Analytics to see your revenue trends, busiest days and top services. Use the data to decide what to promote.", action: { label: "View Analytics", href: "/dashboard/analytics" } },
-  ];
-
-  const guideSteps = isPro ? proGuideSteps : starterGuideSteps;
 
   const formatDate = (date: string) =>
     new Date(date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -177,39 +146,17 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Getting Started Banner ── */}
-      {!dismissedGuide && (
-        <div className="mb-6 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-5 animate-fadeInUp delay-100 shadow-sm shadow-blue-600/10">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-              </div>
-              <div>
-                <h3 className="text-white font-bold text-sm">New here? Let us show you around!</h3>
-                <p className="text-blue-100 text-xs mt-0.5">Follow these simple steps to get your booking page live in under 5 minutes.</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <button onClick={() => setShowGuide(true)} className="bg-white text-blue-700 font-bold text-xs px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors">
-                Show Guide
-              </button>
-              <button onClick={dismissGuide} className="text-white/70 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ── Stat Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {[
-          { label: "Total Bookings", value: bookings.length, sub: `${pendingBookings.length} pending` },
-          { label: "This Month", value: `$${monthRevenue.toLocaleString()}`, sub: "Completed revenue" },
-          { label: "Deposits", value: `$${totalDeposits.toLocaleString()}`, sub: "Collected upfront" },
-          { label: "Completion", value: `${completionRate}%`, sub: `${completedCount} of ${bookings.length} jobs` },
-        ].map((stat, i) => (
+        {(() => {
+          const empty = bookings.length === 0;
+          return [
+            { label: "Total Bookings", value: empty ? "—" : String(bookings.length), sub: empty ? "Awaiting first booking" : `${pendingBookings.length} pending` },
+            { label: "This Month", value: empty ? "—" : `$${monthRevenue.toLocaleString()}`, sub: "Completed revenue" },
+            { label: "Deposits", value: empty ? "—" : `$${totalDeposits.toLocaleString()}`, sub: "Collected upfront" },
+            { label: "Completion", value: empty ? "—" : `${completionRate}%`, sub: empty ? "Will appear after first job" : `${completedCount} of ${bookings.length} jobs` },
+          ];
+        })().map((stat, i) => (
           <div key={i} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm animate-fadeInUp"
             style={{ animationDelay: `${i * 80}ms`, animationFillMode: "both" }}>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{stat.label}</p>
@@ -232,16 +179,21 @@ export default function DashboardPage() {
           </div>
 
           {recentBookings.length === 0 ? (
-            <div className="text-center py-12 px-6">
-              <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                <svg className="w-7 h-7 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" /></svg>
-              </div>
-              <p className="text-gray-900 font-semibold mb-1">No bookings yet</p>
-              <p className="text-gray-500 text-sm mb-4">Share your booking link to start receiving appointments</p>
-              <button onClick={handleCopyLink} className="bg-blue-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors">
-                Copy Booking Link
-              </button>
-            </div>
+            <EmptyState
+              size="compact"
+              icon={EmptyIcons.Calendar}
+              title="No bookings yet"
+              description="Once customers book through your link, their appointments will appear here."
+              action={
+                <button
+                  onClick={handleCopyLink}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
+                >
+                  {copied ? "Copied!" : "Copy Booking Link"}
+                </button>
+              }
+              secondary="Share this link on Instagram, Facebook, or with existing customers."
+            />
           ) : (
             <div className="divide-y divide-gray-50">
               {recentBookings.map((booking) => (
@@ -367,89 +319,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── Floating Help Button ── */}
-      <button
-        onClick={() => setShowGuide(true)}
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white pl-4 pr-5 py-3 rounded-full shadow-xl shadow-blue-600/30 transition-all hover:scale-105"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <span className="text-sm font-semibold">Need Help?</span>
-      </button>
-
-      {/* ── Help / Guide Modal ── */}
-      {showGuide && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowGuide(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-extrabold text-white">Getting Started {isPro ? "— Pro Plan" : "— Starter Plan"}</h2>
-                  <p className="text-blue-100 text-xs mt-0.5">Get your booking page live in 5 minutes</p>
-                </div>
-                <button onClick={() => setShowGuide(false)} className="p-2 rounded-xl hover:bg-white/10 transition-colors">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-              </div>
-              <div className="flex gap-1.5 mt-4">
-                {guideSteps.map((_, i) => (
-                  <button key={i} onClick={() => setGuideStep(i)}
-                    className={`h-1.5 rounded-full transition-all ${i === guideStep ? "bg-white flex-[2]" : "bg-white/30 flex-1 hover:bg-white/50"}`} />
-                ))}
-              </div>
-            </div>
-            <div className="p-6">
-              <div className="flex items-start gap-4 mb-6">
-                <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center flex-shrink-0 text-3xl">
-                  {guideSteps[guideStep].icon}
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900 text-base mb-1.5">{guideSteps[guideStep].title}</h3>
-                  <p className="text-sm text-gray-600 leading-relaxed">{guideSteps[guideStep].desc}</p>
-                </div>
-              </div>
-              {guideSteps[guideStep].action && (
-                <div className="mb-6">
-                  {guideSteps[guideStep].action.href ? (
-                    <Link href={guideSteps[guideStep].action.href!} onClick={() => setShowGuide(false)}
-                      className="inline-flex items-center gap-2 bg-blue-600 text-white font-bold text-sm px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors">
-                      {guideSteps[guideStep].action.label}
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-                    </Link>
-                  ) : (
-                    <button onClick={() => { guideSteps[guideStep].action.onClick?.(); }}
-                      className="inline-flex items-center gap-2 bg-blue-600 text-white font-bold text-sm px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors">
-                      {guideSteps[guideStep].action.label}
-                    </button>
-                  )}
-                </div>
-              )}
-              <div className="flex items-center justify-between border-t border-gray-100 pt-4">
-                <button onClick={() => setGuideStep(Math.max(0, guideStep - 1))} disabled={guideStep === 0}
-                  className={`flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl transition-colors ${guideStep === 0 ? "text-gray-300 cursor-not-allowed" : "text-gray-600 hover:bg-gray-100"}`}>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                  Previous
-                </button>
-                <span className="text-xs text-gray-400 font-semibold">{guideStep + 1} of {guideSteps.length}</span>
-                {guideStep < guideSteps.length - 1 ? (
-                  <button onClick={() => setGuideStep(guideStep + 1)}
-                    className="flex items-center gap-1.5 text-sm font-bold text-blue-700 hover:bg-blue-50 px-4 py-2 rounded-xl transition-colors">
-                    Next
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                  </button>
-                ) : (
-                  <button onClick={() => { setShowGuide(false); dismissGuide(); }}
-                    className="flex items-center gap-1.5 text-sm font-bold text-blue-700 hover:bg-blue-50 px-4 py-2 rounded-xl transition-colors">
-                    Got it!
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

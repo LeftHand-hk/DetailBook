@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { getBookings, setBookings as saveBookings, getUser } from "@/lib/storage";
 import type { Booking, Staff } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
+import EmptyState, { EmptyIcons } from "@/components/EmptyState";
 
 const statusColors: Record<string, string> = {
   confirmed: "bg-green-100 text-green-700 border border-green-200",
@@ -37,6 +38,18 @@ export default function BookingsPage() {
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [isPro, setIsPro] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [userSlug, setUserSlug] = useState<string>("");
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const copyBookingLink = async () => {
+    if (!userSlug) return;
+    const url = `${window.location.origin}/book/${userSlug}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch { /* clipboard not available */ }
+  };
 
   const loadBookings = async () => {
     try {
@@ -72,8 +85,13 @@ export default function BookingsPage() {
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (data?.user?.plan === "pro") setIsPro(true);
+        if (data?.user?.slug) setUserSlug(data.user.slug);
       })
-      .catch(() => setIsPro(getUser()?.plan === "pro"));
+      .catch(() => {
+        const u = getUser();
+        if (u?.plan === "pro") setIsPro(true);
+        if (u?.slug) setUserSlug(u.slug);
+      });
 
     fetch("/api/staff").then((r) => r.ok ? r.json() : []).then(setStaffList).catch(() => {});
   }, []);
@@ -338,24 +356,28 @@ export default function BookingsPage() {
 
       {/* Bookings List */}
       {filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-16 px-6">
-          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-blue-50 flex items-center justify-center">
-            <svg className="w-7 h-7 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-          </div>
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
           {bookings.length === 0 ? (
-            <>
-              <p className="font-semibold text-gray-900">No bookings yet</p>
-              <p className="text-sm text-gray-500 mt-1">
-                Your bookings will show up here. Share your booking link to get started.
-              </p>
-            </>
+            <EmptyState
+              icon={EmptyIcons.Calendar}
+              title="No bookings yet"
+              description="Once customers book through your link, their appointments will appear here."
+              action={
+                <button
+                  onClick={copyBookingLink}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
+                >
+                  {copiedLink ? "Copied!" : "Copy Booking Link"}
+                </button>
+              }
+              secondary="Share this link on Instagram, Facebook, or with existing customers."
+            />
           ) : (
-            <>
-              <p className="font-semibold text-gray-900">No bookings match your filters</p>
-              <p className="text-sm text-gray-500 mt-1">Try adjusting your search or filters.</p>
-            </>
+            <EmptyState
+              icon={EmptyIcons.Filter}
+              title="No bookings match your filters"
+              description="Try adjusting your search or filters to see more results."
+            />
           )}
         </div>
       ) : (

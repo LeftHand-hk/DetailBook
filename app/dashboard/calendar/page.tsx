@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { getBookings, getUser } from "@/lib/storage";
 import type { Booking } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
+import EmptyState, { EmptyIcons } from "@/components/EmptyState";
 
 const DAYS_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
 const DAYS_FULL = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -53,6 +54,22 @@ export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [showDaySheet, setShowDaySheet] = useState(false);
+  const [userSlug, setUserSlug] = useState<string>("");
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const copyBookingLink = async () => {
+    if (!userSlug) return;
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/book/${userSlug}`);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch { /* clipboard not available */ }
+  };
+
+  useEffect(() => {
+    const u = getUser();
+    if (u?.slug) setUserSlug(u.slug);
+  }, []);
 
   useEffect(() => {
     // Load from API (source of truth), fallback to localStorage
@@ -153,6 +170,25 @@ export default function CalendarPage() {
           )}
         </div>
       </div>
+
+      {bookings.length === 0 && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-5">
+          <EmptyState
+            size="compact"
+            icon={EmptyIcons.Calendar}
+            title="Your schedule is open"
+            description="Booked appointments will appear on your calendar. Share your booking link to get started."
+            action={
+              <button
+                onClick={copyBookingLink}
+                className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
+              >
+                {copiedLink ? "Copied!" : "Copy Booking Link"}
+              </button>
+            }
+          />
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-5">
         {/* ── Calendar Card ── */}
