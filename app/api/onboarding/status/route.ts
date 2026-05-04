@@ -46,6 +46,32 @@ export async function GET() {
     Boolean(user.bookingPageTitle) ||
     Boolean(user.bio);
 
+  // Sticky completion: once a derived step has ever been observed as done,
+  // it stays done. Avoids the surprising case where editing a customised
+  // booking page (e.g. clearing a field briefly during autosave) flips the
+  // step back to "not finished".
+  const stepDone = {
+    packages: Boolean(progress.packages) || user._count.packages > 0,
+    business_hours: Boolean(progress.business_hours) || hasBusinessHours,
+    booking_page: Boolean(progress.booking_page) || bookingPageCustomized,
+    booking_link: Boolean(progress.booking_link),
+    deposit: Boolean(progress.deposit) || user.requireDeposit,
+  };
+
+  // Persist newly-observed completions so future GETs don't depend on the
+  // derived state staying true. We only flip on; never off.
+  const newlyDone: Partial<Record<StepId, boolean>> = {};
+  if (!progress.packages && stepDone.packages) newlyDone.packages = true;
+  if (!progress.business_hours && stepDone.business_hours) newlyDone.business_hours = true;
+  if (!progress.booking_page && stepDone.booking_page) newlyDone.booking_page = true;
+  if (!progress.deposit && stepDone.deposit) newlyDone.deposit = true;
+  if (Object.keys(newlyDone).length) {
+    await prisma.user.update({
+      where: { id: session.id },
+      data: { onboardingProgress: { ...progress, ...newlyDone } },
+    });
+  }
+
   const steps = [
     {
       id: "packages" as const,
@@ -53,7 +79,7 @@ export async function GET() {
       description: "Create at least one package customers can book.",
       cta: "Add a package",
       href: "/dashboard/packages",
-      done: user._count.packages > 0,
+      done: stepDone.packages,
     },
     {
       id: "business_hours" as const,
@@ -61,7 +87,7 @@ export async function GET() {
       description: "Tell customers when they can book appointments with you.",
       cta: "Set hours",
       href: "/dashboard/settings",
-      done: hasBusinessHours,
+      done: stepDone.business_hours,
     },
     {
       id: "booking_page" as const,
@@ -69,7 +95,7 @@ export async function GET() {
       description: "Add your logo, banner, and a short intro about your business.",
       cta: "Customize page",
       href: "/dashboard/booking-page",
-      done: bookingPageCustomized,
+      done: stepDone.booking_page,
     },
     {
       id: "booking_link" as const,
@@ -77,15 +103,15 @@ export async function GET() {
       description: "Copy your unique link and share it on Instagram, Google, or WhatsApp.",
       cta: "Get my link",
       href: "/dashboard/booking-page",
-      done: Boolean(progress.booking_link),
+      done: stepDone.booking_link,
     },
     {
       id: "deposit" as const,
       title: "Configure deposits",
       description: "Reduce no-shows by requiring a deposit at the time of booking.",
       cta: "Set up deposits",
-      href: "/dashboard/settings",
-      done: Boolean(progress.deposit) || user.requireDeposit,
+      href: "/dashboard/payments",
+      done: stepDone.deposit,
     },
   ];
 

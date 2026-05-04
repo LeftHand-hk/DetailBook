@@ -28,7 +28,12 @@ export default function OnboardingTour() {
   const pathname = usePathname();
   const [status, setStatus] = useState<Status | null>(null);
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+
+  // The booking-page editor has a sticky autosave bar pinned to bottom-0
+  // (~52px tall) that would otherwise hide the floating buttons. Lift them
+  // when we're on that route.
+  const hasStickyBar = pathname === "/dashboard/booking-page";
+  const buttonBottomPx = hasStickyBar ? 96 + 56 : 96;
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -45,6 +50,16 @@ export default function OnboardingTour() {
   useEffect(() => {
     fetchStatus();
   }, [fetchStatus, pathname]);
+
+  // Refresh when the tab regains focus so a step the user just completed in
+  // another tab (or after returning from a settings save) shows as done
+  // without needing a manual refetch.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onFocus = () => fetchStatus();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchStatus]);
 
   // Auto-open when arriving with ?tour=true (post-signup redirect) OR on the
   // first dashboard visit ever, as long as the user hasn't dismissed and
@@ -76,34 +91,37 @@ export default function OnboardingTour() {
     })();
   }, [fetchStatus]);
 
-  const dismiss = useCallback(async () => {
+  // Optimistic close + fire-and-forget PATCH so the UI never waits on the
+  // network round-trip. We don't refetch — `dismissed` is purely UI state
+  // and the next page load will GET fresh data anyway.
+  const dismiss = useCallback(() => {
     setOpen(false);
-    try {
-      await fetch("/api/onboarding/status", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dismissed: true }),
-      });
-      fetchStatus();
-    } catch { /* ignore */ }
-  }, [fetchStatus]);
+    fetch("/api/onboarding/status", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dismissed: true }),
+    }).catch(() => { /* ignore */ });
+  }, []);
 
-  const markStep = useCallback(
-    async (stepId: Step["id"]) => {
-      setLoading(true);
-      try {
-        await fetch("/api/onboarding/status", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ markStep: stepId }),
-        });
-        await fetchStatus();
-      } finally {
-        setLoading(false);
-      }
-    },
-    [fetchStatus]
-  );
+  // Optimistically flip the step locally so the checkmark appears instantly,
+  // then PATCH in the background. If the request fails the next focus/route
+  // change will reconcile from the server.
+  const markStep = useCallback((stepId: Step["id"]) => {
+    setStatus((prev) => {
+      if (!prev) return prev;
+      const steps = prev.steps.map((s) =>
+        s.id === stepId ? { ...s, done: true } : s
+      );
+      const completed = steps.filter((s) => s.done).length;
+      const percent = Math.round((completed / steps.length) * 100);
+      return { ...prev, steps, completed, percent };
+    });
+    fetch("/api/onboarding/status", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ markStep: stepId }),
+    }).catch(() => { /* ignore */ });
+  }, []);
 
   const goToStep = (step: Step) => {
     setOpen(false);
@@ -120,11 +138,13 @@ export default function OnboardingTour() {
 
   return (
     <>
-      {/* Floating progress button — always visible until 100% */}
+      {/* Floating progress button — sits above the Need Help button (which
+          lives at bottom-6 right-6) so they don't overlap on tap. */}
       {!open && (
         <button
-          onClick={() => setOpen(true)}
-          className="fixed bottom-5 right-5 z-30 flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white pl-4 pr-5 py-3 rounded-2xl shadow-2xl shadow-blue-600/30 transition-all hover:scale-[1.02] group"
+          onClick={() => { fetchStatus(); setOpen(true); }}
+          style={{ bottom: buttonBottomPx, right: 24 }}
+          className="fixed z-30 flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white pl-4 pr-5 py-3 rounded-2xl shadow-2xl shadow-blue-600/30 transition-all hover:scale-[1.02] group"
         >
           <div className="relative w-9 h-9 flex items-center justify-center">
             <svg className="w-9 h-9 -rotate-90" viewBox="0 0 36 36">
@@ -256,8 +276,7 @@ export default function OnboardingTour() {
                               {(step.id === "booking_link" || step.id === "deposit") && (
                                 <button
                                   onClick={() => markStep(step.id)}
-                                  disabled={loading}
-                                  className="inline-flex items-center gap-1.5 text-gray-500 hover:text-gray-700 text-xs font-semibold px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+                                  className="inline-flex items-center gap-1.5 text-gray-500 hover:text-gray-700 text-xs font-semibold px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
                                 >
                                   Mark as done
                                 </button>
