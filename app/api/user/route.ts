@@ -57,7 +57,7 @@ export async function PUT(request: NextRequest) {
       "bannerImage", "bannerOverlayOpacity", "serviceLayout",
       "bookingPageTheme", "accentColor", "bookingPageTitle", "bookingPageSubtitle",
       "showRating", "showSocialLinks", "showServiceAreas", "showBusinessHours",
-      "showTrustBadges", "requireDeposit",
+      "showTrustBadges", "requireDeposit", "depositPercentage",
       "thankYouMessage", "termsText", "smsTemplates", "emailTemplates",
       "paymentMethods", "suspended",
       "emailConfirmations", "smsConfirmations", "smsRemindersEnabled", "emailRemindersEnabled",

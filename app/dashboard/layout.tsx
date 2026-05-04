@@ -7,7 +7,7 @@ import { isLoggedIn, logout, getUser, initializeDemo, syncFromServer } from "@/l
 import type { User } from "@/types";
 import { LogoIcon, LogoWordmark } from "@/components/Logo";
 import NotificationBell from "@/components/NotificationBell";
-import OnboardingTour from "@/components/OnboardingTour";
+import SetupExperience from "@/components/SetupExperience";
 
 interface NavItem {
   label: string;
@@ -441,15 +441,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         )}
 
+        {/* Setup banner — sticky-top inside the scroll area. The component
+            also renders the slide-out side panel as a fixed overlay. */}
+        <SetupExperience />
+
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto bg-gray-50/80">
           {children}
         </main>
       </div>
-
-      {/* Setup tour — floating progress button + modal. Hides itself once
-          all 5 steps are completed. */}
-      <OnboardingTour />
     </div>
   );
 }

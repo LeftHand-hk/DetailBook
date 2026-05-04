@@ -3,20 +3,20 @@ import prisma from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 
 type StepId =
-  | "packages"
-  | "business_hours"
-  | "booking_page"
-  | "booking_link"
-  | "deposit";
+  | "business_info"
+  | "working_hours"
+  | "services"
+  | "deposits"
+  | "share_link";
 
 type ProgressJson = Partial<Record<StepId, boolean>>;
 
 const STEP_ORDER: StepId[] = [
-  "packages",
-  "business_hours",
-  "booking_page",
-  "booking_link",
-  "deposit",
+  "business_info",
+  "working_hours",
+  "services",
+  "deposits",
+  "share_link",
 ];
 
 function readProgress(raw: unknown): ProgressJson {
@@ -40,31 +40,26 @@ export async function GET() {
 
   const hasBusinessHours =
     user.businessHours !== null && user.businessHours !== undefined;
-  const bookingPageCustomized =
-    Boolean(user.logo) ||
-    Boolean(user.bannerImage) ||
-    Boolean(user.bookingPageTitle) ||
-    Boolean(user.bio);
 
-  // Sticky completion: once a derived step has ever been observed as done,
-  // it stays done. Avoids the surprising case where editing a customised
-  // booking page (e.g. clearing a field briefly during autosave) flips the
-  // step back to "not finished".
+  // Sticky completion: once observed done, persist so transient UI states
+  // (clearing a field during autosave, etc.) don't flip a step back.
   const stepDone = {
-    packages: Boolean(progress.packages) || user._count.packages > 0,
-    business_hours: Boolean(progress.business_hours) || hasBusinessHours,
-    booking_page: Boolean(progress.booking_page) || bookingPageCustomized,
-    booking_link: Boolean(progress.booking_link),
-    deposit: Boolean(progress.deposit) || user.requireDeposit,
+    // Business Info is satisfied at signup — businessName is required by
+    // the form. We treat it as auto-completed.
+    business_info: true,
+    working_hours: Boolean(progress.working_hours) || hasBusinessHours,
+    services: Boolean(progress.services) || user._count.packages > 0,
+    // Deposits is optional: counts as done if the user explicitly
+    // configured (toggled on or off via the panel) OR enabled it.
+    deposits: Boolean(progress.deposits) || user.requireDeposit,
+    share_link: Boolean(progress.share_link),
   };
 
-  // Persist newly-observed completions so future GETs don't depend on the
-  // derived state staying true. We only flip on; never off.
+  // Persist newly-observed completions (only flip on, never off).
   const newlyDone: Partial<Record<StepId, boolean>> = {};
-  if (!progress.packages && stepDone.packages) newlyDone.packages = true;
-  if (!progress.business_hours && stepDone.business_hours) newlyDone.business_hours = true;
-  if (!progress.booking_page && stepDone.booking_page) newlyDone.booking_page = true;
-  if (!progress.deposit && stepDone.deposit) newlyDone.deposit = true;
+  if (!progress.working_hours && stepDone.working_hours) newlyDone.working_hours = true;
+  if (!progress.services && stepDone.services) newlyDone.services = true;
+  if (!progress.deposits && stepDone.deposits) newlyDone.deposits = true;
   if (Object.keys(newlyDone).length) {
     await prisma.user.update({
       where: { id: session.id },
@@ -74,53 +69,55 @@ export async function GET() {
 
   const steps = [
     {
-      id: "packages" as const,
-      title: "Add your services",
-      description: "Create at least one package customers can book.",
-      cta: "Add a package",
-      href: "/dashboard/packages",
-      done: stepDone.packages,
+      id: "business_info" as const,
+      title: "Business info",
+      description: "Pre-filled from your signup details.",
+      estimate: null,
+      optional: false,
+      done: stepDone.business_info,
     },
     {
-      id: "business_hours" as const,
-      title: "Set your business hours",
-      description: "Tell customers when they can book appointments with you.",
-      cta: "Set hours",
-      href: "/dashboard/settings",
-      done: stepDone.business_hours,
+      id: "working_hours" as const,
+      title: "Working hours",
+      description: "Tell customers when they can book appointments.",
+      estimate: "1 min",
+      optional: false,
+      done: stepDone.working_hours,
     },
     {
-      id: "booking_page" as const,
-      title: "Customize your booking page",
-      description: "Add your logo, banner, and a short intro about your business.",
-      cta: "Customize page",
-      href: "/dashboard/booking-page",
-      done: stepDone.booking_page,
+      id: "services" as const,
+      title: "Service packages",
+      description: "Add the services you offer with pricing and duration.",
+      estimate: "2 min",
+      optional: false,
+      done: stepDone.services,
     },
     {
-      id: "booking_link" as const,
+      id: "deposits" as const,
+      title: "Deposits",
+      description: "Reduce no-shows by collecting a deposit at booking.",
+      estimate: "1 min",
+      optional: true,
+      done: stepDone.deposits,
+    },
+    {
+      id: "share_link" as const,
       title: "Share your booking link",
-      description: "Copy your unique link and share it on Instagram, Google, or WhatsApp.",
-      cta: "Get my link",
-      href: "/dashboard/booking-page",
-      done: stepDone.booking_link,
-    },
-    {
-      id: "deposit" as const,
-      title: "Configure deposits",
-      description: "Reduce no-shows by requiring a deposit at the time of booking.",
-      cta: "Set up deposits",
-      href: "/dashboard/payments",
-      done: stepDone.deposit,
+      description: "Copy your link and share it on Instagram or with customers.",
+      estimate: "1 min",
+      optional: false,
+      done: stepDone.share_link,
     },
   ];
 
   const total = steps.length;
   const completed = steps.filter((s) => s.done).length;
   const percent = Math.round((completed / total) * 100);
+  const remainingMin = steps
+    .filter((s) => !s.done && s.estimate)
+    .reduce((acc, s) => acc + parseInt(s.estimate || "0", 10), 0);
 
-  // Auto-stamp completion the first time we observe 100%, so the floating
-  // button can hide forever (no need for a separate "I'm done" action).
+  // Auto-stamp completion the first time we observe 100%.
   let completedAt = user.onboardingCompletedAt;
   if (percent === 100 && !completedAt) {
     const updated = await prisma.user.update({
@@ -136,6 +133,7 @@ export async function GET() {
     completed,
     total,
     percent,
+    remainingMin,
     dismissed: user.onboardingDismissed,
     completedAt,
   });
