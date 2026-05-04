@@ -98,6 +98,16 @@ model User {
   signupIp      String?
   signupCountry String?  // ISO-3166 alpha-2 (e.g. "US", "DE", "AL")
 
+  // Setup tour state. The tour is a 5-step modal in /dashboard guiding the
+  // user through post-signup configuration. `dismissed` hides the auto-open
+  // (user can still reopen from the floating "Setup" button); `completedAt`
+  // is set when all steps are done so the button hides entirely. `progress`
+  // stores manual flags (e.g. booking_link_shared) that can't be derived
+  // from row data alone.
+  onboardingDismissed   Boolean   @default(false)
+  onboardingCompletedAt DateTime?
+  onboardingProgress    Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -7,6 +7,7 @@ import { isLoggedIn, logout, getUser, initializeDemo, syncFromServer } from "@/l
 import type { User } from "@/types";
 import { LogoIcon, LogoWordmark } from "@/components/Logo";
 import NotificationBell from "@/components/NotificationBell";
+import OnboardingTour from "@/components/OnboardingTour";
 
 interface NavItem {
   label: string;
@@ -445,6 +446,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {children}
         </main>
       </div>
+
+      {/* Setup tour — floating progress button + modal. Hides itself once
+          all 5 steps are completed. */}
+      <OnboardingTour />
     </div>
   );
 }

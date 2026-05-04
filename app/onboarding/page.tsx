@@ -108,7 +108,7 @@ export default function OnboardingPage() {
                 await fetch("/api/subscription/sync", { method: "POST" });
               } catch { /* ignore — billing page has retry */ }
             }
-            router.push("/dashboard");
+            router.push("/dashboard?tour=true");
           } else if (event.name === "checkout.error") {
             console.error("[Paddle] checkout.error", event);
           }
@@ -301,7 +301,7 @@ export default function OnboardingPage() {
           alert(data.error || "Could not change plan. Please contact support.");
           return;
         }
-        router.push("/dashboard");
+        router.push("/dashboard?tour=true");
         return;
       }
 
@@ -1004,7 +1004,7 @@ export default function OnboardingPage() {
                     Preview Your Booking Page
                   </Link>
                   <Link
-                    href="/dashboard"
+                    href="/dashboard?tour=true"
                     className="flex items-center justify-center gap-2 w-full bg-gray-900 hover:bg-gray-800 text-white font-bold py-3.5 rounded-xl transition-colors text-sm"
                   >
                     Go to Dashboard →
