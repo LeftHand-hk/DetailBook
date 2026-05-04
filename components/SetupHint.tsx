@@ -22,7 +22,7 @@ const COPY: Record<SetupHintProps["step"], { title: string; body: string; tips: 
     body: "Decide if customers should pay a deposit when they book.",
     tips: [
       "Toggle \"Require deposit\" below to turn it on.",
-      "Pick a percentage (10%, 20% or 30%) of the total service price.",
+      "Set the deposit amount per package on the Packages page.",
       "Deposits reduce no-shows and lock in customer commitment.",
     ],
   },

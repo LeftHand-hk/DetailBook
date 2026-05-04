@@ -141,6 +141,43 @@ export default function SetupExperience() {
     }).catch(() => {});
   }, []);
 
+  // Finish: mark share_link done, dismiss the banner, suppress the
+  // celebration flash, and close the panel so the experience never reappears.
+  const finishSetup = useCallback(async () => {
+    completionFlashedRef.current = true;
+    setShowCompleteFlash(false);
+    setStatus((prev) => {
+      if (!prev) return prev;
+      const steps = prev.steps.map((s) =>
+        s.id === "share_link" ? { ...s, done: true } : s,
+      );
+      const completed = steps.filter((s) => s.done).length;
+      return {
+        ...prev,
+        steps,
+        completed,
+        percent: Math.round((completed / steps.length) * 100),
+        dismissed: true,
+        completedAt: prev.completedAt ?? new Date().toISOString(),
+      };
+    });
+    setPanelOpen(false);
+    try {
+      await Promise.all([
+        fetch("/api/onboarding/status", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ markStep: "share_link" }),
+        }),
+        fetch("/api/onboarding/status", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dismissed: true }),
+        }),
+      ]);
+    } catch { /* optimistic; server reconciles on next focus */ }
+  }, []);
+
   const markStep = useCallback(async (stepId: StepId) => {
     setStatus((prev) => {
       if (!prev) return prev;
@@ -183,6 +220,7 @@ export default function SetupExperience() {
         onClose={() => setPanelOpen(false)}
         onMarkStep={markStep}
         onRefresh={fetchStatus}
+        onFinish={finishSetup}
         router={router}
       />
     </>
@@ -297,6 +335,7 @@ function SetupPanel({
   onClose,
   onMarkStep,
   onRefresh,
+  onFinish,
   router,
 }: {
   open: boolean;
@@ -304,6 +343,7 @@ function SetupPanel({
   onClose: () => void;
   onMarkStep: (id: StepId) => void;
   onRefresh: () => Promise<Status | null>;
+  onFinish: () => void;
   router: Router;
 }) {
   const [expandedStep, setExpandedStep] = useState<StepId | null>(null);
@@ -378,6 +418,7 @@ function SetupPanel({
                 onRefresh={onRefresh}
                 router={router}
                 onClosePanel={onClose}
+                onFinish={onFinish}
               />
             ))}
           </ol>
@@ -399,6 +440,7 @@ function StepItem({
   onRefresh,
   router,
   onClosePanel,
+  onFinish,
 }: {
   step: Step;
   index: number;
@@ -408,6 +450,7 @@ function StepItem({
   onRefresh: () => Promise<Status | null>;
   router: Router;
   onClosePanel: () => void;
+  onFinish: () => void;
 }) {
   const isActive = expanded && !step.done;
 
@@ -456,6 +499,7 @@ function StepItem({
             onRefresh={onRefresh}
             router={router}
             onClosePanel={onClosePanel}
+            onFinish={onFinish}
           />
         </div>
       )}
@@ -491,12 +535,14 @@ function StepBody({
   onRefresh,
   router,
   onClosePanel,
+  onFinish,
 }: {
   step: Step;
   onMarkDone: () => void;
   onRefresh: () => Promise<Status | null>;
   router: Router;
   onClosePanel: () => void;
+  onFinish: () => void;
 }) {
   switch (step.id) {
     case "business_info":
@@ -508,7 +554,7 @@ function StepBody({
     case "deposits":
       return <DepositsBody done={step.done} onSaved={onRefresh} onMarkDone={onMarkDone} router={router} onClosePanel={onClosePanel} />;
     case "share_link":
-      return <ShareLinkBody done={step.done} onMarkDone={onMarkDone} />;
+      return <ShareLinkBody done={step.done} onMarkDone={onMarkDone} onFinish={onFinish} />;
   }
 }
 
@@ -816,7 +862,6 @@ function DepositsBody({
 }) {
   const u = (typeof window !== "undefined" ? getUser() : null) as any;
   const [enabled, setEnabled] = useState<boolean>(Boolean(u?.requireDeposit));
-  const [percent, setPercent] = useState<number>(u?.depositPercentage || 20);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
@@ -826,7 +871,7 @@ function DepositsBody({
       await fetch("/api/user", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requireDeposit: enabled, depositPercentage: percent }),
+        body: JSON.stringify({ requireDeposit: enabled }),
       });
       setSavedAt(Date.now());
       await onSaved();
@@ -838,6 +883,11 @@ function DepositsBody({
   const openFullPage = () => {
     onClosePanel();
     router.push("/dashboard/payments?setup=deposits");
+  };
+
+  const openPackages = () => {
+    onClosePanel();
+    router.push("/dashboard/packages?setup=services");
   };
 
   return (
@@ -877,22 +927,22 @@ function DepositsBody({
       </div>
 
       {enabled && (
-        <div className="bg-white border border-gray-200 rounded-lg p-3">
-          <p className="text-xs font-semibold text-gray-700 mb-2">Deposit percentage</p>
-          <div className="grid grid-cols-3 gap-2">
-            {[10, 20, 30].map((p) => (
-              <button
-                key={p}
-                onClick={() => setPercent(p)}
-                className={`py-2 text-sm font-semibold rounded-lg border transition-colors ${
-                  percent === p
-                    ? "bg-blue-600 border-blue-600 text-white"
-                    : "bg-white border-gray-200 text-gray-700 hover:border-blue-400"
-                }`}
-              >
-                {p}%
-              </button>
-            ))}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+          <svg className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-blue-900">Set deposit amount per package</p>
+            <p className="text-[11px] text-blue-800 mt-0.5">
+              The deposit amount is configured on each service package, so you can charge different
+              deposits for different services.
+            </p>
+            <button
+              onClick={openPackages}
+              className="text-xs font-semibold text-blue-700 hover:text-blue-900 mt-1.5"
+            >
+              Open packages →
+            </button>
           </div>
         </div>
       )}
@@ -928,7 +978,9 @@ function DepositsBody({
 
 // ── Step 5: Share Link ───────────────────────────────────────────────────────
 
-function ShareLinkBody({ done, onMarkDone }: { done: boolean; onMarkDone: () => void }) {
+function ShareLinkBody({
+  done, onMarkDone, onFinish,
+}: { done: boolean; onMarkDone: () => void; onFinish: () => void }) {
   const [url, setUrl] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -1012,6 +1064,21 @@ function ShareLinkBody({ done, onMarkDone }: { done: boolean; onMarkDone: () => 
           Print a QR code for your shop or van
         </li>
       </ul>
+
+      <div className="border-t border-gray-200 pt-3 mt-2">
+        <button
+          onClick={onFinish}
+          className="w-full bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+          </svg>
+          Finish setup
+        </button>
+        <p className="text-[11px] text-gray-500 text-center mt-1.5">
+          You won&apos;t see this checklist again.
+        </p>
+      </div>
     </div>
   );
 }
