@@ -54,11 +54,12 @@ export default function LandingPage() {
 
   const faqs = [
     { q: "Do I need a credit card to start?", a: "No! You can start your 15-day free trial without entering any payment info. We'll remind you before the trial ends." },
+    { q: "Do you take a cut of my bookings or deposits?", a: "Never. The monthly subscription is the only thing you pay us — no per-booking fees, no commission, no hidden cuts. When a customer pays a deposit by card, the money goes straight to your own Stripe/Square account. The only fees are the standard processor fees Stripe or Square charge directly." },
     { q: "Can my customers pay the deposit online?", a: "Yes. On both Starter and Pro, customers can pay the deposit straight from your booking page. We support card payments via Stripe, plus PayPal, Cash App, Square, bank transfer, and pay-cash-on-arrival — turn on whichever methods fit your business." },
     { q: "What happens if I exceed 5 packages on Starter?", a: "You'll be prompted to upgrade to Pro. All your existing packages stay active — you just can't add more until you upgrade." },
     { q: "Can I cancel anytime?", a: "Absolutely. No long-term contracts. Cancel any time from your Settings page. You keep access until the end of your billing period." },
     { q: "Does DetailBook work on mobile?", a: "Yes! Both your dashboard and your customer-facing booking page are fully optimized for mobile devices." },
-    { q: "Can I use my own domain for the booking page?", a: "On the Pro plan, you can connect a custom domain (e.g., book.yourbusiness.com). Starter gets a detailbook.app/book/your-name URL." },
+    { q: "Can I use my own domain for the booking page?", a: "On the Pro plan, you can connect a custom domain (e.g., book.yourbusiness.com). Starter gets a detailbookapp.com/book/your-name URL." },
   ];
 
   const navLinks = ["Features","Pricing","FAQ"];
@@ -245,7 +246,7 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-10 sm:mb-14 animate-fadeInUp delay-300">
             <Link href="/signup" onClick={() => trackEvent("Lead")}
               className="group relative inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-black text-lg px-10 py-4 rounded-2xl transition-all duration-300 shadow-2xl shadow-blue-600/40 hover:shadow-blue-500/50 hover:-translate-y-1">
-              <span>Start Free Trial</span>
+              <span>Start My Free Trial</span>
               <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
@@ -472,6 +473,94 @@ export default function LandingPage() {
       </section>
 
       {/* ═══════════════════════════════════════════════
+          HOW IT WORKS — 3 STEPS AFTER SIGNUP
+      ═══════════════════════════════════════════════ */}
+      <section className="bg-slate-900 py-24 px-4">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-4">
+              Up and Running in Under 5 Minutes
+            </h2>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+              No setup fees, no installations, no salespeople. Just three steps from sign-up to taking bookings.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-5 relative">
+            {/* connector line on desktop */}
+            <div className="hidden md:block absolute top-8 left-[16%] right-[16%] h-px bg-gradient-to-r from-transparent via-blue-500/30 to-transparent pointer-events-none" />
+
+            {[
+              { num: "1", title: "Create your account", desc: "Enter your business name and you're in. No credit card needed for the 15-day trial." },
+              { num: "2", title: "Add your service packages", desc: "List the details you offer — basic wash, full detail, ceramic coating. Set price, duration, and deposit." },
+              { num: "3", title: "Share your booking link", desc: "Send your DetailBook link via SMS, IG bio, or your website. Customers book and pay deposits 24/7." },
+            ].map((step) => (
+              <div key={step.num} className="relative bg-slate-800/60 border border-slate-700/60 rounded-2xl p-6 text-center hover:border-blue-500/40 transition-all duration-300">
+                <div className="relative z-10 w-14 h-14 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xl font-black shadow-lg shadow-blue-600/30">
+                  {step.num}
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2">{step.title}</h3>
+                <p className="text-gray-400 text-sm leading-relaxed">{step.desc}</p>
+              </div>
+            ))}
+          </div>
+
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════
+          COMPARISON — DETAILBOOK VS GENERIC TOOLS
+      ═══════════════════════════════════════════════ */}
+      <section className="bg-gray-50 py-24 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">
+              Why Not Just Use Square or Vagaro?
+            </h2>
+            <p className="text-gray-500 text-lg max-w-2xl mx-auto">
+              Generic booking tools weren&apos;t built with auto detailing in mind. {platformName} is.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="grid grid-cols-3 bg-gray-50 border-b border-gray-200">
+              <div className="px-4 sm:px-6 py-4 text-xs sm:text-sm font-bold text-gray-500 uppercase tracking-wide">Feature</div>
+              <div className="px-4 sm:px-6 py-4 text-xs sm:text-sm font-black text-blue-700 uppercase tracking-wide text-center">{platformName}</div>
+              <div className="px-4 sm:px-6 py-4 text-xs sm:text-sm font-bold text-gray-500 uppercase tracking-wide text-center">Generic Tools</div>
+            </div>
+            {[
+              { feature: "Vehicle-type pricing (sedan / SUV / truck)", us: true, them: false },
+              { feature: "Built-in mandatory deposits", us: true, them: false },
+              { feature: "Shop + mobile scheduling in one calendar", us: true, them: false },
+              { feature: "Detailing service-package builder", us: true, them: false },
+              { feature: "No per-booking commission", us: true, them: "Some take a cut" },
+              { feature: "Starts at $29/month", us: true, them: "$30+ and up" },
+            ].map((row, i) => (
+              <div key={i} className={`grid grid-cols-3 ${i % 2 === 0 ? "bg-white" : "bg-gray-50/50"} border-b border-gray-100 last:border-0`}>
+                <div className="px-4 sm:px-6 py-4 text-sm text-gray-700">{row.feature}</div>
+                <div className="px-4 sm:px-6 py-4 text-center">
+                  {row.us === true ? (
+                    <CheckIcon />
+                  ) : (
+                    <span className="text-sm font-semibold text-gray-700">{row.us}</span>
+                  )}
+                </div>
+                <div className="px-4 sm:px-6 py-4 text-center">
+                  {row.them === false ? (
+                    <XIcon />
+                  ) : row.them === true ? (
+                    <CheckIcon />
+                  ) : (
+                    <span className="text-xs sm:text-sm text-gray-500">{row.them}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════
           PRICING — EQUAL HEIGHT CARDS
       ═══════════════════════════════════════════════ */}
       <section id="pricing" className="bg-slate-900 py-24 px-4 relative overflow-hidden">
@@ -512,21 +601,19 @@ export default function LandingPage() {
                 <span className="text-5xl font-black text-white">$29</span>
                 <span className="text-gray-400 ml-1">/month</span>
               </div>
-              <ul className="space-y-3 mb-8 flex-1">
-                {["Custom booking page","Up to 5 service packages","Deposit collection","Email reminders","Calendar dashboard","Mobile app access"].map((item) => (
+              <ul className="space-y-3 mb-6 flex-1">
+                {["Custom booking page","Up to 5 service packages","Deposit collection","Email reminders","Calendar dashboard","Mobile-friendly dashboard","Google Calendar sync"].map((item) => (
                   <li key={item} className="flex items-center gap-3 text-gray-300 text-sm">
                     <CheckIcon />{item}
                   </li>
                 ))}
-                {["SMS reminders","Google Calendar sync","Unlimited packages"].map((item) => (
-                  <li key={item} className="flex items-center gap-3 text-gray-600 text-sm line-through">
-                    <XIcon />{item}
-                  </li>
-                ))}
               </ul>
+              <p className="text-xs text-gray-500 mb-6">
+                Need SMS reminders, multiple staff, or unlimited packages? <span className="text-gray-400">Upgrade to Pro any time.</span>
+              </p>
               <Link href="/signup" onClick={() => trackEvent("Lead")}
                 className="block w-full text-center bg-slate-700 hover:bg-slate-600 border border-slate-600 text-white font-bold py-3.5 rounded-xl transition-all duration-200 hover:-translate-y-0.5">
-                Start Free Trial
+                Get Started — Free
               </Link>
             </div>
 
@@ -557,7 +644,7 @@ export default function LandingPage() {
               </ul>
               <Link href="/signup" onClick={() => trackEvent("Lead")}
                 className="block w-full text-center bg-white text-blue-700 hover:bg-blue-50 font-black py-3.5 rounded-xl transition-all duration-200 hover:-translate-y-0.5">
-                Start Free Trial
+                Try Pro — Free for 15 Days
               </Link>
             </div>
           </div>
@@ -649,7 +736,7 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
             <Link href="/signup" onClick={() => trackEvent("Lead")}
               className="group inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-black text-lg px-10 py-4 rounded-2xl transition-all duration-300 shadow-2xl shadow-blue-600/40 hover:-translate-y-1">
-              Start Your Free Trial
+              Try DetailBook Free
               <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
@@ -683,17 +770,17 @@ export default function LandingPage() {
               </p>
               {/* Social icons */}
               <div className="flex items-center gap-3">
-                {[
-                  { label:"Twitter/X", path:"M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.735-8.835L1.254 2.25H8.08l4.259 5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z" },
-                  { label:"Instagram", path:"M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" },
-                  { label:"Facebook",  path:"M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" },
-                  { label:"YouTube",   path:"M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" },
-                ].map(({ label, path }) => (
-                  <a key={label} href="#" aria-label={label}
-                    className="w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-gray-500 hover:text-white hover:bg-blue-600/30 hover:border-blue-500/40 transition-all duration-200">
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d={path} /></svg>
-                  </a>
-                ))}
+                <a
+                  href="https://www.facebook.com/profile.php?id=100063817955495"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Facebook"
+                  className="w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-gray-500 hover:text-white hover:bg-blue-600/30 hover:border-blue-500/40 transition-all duration-200"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                  </svg>
+                </a>
               </div>
             </div>
 
