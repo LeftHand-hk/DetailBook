@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import MetaPixel from "@/components/MetaPixel";
 
-const SITE_URL = "https://detailbook.app";
+const SITE_URL = "https://detailbookapp.com";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
