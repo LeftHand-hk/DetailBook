@@ -276,10 +276,10 @@ export default function LandingPage() {
               </div>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
                 {[
-                  { label: "Total Bookings", value: "124", change: "+12%", from:"from-blue-500", to:"to-blue-700" },
-                  { label: "Revenue / Month", value: "$4,280", change: "+8%", from:"from-emerald-500", to:"to-emerald-700" },
-                  { label: "Today's Jobs", value: "3", change: "upcoming", from:"from-purple-500", to:"to-purple-700" },
-                  { label: "Total Revenue", value: "$18.4k", change: "all time", from:"from-amber-500", to:"to-orange-600" },
+                  { label: "Total Bookings", value: "32", change: "+9%", from:"from-blue-500", to:"to-blue-700" },
+                  { label: "Revenue / Month", value: "$1,420", change: "+6%", from:"from-emerald-500", to:"to-emerald-700" },
+                  { label: "Today's Jobs", value: "2", change: "upcoming", from:"from-purple-500", to:"to-purple-700" },
+                  { label: "Total Revenue", value: "$4.8k", change: "all time", from:"from-amber-500", to:"to-orange-600" },
                 ].map((stat, i) => (
                   <div key={i} className={`bg-gradient-to-br ${stat.from} ${stat.to} rounded-xl p-3 relative overflow-hidden`}>
                     <div className="absolute -right-2 -top-2 w-10 h-10 bg-white/10 rounded-full" />
