@@ -3,28 +3,16 @@
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { getUser, setUser, getPackages, setPackages, isLoggedIn, generateId, syncFromServer } from "@/lib/storage";
+import { getUser, setUser, isLoggedIn, syncFromServer } from "@/lib/storage";
 import { trackEvent } from "@/lib/meta-pixel";
-import type { User, Package } from "@/types";
+import type { User } from "@/types";
 import Logo from "@/components/Logo";
 import type { Paddle } from "@paddle/paddle-js";
 
 const STEPS = [
   { id: 0, label: "Business Details", icon: "🏢" },
-  { id: 1, label: "First Package",    icon: "📦" },
-  { id: 2, label: "Choose Plan",      icon: "💎" },
-  { id: 3, label: "Booking Page",     icon: "🚀" },
-];
-
-const VEHICLE_TYPES = [
-  { id: "sedan",     label: "Sedan",       icon: "🚗" },
-  { id: "suv",       label: "SUV / Truck",  icon: "🚙" },
-  { id: "van",       label: "Van / Minivan",icon: "🚐" },
-  { id: "sports",    label: "Sports Car",   icon: "🏎️" },
-  { id: "coupe",     label: "Coupe",        icon: "🚘" },
-  { id: "pickup",    label: "Pickup Truck", icon: "🛻" },
-  { id: "luxury",    label: "Luxury / SUV", icon: "🏁" },
-  { id: "motorcycle",label: "Motorcycle",   icon: "🏍️" },
+  { id: 1, label: "Choose Plan",      icon: "💎" },
+  { id: 2, label: "All Set",          icon: "🚀" },
 ];
 
 const US_STATES = [
@@ -129,18 +117,6 @@ export default function OnboardingPage() {
     serviceType: "mobile" as "mobile" | "shop" | "both",
   });
 
-  // Step 2 — first package
-  const [pkgForm, setPkgForm] = useState({
-    name: "",
-    description: "",
-    price: "",
-    duration: "120",
-    depositPercent: "25",
-    vehicleTypes: [] as string[],
-    includedServices: "",
-    notIncluded: "",
-  });
-
   useEffect(() => {
     if (!isLoggedIn()) { router.push("/login"); return; }
     const u = getUser();
@@ -200,61 +176,7 @@ export default function OnboardingPage() {
     setStep(1);
   };
 
-  // ── Step 2 submit ──────────────────────────────────────────────────────────
-  const handleStep2 = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-
-    const depositAmount = pkgForm.depositPercent === "0" ? 0 : Math.round((parseFloat(pkgForm.price) * parseInt(pkgForm.depositPercent)) / 100);
-
-    try {
-      const res = await fetch("/api/packages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: pkgForm.name,
-          description: pkgForm.description,
-          price: pkgForm.price,
-          duration: pkgForm.duration,
-          deposit: depositAmount,
-          active: true,
-        }),
-      });
-      if (res.ok) {
-        await syncFromServer();
-      } else {
-        const existing = getPackages();
-        const newPkg: Package = {
-          id: generateId(),
-          name: pkgForm.name,
-          description: pkgForm.description,
-          price: parseFloat(pkgForm.price),
-          duration: parseInt(pkgForm.duration),
-          deposit: depositAmount,
-          active: true,
-        };
-        setPackages([...existing, newPkg]);
-      }
-    } catch {
-      const existing = getPackages();
-      const depositAmount2 = pkgForm.depositPercent === "0" ? 0 : Math.round((parseFloat(pkgForm.price) * parseInt(pkgForm.depositPercent)) / 100);
-      const newPkg: Package = {
-        id: generateId(),
-        name: pkgForm.name,
-        description: pkgForm.description,
-        price: parseFloat(pkgForm.price),
-        duration: parseInt(pkgForm.duration),
-        deposit: depositAmount2,
-        active: true,
-      };
-      setPackages([...existing, newPkg]);
-    }
-
-    setSaving(false);
-    setStep(2);
-  };
-
-  // ── Step 3 — free trial path ───────────────────────────────────────────────
+  // ── Step 2 — free trial path ───────────────────────────────────────────────
   const handleStep3 = async () => {
     if (!selectedPlan) return;
     setSaving(true);
@@ -274,7 +196,7 @@ export default function OnboardingPage() {
       }
     }
     setSaving(false);
-    setStep(3);
+    setStep(2);
   };
 
   // ── Pay Now path — open Paddle first, activate only after payment ──────────
@@ -340,19 +262,6 @@ export default function OnboardingPage() {
       setTimeout(() => setCopied(false), 2000);
     }
   };
-
-  const toggleVehicleType = (id: string) => {
-    setPkgForm((prev) => ({
-      ...prev,
-      vehicleTypes: prev.vehicleTypes.includes(id)
-        ? prev.vehicleTypes.filter((v) => v !== id)
-        : [...prev.vehicleTypes, id],
-    }));
-  };
-
-  const depositPreview = pkgForm.price && pkgForm.depositPercent
-    ? Math.round((parseFloat(pkgForm.price) * parseInt(pkgForm.depositPercent)) / 100)
-    : 0;
 
   // Compute the actual trial length (promo codes can extend it beyond 15 days)
   const trialDays = (() => {
@@ -572,7 +481,7 @@ export default function OnboardingPage() {
                     {saving ? (
                       <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> Saving...</>
                     ) : (
-                      <>Continue to First Package <span>→</span></>
+                      <>Continue to Plan <span>→</span></>
                     )}
                   </button>
                 </div>
@@ -580,196 +489,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* ── STEP 2: First Package ────────────────────────────────────────── */}
+          {/* ── STEP 2: Choose Plan ──────────────────────────────────────────── */}
           {step === 1 && (
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-8 pt-8 pb-6 border-b border-gray-50">
-                <div className="flex items-center gap-3 mb-1">
-                  <div className="w-10 h-10 bg-indigo-50 rounded-2xl flex items-center justify-center text-xl">📦</div>
-                  <div>
-                    <h1 className="text-xl font-black text-gray-900">Create Your First Package</h1>
-                    <p className="text-gray-400 text-sm">Customers will choose from your packages when booking. You can add more later.</p>
-                  </div>
-                </div>
-              </div>
-
-              <form onSubmit={handleStep2} className="px-8 py-7 space-y-6">
-                {/* Package Name + Description */}
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      Package Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={pkgForm.name}
-                      onChange={(e) => setPkgForm({ ...pkgForm, name: e.target.value })}
-                      placeholder="e.g. Full Interior & Exterior Detail"
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white placeholder-gray-400 text-sm transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      Description <span className="text-red-500">*</span>
-                    </label>
-                    <textarea
-                      rows={3}
-                      required
-                      value={pkgForm.description}
-                      onChange={(e) => setPkgForm({ ...pkgForm, description: e.target.value })}
-                      placeholder="Describe what's included in this package — customers read this before booking."
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white placeholder-gray-400 text-sm transition-all resize-none"
-                    />
-                  </div>
-                </div>
-
-                {/* Price / Duration / Deposit */}
-                <div>
-                  <h3 className="text-sm font-black text-gray-700 mb-3 uppercase tracking-wide">Pricing & Duration</h3>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 mb-1.5">
-                        Price (USD) <span className="text-red-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-semibold text-sm">$</span>
-                        <input
-                          type="number"
-                          required
-                          min="0"
-                          step="0.01"
-                          value={pkgForm.price}
-                          onChange={(e) => setPkgForm({ ...pkgForm, price: e.target.value })}
-                          placeholder="199"
-                          className="w-full pl-8 pr-3 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white text-sm transition-all"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 mb-1.5">Duration</label>
-                      <select
-                        value={pkgForm.duration}
-                        onChange={(e) => setPkgForm({ ...pkgForm, duration: e.target.value })}
-                        className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white text-sm transition-all"
-                      >
-                        {[30,60,90,120,150,180,210,240,300,360,480].map((m) => (
-                          <option key={m} value={m}>
-                            {m < 60 ? `${m} min` : `${Math.floor(m/60)}h ${m%60 > 0 ? `${m%60}m` : ""}`}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 mb-1.5">Deposit %</label>
-                      <select
-                        value={pkgForm.depositPercent}
-                        onChange={(e) => setPkgForm({ ...pkgForm, depositPercent: e.target.value })}
-                        className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white text-sm transition-all"
-                      >
-                        <option value="0">No Deposit</option>
-                        {[10,15,20,25,30,40,50].map((p) => (
-                          <option key={p} value={p}>{p}%</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Deposit preview */}
-                  {depositPreview > 0 && (
-                    <div className="mt-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-blue-700 text-sm">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="font-medium">Customers will pay a <strong>${depositPreview}</strong> deposit to confirm booking</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Vehicle Types */}
-                <div>
-                  <h3 className="text-sm font-black text-gray-700 mb-1 uppercase tracking-wide">
-                    Vehicle Types Included
-                  </h3>
-                  <p className="text-xs text-gray-400 mb-3">Select which vehicle types this package applies to. Leave blank for all types.</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {VEHICLE_TYPES.map((v) => (
-                      <button
-                        key={v.id}
-                        type="button"
-                        onClick={() => toggleVehicleType(v.id)}
-                        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
-                          pkgForm.vehicleTypes.includes(v.id)
-                            ? "bg-blue-600 border-blue-600 text-white shadow-sm"
-                            : "bg-gray-50 border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50"
-                        }`}
-                      >
-                        <span className="text-base">{v.icon}</span>
-                        <span className="text-xs">{v.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Included / Not Included */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      What&apos;s Included <span className="text-gray-400 font-normal text-xs">(optional)</span>
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={pkgForm.includedServices}
-                      onChange={(e) => setPkgForm({ ...pkgForm, includedServices: e.target.value })}
-                      placeholder={"Exterior hand wash\nInterior vacuum\nDash wipe down\nWindow cleaning"}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white placeholder-gray-400 text-xs transition-all resize-none"
-                    />
-                    <p className="text-xs text-gray-400 mt-1">One item per line</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      Not Included <span className="text-gray-400 font-normal text-xs">(optional)</span>
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={pkgForm.notIncluded}
-                      onChange={(e) => setPkgForm({ ...pkgForm, notIncluded: e.target.value })}
-                      placeholder={"Paint correction\nCeramic coating\nEngine bay cleaning"}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white placeholder-gray-400 text-xs transition-all resize-none"
-                    />
-                    <p className="text-xs text-gray-400 mt-1">One item per line</p>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setStep(0)}
-                    className="flex-1 border border-gray-200 bg-white text-gray-600 font-semibold py-3.5 rounded-xl hover:bg-gray-50 transition-colors text-sm"
-                  >
-                    ← Back
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="flex-[2] bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-lg shadow-blue-200"
-                  >
-                    {saving ? (
-                      <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> Saving...</>
-                    ) : (
-                      <>Save Package & Continue →</>
-                    )}
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* ── STEP 3: Choose Plan ──────────────────────────────────────────── */}
-          {step === 2 && (
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-8 pt-8 pb-6 border-b border-gray-50">
                 <div className="flex items-center gap-3 mb-1">
@@ -894,7 +615,7 @@ export default function OnboardingPage() {
                 <div className="flex gap-3">
                   <button
                     type="button"
-                    onClick={() => setStep(1)}
+                    onClick={() => setStep(0)}
                     className="flex-1 border border-gray-200 bg-white text-gray-600 font-semibold py-3.5 rounded-xl hover:bg-gray-50 transition-colors text-sm"
                   >
                     ← Back
@@ -928,8 +649,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* ── STEP 4: Booking Page Ready ───────────────────────────────────── */}
-          {step === 3 && (
+          {/* ── STEP 3: All Set ──────────────────────────────────────────────── */}
+          {step === 2 && (
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-8 pt-10 pb-6 text-center">
                 {/* Animated checkmark */}
@@ -977,10 +698,9 @@ export default function OnboardingPage() {
                 </div>
 
                 {/* Checklist */}
-                <div className="grid sm:grid-cols-3 gap-3 mb-6">
+                <div className="grid sm:grid-cols-2 gap-3 mb-6">
                   {[
                     { icon: "✅", label: "Booking page live" },
-                    { icon: "📦", label: "First package created" },
                     { icon: "🎯", label: `Trial active (${trialDays} days)` },
                   ].map(({ icon, label }) => (
                     <div key={label} className="bg-green-50 border border-green-100 rounded-xl px-3 py-2.5 flex items-center gap-2">

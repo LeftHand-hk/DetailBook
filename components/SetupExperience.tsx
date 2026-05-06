@@ -377,9 +377,9 @@ function SetupPanel({
         {/* Header */}
         <div className="flex-shrink-0 px-5 py-4 border-b border-gray-200 flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold text-gray-900">Let&apos;s get you ready</h2>
+            <h2 className="text-base font-bold text-gray-900">Setup guide</h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              {status.completed} of {status.total} done · {status.percent}%
+              {status.completed} of {status.total} done · about {status.remainingMin || 0} min left
             </p>
           </div>
           <button
@@ -627,6 +627,13 @@ function WorkingHoursBody({ done, onSaved }: { done: boolean; onSaved: () => Pro
 
   return (
     <div className="space-y-3">
+      <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+        <p className="text-[11px] text-blue-800 leading-relaxed">
+          Customers can only book inside these hours. Anything outside is blocked from your booking page automatically.
+          Untick a day if you&apos;re closed.
+        </p>
+      </div>
+
       <button
         type="button"
         onClick={applyMondayToAll}
@@ -758,13 +765,23 @@ function ServicesBody({
 
   return (
     <div className="space-y-4">
+      {/* What is a package — explainer for first-time users */}
+      <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+        <p className="text-xs font-bold text-blue-900 mb-1">What&apos;s a package?</p>
+        <p className="text-[11px] text-blue-800 leading-relaxed">
+          A package is one of the services a customer can book — like &quot;Full Detail&quot; or &quot;Ceramic Coating&quot;.
+          You set the name, price, and how long it takes. Customers pick a package on your booking page,
+          and the calendar blocks off the right amount of time automatically.
+        </p>
+      </div>
+
       <button
         onClick={openFullPage}
         className="w-full flex items-center justify-between gap-2 bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50/40 rounded-lg px-3 py-2.5 text-left transition-all group"
       >
         <div>
           <p className="text-xs font-semibold text-gray-900">Open the full packages page</p>
-          <p className="text-[11px] text-gray-500 mt-0.5">More room to add, edit, and reorder.</p>
+          <p className="text-[11px] text-gray-500 mt-0.5">More room to add, edit, vehicle types, and reorder.</p>
         </div>
         <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -891,6 +908,14 @@ function DepositsBody({
 
   return (
     <div className="space-y-3 text-sm">
+      <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+        <p className="text-xs font-bold text-blue-900 mb-1">Why deposits matter</p>
+        <p className="text-[11px] text-blue-800 leading-relaxed">
+          A deposit is part of the price the customer pays at booking time — usually 20-30%. They&apos;re much less likely
+          to skip an appointment they&apos;ve already paid for. You set the amount on each package.
+        </p>
+      </div>
+
       <button
         onClick={openFullPage}
         className="w-full flex items-center justify-between gap-2 bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50/40 rounded-lg px-3 py-2.5 text-left transition-all group"
