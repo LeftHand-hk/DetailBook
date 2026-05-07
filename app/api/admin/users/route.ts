@@ -10,28 +10,24 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Explicit select — User table holds base64 logo/coverImage/bannerImage
-    // (~50MB per row). Including those columns turned this list query into
-    // hundreds of MB of egress per call and crashed the DB pool.
+    // Drop the heavy base64 columns — without omit the list query was
+    // shipping hundreds of MB per call (logo/coverImage/bannerImage are
+    // ~50MB each) and crashing the DB pool.
     const users = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        email: true,
-        businessName: true,
-        name: true,
-        phone: true,
-        city: true,
-        slug: true,
-        plan: true,
-        trialEndsAt: true,
-        subscriptionStatus: true,
-        suspended: true,
-        createdAt: true,
-        updatedAt: true,
-        lastLoginAt: true,
-        signupIp: true,
-        signupCountry: true,
+      omit: {
+        password: true,
+        logo: true,
+        coverImage: true,
+        bannerImage: true,
+        bio: true,
+        customMessage: true,
+        thankYouMessage: true,
+        termsText: true,
+        googleAccessToken: true,
+        googleRefreshToken: true,
+      },
+      include: {
         _count: {
           select: {
             packages: true,
@@ -58,8 +54,8 @@ export async function GET() {
       lastLoginAt: user.lastLoginAt,
       signupIp: user.signupIp,
       signupCountry: user.signupCountry,
-      packageCount: user._count?.packages ?? 0,
-      bookingCount: user._count?.bookings ?? 0,
+      packageCount: user._count.packages,
+      bookingCount: user._count.bookings,
     }));
 
     return NextResponse.json(result);
