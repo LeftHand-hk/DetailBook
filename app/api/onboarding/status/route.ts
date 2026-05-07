@@ -36,6 +36,8 @@ export async function GET() {
     where: { id: session.id },
     select: {
       onboardingProgress: true,
+      onboardingCompletedAt: true,
+      onboardingDismissed: true,
       businessHours: true,
       requireDeposit: true,
       _count: { select: { packages: true } },
