@@ -30,9 +30,16 @@ export async function GET() {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
+  // Onboarding only needs a few flags + package count. Skip the base64
+  // image columns (logo/coverImage/bannerImage) entirely.
   const user = await prisma.user.findUnique({
     where: { id: session.id },
-    include: { _count: { select: { packages: true } } },
+    select: {
+      onboardingProgress: true,
+      businessHours: true,
+      requireDeposit: true,
+      _count: { select: { packages: true } },
+    },
   });
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 

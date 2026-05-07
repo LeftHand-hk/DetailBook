@@ -41,7 +41,10 @@ export async function POST() {
   }
 
   try {
-    const user = await prisma.user.findUnique({ where: { id: session.id } });
+    const user = await prisma.user.findUnique({
+      where: { id: session.id },
+      select: { id: true, email: true, plan: true },
+    });
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
     const base = paddleApiBase();

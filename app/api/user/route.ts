@@ -12,8 +12,16 @@ export async function GET() {
       );
     }
 
+    // Omit base64 image blobs — coverImage and bannerImage are only used
+    // on the public booking page, not on the dashboard. The logo IS used
+    // in the dashboard header so we keep it.
     const user = await prisma.user.findUnique({
       where: { id: session.id },
+      omit: {
+        password: true,
+        coverImage: true,
+        bannerImage: true,
+      },
       include: {
         packages: true,
         bookings: true,
@@ -24,9 +32,7 @@ export async function GET() {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const { password: _, ...userWithoutPassword } = user;
-
-    return NextResponse.json({ user: userWithoutPassword });
+    return NextResponse.json({ user });
   } catch (error) {
     console.error("Get user error:", error);
     return NextResponse.json(
