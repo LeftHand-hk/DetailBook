@@ -12,8 +12,17 @@ export async function GET() {
       );
     }
 
+    // Omit logo/coverImage/bannerImage (base64 blobs in User table — they
+    // can be 50MB+ per row). The dashboard fetches them via dedicated
+    // endpoints when actually needed.
     const user = await prisma.user.findUnique({
       where: { id: session.id },
+      omit: {
+        password: true,
+        logo: true,
+        coverImage: true,
+        bannerImage: true,
+      },
       include: {
         _count: {
           select: {
@@ -39,9 +48,7 @@ export async function GET() {
         .catch((e) => console.error("Failed to refresh lastLoginAt:", e));
     }
 
-    const { password: _, ...userWithoutPassword } = user;
-
-    return NextResponse.json({ user: userWithoutPassword });
+    return NextResponse.json({ user });
   } catch (error) {
     console.error("Get me error:", error);
     return NextResponse.json(

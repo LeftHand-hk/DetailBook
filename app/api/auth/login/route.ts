@@ -25,7 +25,14 @@ export async function POST(request: NextRequest) {
     const normalizedEmail = email.toLowerCase().trim();
 
     // 1. Try business owner login
-    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    // Fetch only the columns needed to verify + sign the token. The User
+    // table holds base64 logo/coverImage/bannerImage (50MB+ per row);
+    // including them here made the login response huge and timed out
+    // the connection pool.
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: { id: true, email: true, password: true },
+    });
     if (user) {
       const isValid = await verifyPassword(password, user.password);
       if (!isValid) {
@@ -39,8 +46,7 @@ export async function POST(request: NextRequest) {
         .catch((e) => console.error("Failed to update lastLoginAt on login:", e));
 
       const token = signToken({ id: user.id, email: user.email });
-      const { password: _, ...userWithoutPassword } = user;
-      const response = NextResponse.json({ user: userWithoutPassword });
+      const response = NextResponse.json({ user: { id: user.id, email: user.email } });
 
       response.cookies.set("detailbook_token", token, {
         httpOnly: true,
