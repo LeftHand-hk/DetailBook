@@ -364,7 +364,7 @@ export default function PaymentsPage() {
         <MethodCard
           icon={<PayPalIcon />}
           name="PayPal"
-          tagline="Customer pays you on PayPal, then uploads proof."
+          tagline="Customer pays you on PayPal."
           enabled={methods.paypal?.enabled ?? false}
           onToggle={(v) => setMethods({ ...methods, paypal: { ...methods.paypal!, enabled: v } })}
           incomplete={paypalIncomplete}
@@ -392,24 +392,13 @@ export default function PaymentsPage() {
               />
             </div>
           </div>
-          <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-3">
-            <div>
-              <p className="text-sm font-semibold text-gray-800">Require proof of payment</p>
-              <p className="text-xs text-gray-500 mt-0.5">Customer uploads a screenshot</p>
-            </div>
-            <Toggle
-              size="sm"
-              value={methods.paypal?.requireProof ?? true}
-              onChange={(v) => setMethods({ ...methods, paypal: { ...methods.paypal!, requireProof: v } })}
-            />
-          </div>
         </MethodCard>
 
         {/* Cash App */}
         <MethodCard
           icon={<CashAppIcon />}
           name="Cash App"
-          tagline="Customer sends to your $cashtag, then uploads proof."
+          tagline="Customer sends to your $cashtag."
           enabled={methods.cashapp?.enabled ?? false}
           onToggle={(v) => setMethods({ ...methods, cashapp: { ...methods.cashapp!, enabled: v } })}
           incomplete={cashappIncomplete}
@@ -426,17 +415,6 @@ export default function PaymentsPage() {
                 className="flex-1 px-4 py-3 text-sm text-gray-900 focus:outline-none placeholder-gray-300"
               />
             </div>
-          </div>
-          <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-3">
-            <div>
-              <p className="text-sm font-semibold text-gray-800">Require proof of payment</p>
-              <p className="text-xs text-gray-500 mt-0.5">Customer uploads a screenshot</p>
-            </div>
-            <Toggle
-              size="sm"
-              value={methods.cashapp?.requireProof ?? true}
-              onChange={(v) => setMethods({ ...methods, cashapp: { ...methods.cashapp!, requireProof: v } })}
-            />
           </div>
         </MethodCard>
 
@@ -499,17 +477,6 @@ export default function PaymentsPage() {
               onChange={(e) => setMethods({ ...methods, bankTransfer: { ...methods.bankTransfer!, instructions: e.target.value } })}
               placeholder="e.g. Use your booking reference as the payment reference..."
               className={INPUT_CLASS + " resize-none"}
-            />
-          </div>
-          <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-3">
-            <div>
-              <p className="text-sm font-semibold text-gray-800">Require proof of payment</p>
-              <p className="text-xs text-gray-500 mt-0.5">Customer uploads a screenshot</p>
-            </div>
-            <Toggle
-              size="sm"
-              value={methods.bankTransfer?.requireProof ?? true}
-              onChange={(v) => setMethods({ ...methods, bankTransfer: { ...methods.bankTransfer!, requireProof: v } })}
             />
           </div>
         </MethodCard>
