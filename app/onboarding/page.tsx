@@ -27,18 +27,18 @@ export default function OnboardingPage() {
   const [step, setStep]           = useState(0);
 
   // Fire CompleteRegistration exactly once when the user lands here straight
-  // from /signup. We rely on the ?signup=true query param (set by the signup
-  // form's redirect) and strip it immediately so a refresh / re-mount can't
-  // double-count.
-  //
-  // Reading from window.location.search instead of useSearchParams() — the
-  // hook forces the entire page into a Suspense boundary at build time
-  // (Next.js 14 prerender requirement), and we only need a one-shot read
-  // on mount, not a reactive subscription.
+  // from /signup. The signup page sets a sessionStorage flag rather than a
+  // URL query param: a query param forces us to call history.replaceState
+  // to clean it up, and fbevents.js auto-tracks that URL change as a
+  // duplicate PageView. sessionStorage keeps the URL untouched.
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.fbq !== "function") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("signup") !== "true") return;
+    let justSignedUp = false;
+    try {
+      justSignedUp = sessionStorage.getItem("dB_justSignedUp") === "1";
+      if (justSignedUp) sessionStorage.removeItem("dB_justSignedUp");
+    } catch { /* private mode — skip */ }
+    if (!justSignedUp) return;
 
     window.fbq("track", "CompleteRegistration", {
       content_name: "DetailBook Trial Signup",
@@ -46,10 +46,6 @@ export default function OnboardingPage() {
       value: 0,
       currency: "USD",
     });
-
-    const url = new URL(window.location.href);
-    url.searchParams.delete("signup");
-    window.history.replaceState({}, "", url.pathname + url.search + url.hash);
   }, []);
   const [user, setUserState]      = useState<User | null>(null);
   const [copied, setCopied]       = useState(false);
@@ -96,7 +92,8 @@ export default function OnboardingPage() {
                 await fetch("/api/subscription/sync", { method: "POST" });
               } catch { /* ignore — billing page has retry */ }
             }
-            router.push("/dashboard?tour=true");
+            try { sessionStorage.setItem("dB_showTour", "1"); } catch { /* private mode */ }
+            router.push("/dashboard");
           } else if (event.name === "checkout.error") {
             console.error("[Paddle] checkout.error", event);
           }
@@ -223,7 +220,8 @@ export default function OnboardingPage() {
           alert(data.error || "Could not change plan. Please contact support.");
           return;
         }
-        router.push("/dashboard?tour=true");
+        try { sessionStorage.setItem("dB_showTour", "1"); } catch { /* private mode */ }
+        router.push("/dashboard");
         return;
       }
 
@@ -724,7 +722,10 @@ export default function OnboardingPage() {
                     Preview Your Booking Page
                   </Link>
                   <Link
-                    href="/dashboard?tour=true"
+                    href="/dashboard"
+                    onClick={() => {
+                      try { sessionStorage.setItem("dB_showTour", "1"); } catch { /* private mode */ }
+                    }}
                     className="flex items-center justify-center gap-2 w-full bg-gray-900 hover:bg-gray-800 text-white font-bold py-3.5 rounded-xl transition-colors text-sm"
                   >
                     Go to Dashboard →

@@ -102,19 +102,24 @@ export default function SetupExperience() {
     return () => window.removeEventListener("focus", onFocus);
   }, [fetchStatus]);
 
-  // Auto-open panel once with ?tour=true (from signup redirect).
+  // Auto-open panel once when arriving from onboarding. The trigger is a
+  // sessionStorage flag rather than a ?tour=true URL param: a URL param
+  // forced us to call history.replaceState to clean it up, and fbevents.js
+  // detects that URL change and fires a duplicate PageView in Meta Pixel
+  // Helper. Keeping the URL stable avoids the ghost event.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("tour") !== "true") return;
+    let showTour = false;
+    try {
+      showTour = sessionStorage.getItem("dB_showTour") === "1";
+      if (showTour) sessionStorage.removeItem("dB_showTour");
+    } catch { /* private mode */ }
+    if (!showTour) return;
 
     (async () => {
       const s = await fetchStatus();
       if (!s || s.completedAt) return;
       setPanelOpen(true);
-      const url = new URL(window.location.href);
-      url.searchParams.delete("tour");
-      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
       localStorage.setItem(STORAGE_KEY, "1");
     })();
   }, [fetchStatus]);

@@ -71,10 +71,14 @@ export default function SignupPage() {
       login();
       await syncFromServer();
       setLoading(false);
-      // CompleteRegistration fires on /onboarding via the ?signup=true flag
-      // so the pixel runs after navigation completes (avoids the event being
-      // dropped if the user closes the tab mid-redirect).
-      router.push("/onboarding?signup=true");
+      // Mark the just-signed-up state in sessionStorage instead of a URL
+      // query param. A URL flag (?signup=true) forced /onboarding to call
+      // history.replaceState to clean it up, which fbevents.js detected
+      // as a route change and fired a duplicate PageView in Meta Pixel
+      // Helper. sessionStorage keeps the URL stable, so no auto-tracking
+      // ghost event.
+      try { sessionStorage.setItem("dB_justSignedUp", "1"); } catch { /* private mode */ }
+      router.push("/onboarding");
     } catch {
       setError("Something went wrong. Please try again.");
       setLoading(false);
