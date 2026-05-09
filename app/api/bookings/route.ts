@@ -51,6 +51,8 @@ export async function GET(request: NextRequest) {
         status: true,
         staffId: true,
         paymentMethod: true,
+        selectedAddons: true,
+        addonsTotal: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -153,6 +155,45 @@ export async function POST(request: NextRequest) {
     const vYear = vehicle?.year || body.vehicleYear || "";
     const vColor = vehicle?.color || body.vehicleColor || "";
 
+    // Sanitise selected addons against the package's actual addon list so
+    // a customer can't inject a free-form item or trick us with a price.
+    // We look up the live package and only keep entries the customer
+    // genuinely chose, snapshotting the current name/price/duration.
+    let storedSelectedAddons:
+      | { id: string; name: string; price: number; duration?: number }[]
+      | null = null;
+    let computedAddonsTotal = 0;
+    if (Array.isArray(body.selectedAddons) && body.selectedAddons.length > 0 && serviceId) {
+      const pkg = await prisma.package.findUnique({
+        where: { id: serviceId },
+        select: { addons: true, userId: true },
+      });
+      if (pkg && pkg.userId === userId && Array.isArray(pkg.addons)) {
+        const offered = pkg.addons as unknown as Array<{
+          id?: string; name?: string; price?: number; duration?: number;
+        }>;
+        const requestedIds = new Set(
+          (body.selectedAddons as unknown[])
+            .map((a) => (a && typeof a === "object" ? (a as any).id : null))
+            .filter((v): v is string => typeof v === "string"),
+        );
+        const matched = offered.filter((a) => a && a.id && requestedIds.has(a.id));
+        if (matched.length > 0) {
+          storedSelectedAddons = matched.map((a) => {
+            const entry: { id: string; name: string; price: number; duration?: number } = {
+              id: String(a.id),
+              name: String(a.name || ""),
+              price: Number(a.price) || 0,
+            };
+            if (typeof a.duration === "number" && a.duration > 0) entry.duration = a.duration;
+            return entry;
+          });
+          computedAddonsTotal = storedSelectedAddons.reduce((s, a) => s + (a.price || 0), 0);
+          computedAddonsTotal = Math.round(computedAddonsTotal * 100) / 100;
+        }
+      }
+    }
+
     // paymentProof is either a "stripe:<payment_intent_id>" / "square:<payment_id>"
     // reference (set by the embedded card modals after a successful charge) or
     // a legacy base64 data URL from the old proof-upload UI. Reject anything
@@ -218,6 +259,8 @@ export async function POST(request: NextRequest) {
         staffId: body.staffId || null,
         paymentMethod: body.paymentMethod || "",
         paymentProof: safeProof,
+        selectedAddons: storedSelectedAddons === null ? undefined : (storedSelectedAddons as any),
+        addonsTotal: computedAddonsTotal,
       },
     });
 
@@ -257,6 +300,14 @@ export async function POST(request: NextRequest) {
     const eCustomMessage = escapeHtml((user as any).customMessage || "");
     const ePhoneOrEmail = escapeHtml(user.phone || user.email || "");
 
+    // Formatted add-on lines for the owner email + a clean total. Empty
+    // string when no add-ons so the booking email stays unchanged for
+    // packages that don't offer them.
+    const addonRowsHtml = (storedSelectedAddons || [])
+      .map((a) => `<tr><td style="padding:6px 0;color:#6b7280;">+ ${escapeHtml(a.name)}</td><td style="padding:6px 0;font-weight:600;color:#111827;">$${a.price}</td></tr>`)
+      .join("");
+    const grandTotal = (parseFloat(servicePrice) || 0) + computedAddonsTotal;
+
     // Collect all email/SMS sends and await them at the end. On Netlify (and
     // any serverless host) the Node runtime is frozen the moment we return
     // the response, which silently kills any in-flight fire-and-forget
@@ -283,6 +334,8 @@ export async function POST(request: NextRequest) {
                 <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;font-weight:600;color:#111827;">${eTime}</td></tr>
                 <tr><td style="padding:6px 0;color:#6b7280;">Vehicle</td><td style="padding:6px 0;font-weight:600;color:#111827;">${eVYear} ${eVMake} ${eVModel} (${eVColor})</td></tr>
                 <tr><td style="padding:6px 0;color:#6b7280;">Price</td><td style="padding:6px 0;font-weight:600;color:#111827;">$${booking.servicePrice}</td></tr>
+                ${addonRowsHtml}
+                ${addonRowsHtml ? `<tr><td style="padding:6px 0;color:#6b7280;border-top:1px solid #e5e7eb;">Total</td><td style="padding:6px 0;font-weight:700;color:#111827;border-top:1px solid #e5e7eb;">$${grandTotal}</td></tr>` : ""}
                 ${booking.address ? `<tr><td style="padding:6px 0;color:#6b7280;">Address</td><td style="padding:6px 0;font-weight:600;color:#111827;">${eAddress}</td></tr>` : ""}
                 ${notes ? `<tr><td style="padding:6px 0;color:#6b7280;">Notes</td><td style="padding:6px 0;font-weight:600;color:#111827;">${eNotes}</td></tr>` : ""}
               </table>

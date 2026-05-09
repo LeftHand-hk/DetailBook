@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { getPackages, setPackages, getUser, generateId } from "@/lib/storage";
-import type { Package, User } from "@/types";
+import type { Package, PackageAddon, User } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
 import SetupHint from "@/components/SetupHint";
 import EmptyState, { EmptyIcons } from "@/components/EmptyState";
@@ -17,12 +17,22 @@ const QUICK_TEMPLATES = [
 
 const STARTER_LIMIT = 5;
 
+// Addon rows in the form keep price/duration as strings so we can render
+// empty inputs naturally. They're parsed to numbers right before submit.
+interface AddonDraft {
+  id: string;
+  name: string;
+  price: string;
+  duration: string;
+}
+
 interface PackageFormData {
   name: string;
   description: string;
   price: string;
   duration: string;
   deposit: string;
+  addons: AddonDraft[];
 }
 
 const EMPTY_FORM: PackageFormData = {
@@ -31,7 +41,12 @@ const EMPTY_FORM: PackageFormData = {
   price: "",
   duration: "",
   deposit: "",
+  addons: [],
 };
+
+function newAddonDraft(): AddonDraft {
+  return { id: `a_${Math.random().toString(36).slice(2, 10)}`, name: "", price: "", duration: "" };
+}
 
 export default function PackagesPage() {
   const [packages, setPackagesState] = useState<Package[]>([]);
@@ -67,7 +82,7 @@ export default function PackagesPage() {
 
   const openWithTemplate = (t: typeof QUICK_TEMPLATES[number]) => {
     setEditing(null);
-    setForm({ ...t });
+    setForm({ ...t, addons: [] });
     setShowModal(true);
   };
 
@@ -79,8 +94,27 @@ export default function PackagesPage() {
       price: String(pkg.price),
       duration: String(pkg.duration),
       deposit: pkg.deposit ? String(pkg.deposit) : "",
+      addons: (pkg.addons || []).map((a) => ({
+        id: a.id,
+        name: a.name,
+        price: String(a.price),
+        duration: a.duration ? String(a.duration) : "",
+      })),
     });
     setShowModal(true);
+  };
+
+  const updateAddon = (id: string, patch: Partial<AddonDraft>) => {
+    setForm((f) => ({
+      ...f,
+      addons: f.addons.map((a) => (a.id === id ? { ...a, ...patch } : a)),
+    }));
+  };
+  const removeAddon = (id: string) => {
+    setForm((f) => ({ ...f, addons: f.addons.filter((a) => a.id !== id) }));
+  };
+  const addAddonRow = () => {
+    setForm((f) => ({ ...f, addons: [...f.addons, newAddonDraft()] }));
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -90,12 +124,26 @@ export default function PackagesPage() {
     setSaving(true);
 
     const depositVal = form.deposit ? parseFloat(form.deposit) : undefined;
+    // Drop blank addon rows (name empty or invalid price) so a half-typed
+    // entry can't end up persisted with a $0 / NaN price.
+    const cleanAddons: PackageAddon[] = form.addons
+      .map((a): PackageAddon | null => {
+        const name = a.name.trim();
+        const price = parseFloat(a.price);
+        if (!name || !Number.isFinite(price) || price < 0) return null;
+        const duration = a.duration ? parseInt(a.duration, 10) : NaN;
+        const out: PackageAddon = { id: a.id, name, price };
+        if (Number.isFinite(duration) && duration > 0) out.duration = duration;
+        return out;
+      })
+      .filter((a): a is PackageAddon => a !== null);
     const payload = {
       name: form.name,
       description: form.description,
       price: parseFloat(form.price),
       duration: parseInt(form.duration),
       deposit: depositVal ?? 0,
+      addons: cleanAddons,
     };
 
     try {
@@ -130,9 +178,9 @@ export default function PackagesPage() {
       // Fallback to localStorage
       const updated: Package[] = editing
         ? packages.map((p) =>
-            p.id === editing.id ? { ...p, ...payload, deposit: depositVal } : p
+            p.id === editing.id ? { ...p, ...payload, deposit: depositVal, addons: cleanAddons } : p
           )
-        : [...packages, { id: generateId(), ...payload, active: true, deposit: depositVal }];
+        : [...packages, { id: generateId(), ...payload, active: true, deposit: depositVal, addons: cleanAddons }];
       setPackages(updated);
       setPackagesState(updated);
     }
@@ -293,12 +341,20 @@ export default function PackagesPage() {
                       <span className="text-2xl font-extrabold text-blue-600">${pkg.price}</span>
                       <span className="text-sm text-gray-500">· {formatDuration(pkg.duration)}</span>
                     </div>
-                    {pkg.deposit && pkg.deposit > 0 && (
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full mt-1.5">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" /></svg>
-                        ${pkg.deposit} deposit required
-                      </span>
-                    )}
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {pkg.deposit && pkg.deposit > 0 && (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" /></svg>
+                          ${pkg.deposit} deposit
+                        </span>
+                      )}
+                      {pkg.addons && pkg.addons.length > 0 && (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                          {pkg.addons.length} add-on{pkg.addons.length === 1 ? "" : "s"}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -439,6 +495,85 @@ export default function PackagesPage() {
                   />
                   <p className="text-xs text-gray-400 mt-1.5">Amount required upfront to secure the booking. Leave empty or 0 for no deposit.</p>
                 </div>
+              </div>
+
+              {/* Add-ons (optional). Shown to customers as ticked extras on
+                  the booking page; each adds its price (and optional minutes)
+                  to the appointment total. */}
+              <div className="border-t border-gray-100 pt-4">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-semibold text-gray-800">Add-ons (optional)</label>
+                  <button
+                    type="button"
+                    onClick={addAddonRow}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add row
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mb-3">Extras the customer can tick at booking — e.g. &ldquo;Engine bay clean +$25&rdquo;, &ldquo;Pet hair removal +$15&rdquo;.</p>
+
+                {form.addons.length === 0 ? (
+                  <button
+                    type="button"
+                    onClick={addAddonRow}
+                    className="w-full py-3 border-2 border-dashed border-gray-200 hover:border-blue-300 hover:bg-blue-50/40 rounded-xl text-sm text-gray-500 hover:text-blue-600 font-medium transition-colors"
+                  >
+                    + Add your first add-on
+                  </button>
+                ) : (
+                  <div className="space-y-2">
+                    {form.addons.map((addon) => (
+                      <div key={addon.id} className="grid grid-cols-[1fr_90px_90px_auto] gap-2 items-start">
+                        <input
+                          type="text"
+                          value={addon.name}
+                          onChange={(e) => updateAddon(addon.id, { name: e.target.value })}
+                          placeholder="Add-on name"
+                          className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400"
+                        />
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={addon.price}
+                            onChange={(e) => updateAddon(addon.id, { price: e.target.value })}
+                            placeholder="0"
+                            className="w-full pl-6 pr-2 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400"
+                          />
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="0"
+                            step="5"
+                            value={addon.duration}
+                            onChange={(e) => updateAddon(addon.id, { duration: e.target.value })}
+                            placeholder="min"
+                            className="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 text-center"
+                            title="Extra minutes (optional)"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeAddon(addon.id)}
+                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Remove"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                    <p className="text-[11px] text-gray-400 pt-1">Name · Price · Extra minutes (optional)</p>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3 pt-2">

@@ -201,6 +201,14 @@ model Package {
   deposit     Float?
   active      Boolean @default(true)
 
+  // Optional list of paid extras the customer can tick on top of the
+  // base package (e.g. "Engine bay clean +$25", "Pet hair removal +$15").
+  // Stored as Json (not a separate model) because addons live and die
+  // with the package — there's no need to query them independently and
+  // the array stays small (typically 0-10 entries).
+  // Shape: [{ id: string, name: string, price: number, duration?: number }]
+  addons Json?
+
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
@@ -253,6 +261,16 @@ model Booking {
   paymentProof    String? @db.Text
 
   reminderSentAt DateTime?
+
+  // Snapshot of paid extras the customer ticked at booking time. We store
+  // a copy (not a FK to Package.addons) so the booking row stays correct
+  // if the owner later edits or deletes the addon definition.
+  // Shape: [{ id: string, name: string, price: number, duration?: number }]
+  selectedAddons Json?
+  // Sum of selectedAddons[].price, denormalised for fast dashboard
+  // aggregation (revenue per booking) without parsing the JSON each time.
+  // The customer's grand total is servicePrice + addonsTotal.
+  addonsTotal     Float    @default(0)
 
   staffId   String?
   staff     Staff?   @relation(fields: [staffId], references: [id], onDelete: SetNull)

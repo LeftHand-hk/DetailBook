@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getUser, getPackages } from "@/lib/storage";
-import type { User, Package } from "@/types";
+import type { User, Package, PackageAddon } from "@/types";
 import { usePlatformName } from "@/components/PlatformName";
 import StripeDepositModal from "@/components/StripeDepositModal";
 import SquareDepositModal from "@/components/SquareDepositModal";
@@ -77,6 +77,10 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState(0);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
+  // IDs of the add-ons the customer has currently ticked. Reset whenever
+  // the customer picks a different package so options from the previous
+  // package don't leak into the booking.
+  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [form, setForm] = useState<BookingForm>(EMPTY_FORM);
@@ -226,6 +230,26 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     ? Number((selectedPackage as any).deposit || 0)
     : 0;
 
+  // Reset ticked add-ons whenever the customer switches packages so they
+  // don't carry options from the prior package into the new one.
+  useEffect(() => {
+    setSelectedAddonIds([]);
+  }, [selectedPackage?.id]);
+
+  // Add-on derived values. We always recompute from the live package +
+  // the ticked ids so changing the selection updates the summary instantly.
+  const availableAddons: PackageAddon[] = (selectedPackage?.addons || []).filter(
+    (a) => a && a.name && Number.isFinite(a.price)
+  );
+  const chosenAddons: PackageAddon[] = availableAddons.filter((a) => selectedAddonIds.includes(a.id));
+  const addonsTotal = chosenAddons.reduce((s, a) => s + (a.price || 0), 0);
+  const addonsExtraMinutes = chosenAddons.reduce((s, a) => s + (a.duration || 0), 0);
+  const totalPrice = (selectedPackage?.price || 0) + addonsTotal;
+  const totalDuration = (selectedPackage?.duration || 0) + addonsExtraMinutes;
+  const toggleAddon = (id: string) => {
+    setSelectedAddonIds((cur) => cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
+  };
+
   const formatDate = (dateStr: string) =>
     new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
       weekday: "long", month: "long", day: "numeric", year: "numeric",
@@ -273,6 +297,9 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       serviceId: selectedPackage!.id,
       serviceName: selectedPackage!.name,
       servicePrice: selectedPackage!.price,
+      // Send only ids — the API re-resolves and snapshots the price from
+      // the live package so a tampered client can't pay $0 for an add-on.
+      selectedAddons: chosenAddons.map((a) => ({ id: a.id })),
       date: selectedDate,
       time: selectedTime,
       depositRequired: depositAmount,
@@ -674,7 +701,14 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
               ...(selectedPackage ? [{ label: "Service", value: selectedPackage.name }] : []),
               ...(selectedDate ? [{ label: "Date", value: formatDate(selectedDate) }] : []),
               ...(selectedTime ? [{ label: "Time", value: selectedTime }] : []),
-              ...(selectedPackage ? [{ label: "Total", value: `$${selectedPackage.price}` }] : []),
+              ...(selectedPackage ? [{
+                label: chosenAddons.length > 0 ? "Total (incl. add-ons)" : "Total",
+                value: `$${totalPrice}`,
+              }] : []),
+              ...(chosenAddons.length > 0 ? [{
+                label: "Add-ons",
+                value: chosenAddons.map((a) => `${a.name} ($${a.price})`).join(", "),
+              }] : []),
               ...(depositAmount > 0 && fullyConfirmed ? [{ label: "Deposit Paid", value: `$${depositAmount}`, highlight: true }] : []),
               ...(depositAmount > 0 && !fullyConfirmed ? [{ label: "Deposit Due", value: `$${depositAmount}`, highlight: true }] : []),
               ...(selectedStaff ? [{ label: "Detailer", value: selectedStaff.name }] : []),
@@ -751,7 +785,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                   if (ampm && ampm[3].toUpperCase() === "AM" && h === 12) h = 0;
                   const pad = (n: number) => String(n).padStart(2, "0");
                   const start = new Date(y, mo - 1, d, h, m, 0);
-                  const end = new Date(start.getTime() + (selectedPackage.duration || 60) * 60000);
+                  const end = new Date(start.getTime() + ((totalDuration || selectedPackage.duration || 60)) * 60000);
                   const fmt = (dt: Date) => `${dt.getFullYear()}${pad(dt.getMonth()+1)}${pad(dt.getDate())}T${pad(dt.getHours())}${pad(dt.getMinutes())}00`;
                   const title = encodeURIComponent(`${selectedPackage.name} – ${user.businessName}`);
                   const details = encodeURIComponent(`Booking ID: #${bookingId}\nService: ${selectedPackage.name}\nBusiness: ${user.businessName}${user.phone ? `\nPhone: ${user.phone}` : ""}`);
@@ -1323,14 +1357,73 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                 </div>
                 <div>
                   <p className="text-white font-bold">{selectedPackage?.name}</p>
-                  <p className="text-blue-200 text-xs">{selectedPackage && formatDuration(selectedPackage.duration)}</p>
+                  <p className="text-blue-200 text-xs">
+                    {selectedPackage && formatDuration(totalDuration)}
+                    {chosenAddons.length > 0 && ` · +${chosenAddons.length} add-on${chosenAddons.length === 1 ? "" : "s"}`}
+                  </p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-white font-extrabold text-xl">${selectedPackage?.price}</p>
+                <p className="text-white font-extrabold text-xl">${totalPrice}</p>
+                {addonsTotal > 0 && (
+                  <p className="text-blue-200 text-[11px] leading-tight">${selectedPackage?.price} + ${addonsTotal}</p>
+                )}
                 <button onClick={() => setStep(0)} className="text-blue-300 text-xs hover:text-white transition-colors">Change</button>
               </div>
             </div>
+
+            {/* Add-ons (only shown when the package has any) */}
+            {availableAddons.length > 0 && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-5">
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="font-bold text-gray-900 text-base">Add-ons</h3>
+                  <span className="text-xs text-gray-400">Optional</span>
+                </div>
+                <p className="text-gray-500 text-xs mb-4">Boost your detail with any of these extras.</p>
+                <div className="space-y-2">
+                  {availableAddons.map((addon) => {
+                    const checked = selectedAddonIds.includes(addon.id);
+                    return (
+                      <button
+                        key={addon.id}
+                        type="button"
+                        onClick={() => toggleAddon(addon.id)}
+                        className={`w-full text-left flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${
+                          checked
+                            ? "border-blue-500 bg-blue-50/70 shadow-sm"
+                            : "border-gray-100 hover:border-blue-200 hover:bg-blue-50/30"
+                        }`}
+                      >
+                        <span className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                          checked ? "bg-blue-600 border-blue-600" : "border-gray-300 bg-white"
+                        }`}>
+                          {checked && (
+                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-sm font-semibold text-gray-900 truncate">{addon.name}</span>
+                          {typeof addon.duration === "number" && addon.duration > 0 && (
+                            <span className="block text-[11px] text-gray-400">+{addon.duration} min</span>
+                          )}
+                        </span>
+                        <span className={`flex-shrink-0 text-sm font-extrabold ${checked ? "text-blue-700" : "text-gray-700"}`}>
+                          +${addon.price}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {chosenAddons.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-sm">
+                    <span className="text-gray-500">{chosenAddons.length} selected</span>
+                    <span className="font-bold text-gray-900">+${addonsTotal}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             <h2 className="text-2xl font-extrabold text-gray-900 mb-1">Pick a Date</h2>
             <p className="text-gray-500 text-sm mb-5">Choose when you&apos;d like the service done.</p>
@@ -1433,10 +1526,13 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
               <div className="flex items-center justify-between text-sm">
                 <div>
                   <p className="text-white font-bold">{selectedPackage?.name}</p>
-                  <p className="text-blue-300 text-xs">{selectedDate ? formatDate(selectedDate) : ""} · {selectedTime}</p>
+                  <p className="text-blue-300 text-xs">
+                    {selectedDate ? formatDate(selectedDate) : ""} · {selectedTime}
+                    {chosenAddons.length > 0 && ` · ${chosenAddons.length} add-on${chosenAddons.length === 1 ? "" : "s"}`}
+                  </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-white font-extrabold text-lg">${selectedPackage?.price}</p>
+                  <p className="text-white font-extrabold text-lg">${totalPrice}</p>
                   <button onClick={() => setStep(1)} className="text-blue-400 text-xs hover:text-white transition-colors">Change</button>
                 </div>
               </div>
@@ -1754,6 +1850,12 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                     <span className="text-white/60">{selectedPackage?.name}</span>
                     <span className="font-semibold">${selectedPackage?.price}</span>
                   </div>
+                  {chosenAddons.map((addon) => (
+                    <div key={addon.id} className="flex justify-between text-sm">
+                      <span className="text-white/50 pl-3">+ {addon.name}</span>
+                      <span className="font-semibold text-white/80">${addon.price}</span>
+                    </div>
+                  ))}
                   <div className="flex justify-between text-sm">
                     <span className="text-white/60">Date</span>
                     <span className="font-semibold">{selectedDate ? formatDate(selectedDate) : ""}</span>
@@ -1776,6 +1878,13 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                   )}
                 </div>
 
+                {chosenAddons.length > 0 && (
+                  <div className="flex justify-between items-center pb-3 mb-3 border-b border-white/10">
+                    <span className="text-white/70 text-sm font-semibold">Total</span>
+                    <span className="text-xl font-extrabold">${totalPrice}</span>
+                  </div>
+                )}
+
                 {depositAmount > 0 && (
                   <div className="bg-blue-500/20 border border-blue-500/30 rounded-xl p-4 mb-4">
                     <div className="flex justify-between items-center">
@@ -1790,7 +1899,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
 
                 <div className="flex justify-between items-center pt-3 border-t border-white/10 text-sm">
                   <span className="text-white/50">{depositAmount > 0 ? "Balance due on service day" : "Total due on service day"}</span>
-                  <span className="text-lg font-bold">${(selectedPackage?.price ?? 0) - depositAmount}</span>
+                  <span className="text-lg font-bold">${totalPrice - depositAmount}</span>
                 </div>
               </div>
 
@@ -1860,11 +1969,14 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
               <div className="flex items-center justify-between text-sm">
                 <div>
                   <p className="text-white font-bold">{selectedPackage.name}</p>
-                  <p className="text-blue-300 text-xs">{selectedDate ? formatDate(selectedDate) : ""} · {selectedTime}</p>
+                  <p className="text-blue-300 text-xs">
+                    {selectedDate ? formatDate(selectedDate) : ""} · {selectedTime}
+                    {chosenAddons.length > 0 && ` · ${chosenAddons.length} add-on${chosenAddons.length === 1 ? "" : "s"}`}
+                  </p>
                 </div>
                 <div className="text-right">
                   <p className="text-white font-extrabold text-lg">${depositAmount}</p>
-                  <p className="text-blue-400 text-xs">Deposit</p>
+                  <p className="text-blue-400 text-xs">Deposit · ${totalPrice} total</p>
                 </div>
               </div>
             </div>
