@@ -187,12 +187,24 @@ export default function LandingPage() {
         {/* Base dark background */}
         <div className="absolute inset-0 bg-[#080c18]" />
 
-        {/* Animated gradient orbs */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Animated gradient orbs — desktop only. The 100-120px blur radii
+            multiplied by huge surface areas tank mobile GPUs (the user
+            reported blank sections for ~10s on phones). The flat dark
+            base + grid lines below still look polished without them. */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none hidden md:block">
           <div className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-blue-600/25 rounded-full blur-[120px] animate-blobFloat" />
           <div className="absolute top-[10%] right-[-15%] w-[60%] h-[60%] bg-indigo-700/20 rounded-full blur-[100px] animate-blobFloat delay-400" />
           <div className="absolute bottom-[-10%] left-[20%] w-[50%] h-[50%] bg-cyan-600/15 rounded-full blur-[100px] animate-blobFloat delay-700" />
         </div>
+        {/* Mobile fallback: a static, much cheaper radial gradient that
+            keeps the section from looking too flat. */}
+        <div
+          className="absolute inset-0 pointer-events-none md:hidden"
+          style={{
+            background:
+              "radial-gradient(ellipse at top left, rgba(37,99,235,0.18), transparent 55%), radial-gradient(ellipse at bottom right, rgba(67,56,202,0.12), transparent 55%)",
+          }}
+        />
 
         {/* SVG Grid lines */}
         <div className="absolute inset-0 overflow-hidden opacity-[0.07] pointer-events-none">
@@ -697,8 +709,16 @@ export default function LandingPage() {
         {/* Background */}
         <div className="absolute inset-0 bg-[#060b16]" />
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-[-30%] left-[-10%] w-[60%] h-[120%] bg-blue-700/25 rounded-full blur-3xl animate-blobFloat" />
-          <div className="absolute top-[-20%] right-[-15%] w-[55%] h-[100%] bg-indigo-700/20 rounded-full blur-3xl animate-blobFloat delay-500" />
+          {/* Animated blobs desktop only — same mobile-perf reason as the hero. */}
+          <div className="absolute top-[-30%] left-[-10%] w-[60%] h-[120%] bg-blue-700/25 rounded-full blur-3xl animate-blobFloat hidden md:block" />
+          <div className="absolute top-[-20%] right-[-15%] w-[55%] h-[100%] bg-indigo-700/20 rounded-full blur-3xl animate-blobFloat delay-500 hidden md:block" />
+          <div
+            className="absolute inset-0 md:hidden"
+            style={{
+              background:
+                "radial-gradient(ellipse at top, rgba(29,78,216,0.22), transparent 60%)",
+            }}
+          />
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-px bg-gradient-to-r from-transparent via-blue-500/40 to-transparent" />
         </div>
         {/* Grid overlay */}

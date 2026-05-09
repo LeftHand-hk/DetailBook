@@ -1,6 +1,20 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import MetaPixel from "@/components/MetaPixel";
+
+// Self-host Inter at build time so the font ships from our own origin
+// (Netlify CDN) instead of Google's CSS endpoint. The previous setup used
+// `@import url(fonts.googleapis.com/...)` inside globals.css which is
+// render-blocking — on mobile, it left every text section invisible until
+// the external request resolved, so users saw white empty sections for
+// several seconds. next/font also auto-applies font-display: swap and
+// preloads the WOFF2 file alongside the page HTML.
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+});
 
 const SITE_URL = "https://detailbookapp.com";
 
@@ -36,8 +50,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className="bg-white text-gray-900 antialiased">
+    <html lang="en" className={inter.variable}>
+      <body className="bg-white text-gray-900 antialiased font-sans">
         <MetaPixel />
         {children}
       </body>

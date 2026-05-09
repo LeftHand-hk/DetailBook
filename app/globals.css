@@ -2,7 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+/* Inter is now loaded via next/font/google in app/layout.tsx — that
+   self-hosts the WOFF2 file, eliminating the render-blocking external
+   request that was blanking out below-the-fold sections on mobile. */
 
 * {
   box-sizing: border-box;
@@ -13,7 +15,6 @@ html {
 }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
