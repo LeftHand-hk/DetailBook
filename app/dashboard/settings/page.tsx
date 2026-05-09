@@ -805,8 +805,8 @@ function GoogleCalendarSection({ userPlan }: { userPlan?: string }) {
           </div>
         )}
 
-        <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-gray-200">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 p-4 rounded-xl border border-gray-200">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm">
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
                 <rect width="24" height="24" rx="4" fill="#4285F4" />
@@ -816,8 +816,8 @@ function GoogleCalendarSection({ userPlan }: { userPlan?: string }) {
                 <path d="M3.69 14L5.96 12.22C5.84 11.65 5.78 11.05 5.78 10.4C5.78 9.75 5.84 9.15 5.96 8.58L3.69 10C3.35 10.75 3.14 11.55 3.14 12.4C3.14 13.25 3.35 14.05 3.69 14Z" fill="#FBBC04" />
               </svg>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
                 <p className="text-sm font-bold text-gray-900">Google Calendar</p>
                 {!isPro && (
                   <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Pro</span>
@@ -826,7 +826,7 @@ function GoogleCalendarSection({ userPlan }: { userPlan?: string }) {
                   <span className="text-[10px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Connected</span>
                 )}
               </div>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-xs text-gray-500 mt-0.5 truncate">
                 {status?.connected
                   ? `Syncing to: ${status.calendarId || "Primary calendar"}`
                   : "Sync your bookings to Google Calendar automatically."}
@@ -835,26 +835,26 @@ function GoogleCalendarSection({ userPlan }: { userPlan?: string }) {
           </div>
 
           {loading ? (
-            <div className="w-5 h-5 border-2 border-gray-200 border-t-blue-600 rounded-full animate-spin flex-shrink-0 mt-1" />
+            <div className="w-5 h-5 border-2 border-gray-200 border-t-blue-600 rounded-full animate-spin flex-shrink-0 sm:mt-1 self-end sm:self-auto" />
           ) : !isPro ? (
             <a href="/dashboard/billing"
-              className="flex-shrink-0 bg-blue-600 text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+              className="self-stretch sm:self-auto flex-shrink-0 text-center bg-blue-600 text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors">
               Upgrade
             </a>
           ) : status?.connected ? (
-            <div className="flex gap-2 flex-shrink-0">
+            <div className="flex gap-2 flex-shrink-0 self-stretch sm:self-auto">
               <button onClick={handleSync} disabled={syncing}
-                className="text-xs font-bold text-blue-600 hover:text-blue-700 px-3 py-2 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50">
+                className="flex-1 sm:flex-none text-xs font-bold text-blue-600 hover:text-blue-700 px-3 py-2 rounded-lg border border-blue-200 sm:border-transparent hover:bg-blue-50 transition-colors disabled:opacity-50">
                 {syncing ? "Syncing..." : "Sync Now"}
               </button>
               <button onClick={handleDisconnect} disabled={disconnecting}
-                className="text-xs font-bold text-red-600 hover:text-red-700 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50">
+                className="flex-1 sm:flex-none text-xs font-bold text-red-600 hover:text-red-700 px-3 py-2 rounded-lg border border-red-200 sm:border-transparent hover:bg-red-50 transition-colors disabled:opacity-50">
                 {disconnecting ? "..." : "Disconnect"}
               </button>
             </div>
           ) : (
             <button onClick={handleConnect}
-              className="flex-shrink-0 bg-blue-600 text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+              className="self-stretch sm:self-auto flex-shrink-0 bg-blue-600 text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors">
               Connect
             </button>
           )}
