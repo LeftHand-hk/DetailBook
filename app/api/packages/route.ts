@@ -3,33 +3,26 @@ import prisma from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 
 // Validates the addons payload from the owner. We accept an array of
-// {id?, name, price, duration?} objects, drop anything malformed, and
-// regenerate ids server-side so the front-end can't smuggle collisions.
-// Returns the cleaned array (or null when the field was not provided —
-// caller distinguishes "leave alone" from "set to empty list").
+// {id?, name, price} objects, drop anything malformed, and regenerate
+// ids server-side so the front-end can't smuggle collisions. Returns
+// the cleaned array (or null when the field was not provided — caller
+// distinguishes "leave alone" from "set to empty list").
 function sanitizeAddons(input: unknown): unknown[] | null | undefined {
   if (input === undefined) return undefined;
   if (input === null) return null;
   if (!Array.isArray(input)) return null;
-  const out: { id: string; name: string; price: number; duration?: number }[] = [];
+  const out: { id: string; name: string; price: number }[] = [];
   for (const raw of input) {
     if (!raw || typeof raw !== "object") continue;
     const r = raw as Record<string, unknown>;
     const name = typeof r.name === "string" ? r.name.trim() : "";
     const priceNum = typeof r.price === "number" ? r.price : parseFloat(String(r.price));
     if (!name || !Number.isFinite(priceNum) || priceNum < 0) continue;
-    const durationNum = r.duration == null || r.duration === ""
-      ? undefined
-      : (typeof r.duration === "number" ? r.duration : parseInt(String(r.duration), 10));
-    const cleaned: { id: string; name: string; price: number; duration?: number } = {
+    out.push({
       id: typeof r.id === "string" && r.id ? r.id : `a_${Math.random().toString(36).slice(2, 10)}`,
       name,
       price: Math.round(priceNum * 100) / 100,
-    };
-    if (typeof durationNum === "number" && Number.isFinite(durationNum) && durationNum > 0) {
-      cleaned.duration = Math.floor(durationNum);
-    }
-    out.push(cleaned);
+    });
   }
   return out;
 }

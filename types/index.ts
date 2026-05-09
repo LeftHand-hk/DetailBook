@@ -101,10 +101,6 @@ export interface PackageAddon {
   id: string;
   name: string;
   price: number;
-  // Optional extra minutes added to the appointment when the customer
-  // picks this addon. Owners may leave it empty for things that don't
-  // change duration (e.g. an air freshener upsell).
-  duration?: number;
 }
 
 export interface Package {

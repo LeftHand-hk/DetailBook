@@ -238,14 +238,14 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
 
   // Add-on derived values. We always recompute from the live package +
   // the ticked ids so changing the selection updates the summary instantly.
+  // Add-ons only affect price — appointment duration stays at the
+  // package's own duration.
   const availableAddons: PackageAddon[] = (selectedPackage?.addons || []).filter(
     (a) => a && a.name && Number.isFinite(a.price)
   );
   const chosenAddons: PackageAddon[] = availableAddons.filter((a) => selectedAddonIds.includes(a.id));
   const addonsTotal = chosenAddons.reduce((s, a) => s + (a.price || 0), 0);
-  const addonsExtraMinutes = chosenAddons.reduce((s, a) => s + (a.duration || 0), 0);
   const totalPrice = (selectedPackage?.price || 0) + addonsTotal;
-  const totalDuration = (selectedPackage?.duration || 0) + addonsExtraMinutes;
   const toggleAddon = (id: string) => {
     setSelectedAddonIds((cur) => cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
   };
@@ -785,7 +785,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                   if (ampm && ampm[3].toUpperCase() === "AM" && h === 12) h = 0;
                   const pad = (n: number) => String(n).padStart(2, "0");
                   const start = new Date(y, mo - 1, d, h, m, 0);
-                  const end = new Date(start.getTime() + ((totalDuration || selectedPackage.duration || 60)) * 60000);
+                  const end = new Date(start.getTime() + (selectedPackage.duration || 60) * 60000);
                   const fmt = (dt: Date) => `${dt.getFullYear()}${pad(dt.getMonth()+1)}${pad(dt.getDate())}T${pad(dt.getHours())}${pad(dt.getMinutes())}00`;
                   const title = encodeURIComponent(`${selectedPackage.name} – ${user.businessName}`);
                   const details = encodeURIComponent(`Booking ID: #${bookingId}\nService: ${selectedPackage.name}\nBusiness: ${user.businessName}${user.phone ? `\nPhone: ${user.phone}` : ""}`);
@@ -1358,7 +1358,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                 <div>
                   <p className="text-white font-bold">{selectedPackage?.name}</p>
                   <p className="text-blue-200 text-xs">
-                    {selectedPackage && formatDuration(totalDuration)}
+                    {selectedPackage && formatDuration(selectedPackage.duration)}
                     {chosenAddons.length > 0 && ` · +${chosenAddons.length} add-on${chosenAddons.length === 1 ? "" : "s"}`}
                   </p>
                 </div>
@@ -1405,9 +1405,6 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                         </span>
                         <span className="flex-1 min-w-0">
                           <span className="block text-sm font-semibold text-gray-900 truncate">{addon.name}</span>
-                          {typeof addon.duration === "number" && addon.duration > 0 && (
-                            <span className="block text-[11px] text-gray-400">+{addon.duration} min</span>
-                          )}
                         </span>
                         <span className={`flex-shrink-0 text-sm font-extrabold ${checked ? "text-blue-700" : "text-gray-700"}`}>
                           +${addon.price}

@@ -17,13 +17,12 @@ const QUICK_TEMPLATES = [
 
 const STARTER_LIMIT = 5;
 
-// Addon rows in the form keep price/duration as strings so we can render
-// empty inputs naturally. They're parsed to numbers right before submit.
+// Addon rows in the form keep price as a string so we can render empty
+// inputs naturally. It's parsed to a number right before submit.
 interface AddonDraft {
   id: string;
   name: string;
   price: string;
-  duration: string;
 }
 
 interface PackageFormData {
@@ -45,7 +44,7 @@ const EMPTY_FORM: PackageFormData = {
 };
 
 function newAddonDraft(): AddonDraft {
-  return { id: `a_${Math.random().toString(36).slice(2, 10)}`, name: "", price: "", duration: "" };
+  return { id: `a_${Math.random().toString(36).slice(2, 10)}`, name: "", price: "" };
 }
 
 export default function PackagesPage() {
@@ -98,7 +97,6 @@ export default function PackagesPage() {
         id: a.id,
         name: a.name,
         price: String(a.price),
-        duration: a.duration ? String(a.duration) : "",
       })),
     });
     setShowModal(true);
@@ -131,10 +129,7 @@ export default function PackagesPage() {
         const name = a.name.trim();
         const price = parseFloat(a.price);
         if (!name || !Number.isFinite(price) || price < 0) return null;
-        const duration = a.duration ? parseInt(a.duration, 10) : NaN;
-        const out: PackageAddon = { id: a.id, name, price };
-        if (Number.isFinite(duration) && duration > 0) out.duration = duration;
-        return out;
+        return { id: a.id, name, price };
       })
       .filter((a): a is PackageAddon => a !== null);
     const payload = {
@@ -527,7 +522,7 @@ export default function PackagesPage() {
                 ) : (
                   <div className="space-y-2">
                     {form.addons.map((addon) => (
-                      <div key={addon.id} className="grid grid-cols-[1fr_90px_90px_auto] gap-2 items-start">
+                      <div key={addon.id} className="grid grid-cols-[1fr_110px_auto] gap-2 items-start">
                         <input
                           type="text"
                           value={addon.name}
@@ -547,18 +542,6 @@ export default function PackagesPage() {
                             className="w-full pl-6 pr-2 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400"
                           />
                         </div>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            min="0"
-                            step="5"
-                            value={addon.duration}
-                            onChange={(e) => updateAddon(addon.id, { duration: e.target.value })}
-                            placeholder="min"
-                            className="w-full px-2 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 text-center"
-                            title="Extra minutes (optional)"
-                          />
-                        </div>
                         <button
                           type="button"
                           onClick={() => removeAddon(addon.id)}
@@ -571,7 +554,6 @@ export default function PackagesPage() {
                         </button>
                       </div>
                     ))}
-                    <p className="text-[11px] text-gray-400 pt-1">Name · Price · Extra minutes (optional)</p>
                   </div>
                 )}
               </div>

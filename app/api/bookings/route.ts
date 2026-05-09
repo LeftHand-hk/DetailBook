@@ -158,9 +158,9 @@ export async function POST(request: NextRequest) {
     // Sanitise selected addons against the package's actual addon list so
     // a customer can't inject a free-form item or trick us with a price.
     // We look up the live package and only keep entries the customer
-    // genuinely chose, snapshotting the current name/price/duration.
+    // genuinely chose, snapshotting the current name/price.
     let storedSelectedAddons:
-      | { id: string; name: string; price: number; duration?: number }[]
+      | { id: string; name: string; price: number }[]
       | null = null;
     let computedAddonsTotal = 0;
     if (Array.isArray(body.selectedAddons) && body.selectedAddons.length > 0 && serviceId) {
@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
       });
       if (pkg && pkg.userId === userId && Array.isArray(pkg.addons)) {
         const offered = pkg.addons as unknown as Array<{
-          id?: string; name?: string; price?: number; duration?: number;
+          id?: string; name?: string; price?: number;
         }>;
         const requestedIds = new Set(
           (body.selectedAddons as unknown[])
@@ -179,15 +179,11 @@ export async function POST(request: NextRequest) {
         );
         const matched = offered.filter((a) => a && a.id && requestedIds.has(a.id));
         if (matched.length > 0) {
-          storedSelectedAddons = matched.map((a) => {
-            const entry: { id: string; name: string; price: number; duration?: number } = {
-              id: String(a.id),
-              name: String(a.name || ""),
-              price: Number(a.price) || 0,
-            };
-            if (typeof a.duration === "number" && a.duration > 0) entry.duration = a.duration;
-            return entry;
-          });
+          storedSelectedAddons = matched.map((a) => ({
+            id: String(a.id),
+            name: String(a.name || ""),
+            price: Number(a.price) || 0,
+          }));
           computedAddonsTotal = storedSelectedAddons.reduce((s, a) => s + (a.price || 0), 0);
           computedAddonsTotal = Math.round(computedAddonsTotal * 100) / 100;
         }
