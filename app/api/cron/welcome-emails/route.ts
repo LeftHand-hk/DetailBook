@@ -3,9 +3,9 @@ import { runWelcomeSequenceTick } from "@/lib/welcome-emails";
 
 // Hourly cron — called by cron-job.org. For every user signed up in the
 // last 30 days, dispatches the next welcome email if one is due.
-// Cadence: email 1 = Day 0, email 2 = Day 5, email 3 = Day 13.
-// Skips users who paused (unsubscribed), are suspended/cancelled, or
-// (for email 3) have already subscribed to a paid plan.
+// Cadence: Day 0 (welcome), Day 2 (engagement, only if no packages),
+// Day 5 (share link), Day 13 (trial ending). Skips users who paused,
+// are suspended/cancelled, or (for Day 13) have upgraded to a paid plan.
 export async function GET(request: NextRequest) {
   const secret =
     request.headers.get("x-cron-secret") ||

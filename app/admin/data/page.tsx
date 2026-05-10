@@ -50,10 +50,149 @@ const SECTIONS: { title: string; keys: string[] }[] = [
     keys: ["googleCalendarEnabled", "googleCalendarId"],
   },
   {
-    title: "Onboarding & Welcome Emails",
-    keys: ["onboardingDismissed", "onboardingCompletedAt", "onboardingProgress", "welcomeEmailsSent", "welcomeEmailLastSentAt", "welcomeEmailsPaused"],
+    title: "Onboarding",
+    keys: ["onboardingDismissed", "onboardingCompletedAt", "onboardingProgress"],
   },
 ];
+
+// The welcome-email columns are rendered by <WelcomeEmailsCard /> with
+// status badges + Resend/Test buttons rather than the generic FieldRow
+// view, so we exclude them from the generic SECTIONS catch-all.
+const WELCOME_EMAIL_KEYS = new Set([
+  "welcomeEmailDay0At",
+  "welcomeEmailDay2At",
+  "welcomeEmailDay2Skipped",
+  "welcomeEmailDay5At",
+  "welcomeEmailDay13At",
+  "welcomeEmailsSent",
+  "welcomeEmailLastSentAt",
+  "welcomeEmailsPaused",
+]);
+
+type WelcomeKey = "day0" | "day2" | "day5" | "day13";
+const WELCOME_DEFS: { key: WelcomeKey; label: string; col: string }[] = [
+  { key: "day0",  label: "Day 0 — Welcome",       col: "welcomeEmailDay0At" },
+  { key: "day2",  label: "Day 2 — Engagement",    col: "welcomeEmailDay2At" },
+  { key: "day5",  label: "Day 5 — Share link",    col: "welcomeEmailDay5At" },
+  { key: "day13", label: "Day 13 — Trial ending", col: "welcomeEmailDay13At" },
+];
+
+function formatTs(value: unknown): string | null {
+  if (typeof value !== "string" || !value) return null;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleString();
+}
+
+function WelcomeEmailsCard({ user, onAction }: { user: Record<string, unknown>; onAction: () => void }) {
+  const [pending, setPending] = useState<string | null>(null);
+  const [testTo, setTestTo] = useState("");
+  const [testStatus, setTestStatus] = useState<string>("");
+
+  const paused = Boolean(user.welcomeEmailsPaused);
+  const day2Skipped = Boolean(user.welcomeEmailDay2Skipped);
+
+  const resend = async (key: WelcomeKey) => {
+    setPending(key);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/resend-welcome`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) alert(`Failed: ${data.error || res.status}`);
+      onAction();
+    } finally {
+      setPending(null);
+    }
+  };
+
+  const runTestSequence = async () => {
+    if (!testTo.trim()) return;
+    setPending("test");
+    setTestStatus("Sending…");
+    try {
+      const res = await fetch(`/api/admin/welcome-email-test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: testTo.trim(), all: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setTestStatus(`Failed: ${data.error || res.status}`);
+      } else {
+        setTestStatus(`Sent 4 emails to ${data.sentTo || testTo}.`);
+      }
+    } catch (err: any) {
+      setTestStatus(`Failed: ${err.message || "network error"}`);
+    } finally {
+      setPending(null);
+    }
+  };
+
+  return (
+    <div>
+      <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Welcome Emails</h3>
+      <div className="bg-gray-50/50 border border-gray-100 rounded-xl p-4 space-y-2">
+        {paused && (
+          <div className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+            User unsubscribed — no more welcome emails will be sent.
+          </div>
+        )}
+        {WELCOME_DEFS.map((def) => {
+          const ts = formatTs(user[def.col]);
+          const skipped = def.key === "day2" && day2Skipped;
+          const statusText = ts
+            ? skipped ? `Skipped (had packages) on ${ts}` : `Sent on ${ts}`
+            : "Pending";
+          const statusClass = ts
+            ? skipped ? "text-gray-500" : "text-green-700"
+            : "text-blue-700";
+          return (
+            <div key={def.key} className="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-gray-100 last:border-0">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900">{def.label}</p>
+                <p className={`text-xs font-medium ${statusClass}`}>{statusText}</p>
+              </div>
+              <button
+                onClick={() => resend(def.key)}
+                disabled={pending === def.key}
+                className="text-xs font-bold text-blue-600 hover:text-blue-700 border border-blue-200 hover:bg-blue-50 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                {pending === def.key ? "Sending…" : ts ? "Resend" : "Send now"}
+              </button>
+            </div>
+          );
+        })}
+
+        <div className="pt-3 border-t border-gray-100">
+          <p className="text-xs font-semibold text-gray-700 mb-1.5">Test sequence</p>
+          <p className="text-[11px] text-gray-500 mb-2">Send all 4 welcome emails to a test address (uses this user&apos;s businessName for personalisation, doesn&apos;t touch their tracking).</p>
+          <div className="flex flex-wrap gap-2">
+            <input
+              type="email"
+              value={testTo}
+              onChange={(e) => setTestTo(e.target.value)}
+              placeholder="test@example.com"
+              className="flex-1 min-w-[160px] px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              onClick={runTestSequence}
+              disabled={!testTo.trim() || pending === "test"}
+              className="text-xs font-bold bg-gray-900 hover:bg-gray-800 text-white disabled:opacity-50 px-4 py-2 rounded-lg transition-colors"
+            >
+              {pending === "test" ? "Sending…" : "Send all 4"}
+            </button>
+          </div>
+          {testStatus && (
+            <p className="text-[11px] text-gray-600 mt-2">{testStatus}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function isImageDataUrl(v: unknown): v is string {
   return typeof v === "string" && v.startsWith("data:image");
@@ -165,9 +304,17 @@ export default function AdminDataPage() {
     );
   }, [users, search]);
 
-  // Build the section payload for the selected user. Keys present in the
-  // user record but not in any SECTIONS config end up in "Other" so we
-  // never silently drop a column.
+  const reloadDetail = () => {
+    if (!selectedId) return;
+    fetch(`/api/admin/users/${selectedId}`, { cache: "no-store" })
+      .then((r) => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+      .then((data: FullUser) => setDetail(data))
+      .catch(() => { /* leave previous detail in place */ });
+  };
+
+  // Build the section payload for the selected user. Welcome-email
+  // columns are rendered by <WelcomeEmailsCard /> separately so we
+  // hide them here to avoid duplicating the info.
   const detailSections = useMemo(() => {
     if (!detail) return [];
     const consumed = new Set<string>();
@@ -179,7 +326,7 @@ export default function AdminDataPage() {
     })).filter((s) => s.rows.length > 0);
 
     const otherRows = Object.keys(detail)
-      .filter((k) => !consumed.has(k) && k !== "_count")
+      .filter((k) => !consumed.has(k) && k !== "_count" && !WELCOME_EMAIL_KEYS.has(k))
       .map((k) => ({ key: k, value: detail[k] }));
     if (otherRows.length > 0) {
       sections.push({ title: "Other", rows: otherRows });
@@ -276,6 +423,8 @@ export default function AdminDataPage() {
                     )}
                   </div>
                 </header>
+
+                <WelcomeEmailsCard user={detail} onAction={reloadDetail} />
 
                 {detailSections.map((sec) => (
                   <div key={sec.title}>

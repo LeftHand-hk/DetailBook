@@ -1,13 +1,13 @@
-// One-off: send all 3 welcome emails to the founder's address so we can
+// One-off: send all 4 welcome emails to the founder's address so we can
 // confirm formatting in a real inbox. Uses overrideTo so it does not
 // affect any user's tracking.
 //
-// Usage:  npx tsx scripts/send-test-welcome.mts <email>
+// Usage:  npx tsx scripts/send-test-welcome.ts <email>
 // Default recipient: mail.arditzogiani@gmail.com
 
 import "dotenv/config";
 import prisma from "../lib/prisma";
-import { sendWelcomeEmail } from "../lib/welcome-emails";
+import { sendWelcomeEmail, type WelcomeEmailKey } from "../lib/welcome-emails";
 
 const recipient = process.argv[2] || "mail.arditzogiani@gmail.com";
 
@@ -21,14 +21,15 @@ async function main() {
     process.exit(1);
   }
   console.log(`Using sample user: ${sample.email} (${sample.businessName})`);
-  console.log(`Sending all 3 welcome emails to ${recipient}...`);
+  console.log(`Sending all 4 welcome emails to ${recipient}...`);
 
-  for (const num of [1, 2, 3] as const) {
-    const result = await sendWelcomeEmail(sample.id, num, { overrideTo: recipient });
+  const keys: WelcomeEmailKey[] = ["day0", "day2", "day5", "day13"];
+  for (const key of keys) {
+    const result = await sendWelcomeEmail(sample.id, key, { overrideTo: recipient });
     if (result.success) {
-      console.log(`  ✓ #${num} sent`);
+      console.log(`  ✓ ${key} sent`);
     } else {
-      console.log(`  ✗ #${num} failed: ${result.error}`);
+      console.log(`  ✗ ${key} failed: ${result.error}`);
     }
   }
   await prisma.$disconnect();

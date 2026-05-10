@@ -108,14 +108,24 @@ model User {
   onboardingCompletedAt DateTime?
   onboardingProgress    Json?
 
-  // Welcome email sequence (3 emails over 13 days). `welcomeEmailsSent`
-  // tracks how many emails in the sequence have gone out (0–3).
-  // `welcomeEmailLastSentAt` is the timestamp of the most recent send and
-  // is what the hourly cron uses to decide when the next email is due.
+  // Welcome email sequence (4 emails: Day 0, Day 2, Day 5, Day 13). Each
+  // *At column is the timestamp of decision (sent OR explicitly skipped).
+  // For Day 2 in particular, `welcomeEmailDay2Skipped` distinguishes
+  // "we decided not to send because the user already has packages" from
+  // "we sent it" — both set welcomeEmailDay2At.
+  //
   // `welcomeEmailsPaused` is flipped true when the user clicks the
-  // unsubscribe link at the bottom of any email; once paused, no further
-  // emails in the sequence are sent. `welcomeUnsubToken` is a per-user
-  // token embedded in the unsubscribe URL so we don't need login.
+  // unsubscribe link; once paused no more emails in the sequence go out.
+  // `welcomeUnsubToken` is the random token embedded in the unsub URL.
+  //
+  // `welcomeEmailsSent` / `welcomeEmailLastSentAt` are kept temporarily
+  // for back-compat with old admin views; new code reads the per-email
+  // *At columns instead.
+  welcomeEmailDay0At      DateTime?
+  welcomeEmailDay2At      DateTime?
+  welcomeEmailDay2Skipped Boolean   @default(false)
+  welcomeEmailDay5At      DateTime?
+  welcomeEmailDay13At     DateTime?
   welcomeEmailsSent       Int       @default(0)
   welcomeEmailLastSentAt  DateTime?
   welcomeEmailsPaused     Boolean   @default(false)
@@ -129,11 +139,36 @@ model User {
   staff    Staff[]
   supportTickets SupportTicket[]
   notifications Notification[]
+  emailLogs EmailLog[]
 
   @@index([email])
   @@index([slug])
   @@index([createdAt])
   @@index([lastLoginAt])
+}
+
+// Audit log for every transactional email we attempt to send. One row
+// per attempt (a 3-retry send writes 3 rows so debugging which attempt
+// finally succeeded is straightforward). `success=false` rows let us
+// detect SMTP outages from the admin UI without scraping server logs.
+model EmailLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  // e.g. "welcome_day0", "welcome_day2", "welcome_day5", "welcome_day13"
+  emailType    String
+  // The address we actually sent to (may differ from user.email for the
+  // admin "test sequence" button which mails the admin).
+  recipient    String
+  success      Boolean  @default(false)
+  errorMessage String?  @db.Text
+  // 1, 2, 3 for the three retry attempts in a single send call.
+  attempt      Int      @default(1)
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([emailType])
+  @@index([createdAt])
 }
 
 model Notification {
