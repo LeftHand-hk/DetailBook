@@ -129,14 +129,19 @@ export async function POST(request: NextRequest) {
 
     const token = signToken({ id: user.id, email: user.email });
 
-    // Fire the Day 0 welcome email in the background so signup stays
-    // fast. sendWelcomeEmail retries 3x with backoff internally; the
-    // hourly cron also re-tries any user whose welcomeEmailDay0At is
-    // still null, so a total SMTP outage here just delays the email
-    // by an hour rather than losing it.
-    sendWelcomeEmail(user.id, "day0").catch((err) => {
-      console.error("[register] welcome day0 email failed:", err);
-    });
+    // Await the Day 0 welcome email so the retry chain (3 attempts with
+    // backoff) actually completes. Netlify freezes the serverless
+    // function the moment we return the response, so fire-and-forget
+    // here would kill attempts 2-3 mid-await and lose the email on any
+    // transient SMTP hiccup. Worst case this adds ~6s to signup; the
+    // happy path is a single ~500ms send. The cron is still the safety
+    // net for total outages — anything that fails all 3 attempts gets
+    // re-tried hourly until welcomeEmailDay0At is set.
+    try {
+      await sendWelcomeEmail(user.id, "day0");
+    } catch (err) {
+      console.error("[register] welcome day0 email threw:", err);
+    }
 
     const { password: _, ...userWithoutPassword } = user;
 

@@ -19,6 +19,17 @@ function getTransporter(): nodemailer.Transporter | null {
     port: parseInt(port),
     secure: parseInt(port) === 465,
     auth: { user, pass },
+    // Fail fast on a misbehaving SMTP endpoint. Without these,
+    // nodemailer's defaults are ~3 minutes total, which on a serverless
+    // host means a stuck connection eats the entire function lifetime
+    // and the welcome email never sends. A real customer hit this
+    // 2026-05-10 — attempt 1 hung 90s before erroring with "Greeting
+    // never received" while the SMTP provider was throttling burst
+    // traffic. With these timeouts each attempt errors within ~10s,
+    // letting the retry chain complete inside the signup request.
+    connectionTimeout: 5000,
+    greetingTimeout: 5000,
+    socketTimeout: 10000,
   });
 
   return transporter;
