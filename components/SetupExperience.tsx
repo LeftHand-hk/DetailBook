@@ -372,9 +372,13 @@ function SetupPanel({
         }`}
       />
 
-      {/* Panel — slides from right */}
+      {/* Panel — slides from right. h-[100dvh] (dynamic viewport height)
+          instead of h-screen so iOS Safari's collapsing address bar
+          doesn't push the bottom of the panel below the visible area —
+          the "Finish setup" button on the last step was unreachable on
+          phones before this. */}
       <aside
-        className={`fixed top-0 right-0 h-screen z-50 w-full sm:w-[440px] bg-white shadow-2xl flex flex-col transition-transform duration-300 ${
+        className={`fixed top-0 right-0 h-[100dvh] z-50 w-full sm:w-[440px] bg-white shadow-2xl flex flex-col transition-transform duration-300 ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
         aria-hidden={!open}
@@ -406,8 +410,14 @@ function SetupPanel({
           />
         </div>
 
-        {/* Steps */}
-        <div className="flex-1 overflow-y-auto">
+        {/* Steps. overscroll-contain stops the body underneath from
+            scrolling when the user reaches the top/bottom of this list
+            on mobile (otherwise touch momentum bleeds through to the
+            backdrop). pb-24 leaves space under the last expanded step
+            so a long final body (e.g. ShareLinkBody with its Finish
+            button) clears the safe-area at the bottom of the viewport
+            on iOS. */}
+        <div className="flex-1 overflow-y-auto overscroll-contain pb-24">
           <ol className="divide-y divide-gray-100">
             {status.steps.map((step, idx) => (
               <StepItem
@@ -724,6 +734,12 @@ function ServicesBody({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [addedCount, setAddedCount] = useState(0);
+  // Synchronous guard against double-click — setSaving is async so a
+  // fast second click could fire the POST again before the disabled
+  // button re-renders. Confirmed in production: one user clicked Add
+  // twice and the same package was created twice. The ref locks the
+  // critical section the moment submit() runs.
+  const submittingRef = useRef(false);
 
   const applyTemplate = (t: typeof SERVICE_TEMPLATES[number]) => {
     setForm({ name: t.name, description: t.description, price: t.price, duration: t.duration });
@@ -731,11 +747,13 @@ function ServicesBody({
   };
 
   const submit = async () => {
+    if (submittingRef.current) return;
     setError("");
     if (!form.name || !form.price || !form.duration) {
       setError("Name, price, and duration are required.");
       return;
     }
+    submittingRef.current = true;
     setSaving(true);
     try {
       const res = await fetch("/api/packages", {
@@ -760,6 +778,7 @@ function ServicesBody({
       }
     } finally {
       setSaving(false);
+      submittingRef.current = false;
     }
   };
 
