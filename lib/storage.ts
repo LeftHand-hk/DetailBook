@@ -313,6 +313,17 @@ export function getPackages(): Package[] {
   }
 }
 
+// Cache-only write — skip the diff/sync entirely. Use this from
+// pages that have already issued their own POST/PUT/DELETE to
+// /api/packages and just need the local cache to match. Calling the
+// full setPackages() after a successful POST was causing duplicate
+// rows: the diff saw the just-created row as "new" (because the prev
+// snapshot didn't have it yet) and POSTed it AGAIN.
+export function setPackagesLocal(packages: Package[]): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(KEYS.PACKAGES, JSON.stringify(packages));
+}
+
 export function setPackages(packages: Package[]): void {
   if (typeof window === "undefined") return;
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { getPackages, setPackages, getUser, generateId } from "@/lib/storage";
+import { getPackages, setPackages, setPackagesLocal, getUser, generateId } from "@/lib/storage";
 import type { Package, PackageAddon, User } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
 import SetupHint from "@/components/SetupHint";
@@ -172,7 +172,9 @@ export default function PackagesPage() {
           const updated = await res.json();
           const newList = packages.map((p) => (p.id === editing.id ? updated : p));
           setPackagesState(newList);
-          setPackages(newList);
+          // Cache-only write — we already PUT the change; setPackages
+          // would diff and re-PUT the same row, harmless but wasteful.
+          setPackagesLocal(newList);
         }
       } else {
         // Create new package via API
@@ -185,7 +187,10 @@ export default function PackagesPage() {
           const created = await res.json();
           const newList = [...packages, created];
           setPackagesState(newList);
-          setPackages(newList);
+          // Cache-only — using the full setPackages here caused the
+          // "duplicate package" bug: its diff saw the just-created
+          // row as new (not yet in prev) and POSTed it a second time.
+          setPackagesLocal(newList);
         }
       }
     } catch {
@@ -216,7 +221,7 @@ export default function PackagesPage() {
     if (!pkg) return;
     const updated = packages.map((p) => (p.id === id ? { ...p, active: !p.active } : p));
     setPackagesState(updated);
-    setPackages(updated);
+    setPackagesLocal(updated);
     try {
       await fetch(`/api/packages/${id}`, {
         method: "PUT",
@@ -229,7 +234,7 @@ export default function PackagesPage() {
   const handleDelete = async (id: string) => {
     const updated = packages.filter((p) => p.id !== id);
     setPackagesState(updated);
-    setPackages(updated);
+    setPackagesLocal(updated);
     setDeleteConfirm(null);
     try {
       await fetch(`/api/packages/${id}`, { method: "DELETE" });

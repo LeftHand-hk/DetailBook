@@ -9,6 +9,12 @@ export async function GET(
   try {
     const { slug } = await params;
 
+    // Photos are deliberately NOT included here. A user with 12 photos
+    // (≤6 MB of base64) was making this response slow to parse and slow
+    // to ship over the wire — and the booking flow doesn't need them
+    // for the first paint. The booking page fetches them in a second
+    // request via /api/book/[slug]/photos so the initial render isn't
+    // blocked on photo download.
     const user = await prisma.user.findUnique({
       where: { slug },
       include: {
@@ -20,9 +26,6 @@ export async function GET(
           where: { active: true },
           select: { id: true, name: true, role: true, color: true, avatar: true },
           orderBy: { createdAt: "asc" },
-        },
-        photos: {
-          orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
         },
       },
     });
@@ -95,7 +98,9 @@ export async function GET(
       timezone: (user as any).timezone ?? "America/New_York",
       packages: user.packages,
       staff: (user as any).staff ?? [],
-      photos: (user as any).photos ?? [],
+      // photos intentionally not returned here — booking page fetches
+      // them separately from /api/book/[slug]/photos to keep first
+      // paint fast.
       galleryLayout: (user as any).galleryLayout ?? "grid",
       galleryShowTitle: (user as any).galleryShowTitle ?? true,
       galleryTitle: (user as any).galleryTitle ?? "Our Work",

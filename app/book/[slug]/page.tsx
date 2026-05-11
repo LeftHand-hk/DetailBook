@@ -159,7 +159,9 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
           if (data.serviceType) setServiceType(data.serviceType);
           if (data.packages) setPackages(data.packages.filter((p: any) => p.active));
           if (data.bookedSlots && Array.isArray(data.bookedSlots)) setBookedSlots(data.bookedSlots);
-          if (Array.isArray(data.photos)) setPhotos(data.photos as PublicPhoto[]);
+          // Photos are NOT in the main payload (they're base64-heavy
+          // and were blocking first paint). They land via a separate
+          // request right after — see the second useEffect below.
           // Build user object from API response (more up-to-date than localStorage)
           setUser(data);
         } else {
@@ -175,6 +177,19 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [step]);
+
+  // Photos are fetched separately to keep the first paint snappy.
+  // Triggers on `slug` change (i.e. once per page load) and writes
+  // the photo list into state when it returns. The PublicPhotoGallery
+  // hides itself while photos is empty so there's no layout flicker.
+  useEffect(() => {
+    fetch(`/api/book/${slug}/photos`, { cache: "no-store" })
+      .then((r) => r.ok ? r.json() : [])
+      .then((data) => {
+        if (Array.isArray(data)) setPhotos(data as PublicPhoto[]);
+      })
+      .catch(() => { /* gallery just stays empty */ });
+  }, [slug]);
 
   // Handle Stripe deposit return
   const [pendingStripeReturn, setPendingStripeReturn] = useState<string | null>(null);
@@ -1179,17 +1194,6 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
         );
       })()}
 
-      {/* Photo gallery — sits between the hero/info header and the
-          services list. Renders nothing when the business has zero
-          photos so unfinished pages don't pick up an empty band. */}
-      {step === 0 && photos.length > 0 && (
-        <PublicPhotoGallery
-          photos={photos}
-          layout={(user as any).galleryLayout || "grid"}
-          showTitle={(user as any).galleryShowTitle ?? true}
-          title={(user as any).galleryTitle || "Our Work"}
-        />
-      )}
 
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-5">
 
@@ -1428,6 +1432,22 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                     </div>
                   </button>
                 ))}
+              </div>
+            )}
+
+            {/* Photo gallery — directly below the services list. Hidden
+                when 0 photos so the section doesn't reserve empty space
+                on unfinished pages. Photos arrive via the deferred
+                /api/book/[slug]/photos request so the first paint isn't
+                blocked on the (potentially several-MB) photo payload. */}
+            {photos.length > 0 && (
+              <div className="mt-2">
+                <PublicPhotoGallery
+                  photos={photos}
+                  layout={(user as any).galleryLayout || "grid"}
+                  showTitle={(user as any).galleryShowTitle ?? true}
+                  title={(user as any).galleryTitle || "Our Work"}
+                />
               </div>
             )}
 
