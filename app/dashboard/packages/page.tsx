@@ -69,18 +69,21 @@ export default function PackagesPage() {
       .then((data: Package[]) => setPackagesState(data))
       .catch(() => setPackagesState(getPackages()));
 
-    // Auto-open the "new package" modal when arriving from the Setup
-    // Guide's "+ Create custom service" link (which redirects here
-    // instead of expanding an inline form). One-shot read on mount —
-    // a refresh shouldn't re-trigger the modal so we strip the param.
+    // Auto-open the "new package" modal only when the Setup Guide's
+    // "+ Create custom service" link sent us here — that link uses
+    // ?newPackage=1 specifically. The onboarding "Create Your First
+    // Package" CTA and the dashboard Setup Progress Card just want to
+    // land on the empty packages view, which is why they pass
+    // ?setup=services (informational, no auto-open). One-shot read on
+    // mount; strip the param so a refresh doesn't reopen the modal.
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      if (params.get("setup") === "services") {
+      if (params.get("newPackage") === "1") {
         setEditing(null);
         setForm(EMPTY_FORM);
         setShowModal(true);
         const url = new URL(window.location.href);
-        url.searchParams.delete("setup");
+        url.searchParams.delete("newPackage");
         window.history.replaceState({}, "", url.pathname + url.search + url.hash);
       }
     }

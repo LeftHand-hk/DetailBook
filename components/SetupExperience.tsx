@@ -781,15 +781,17 @@ function ServicesBody({
     }
   };
 
-  // Custom-service flow now jumps out of the slide-out panel to the
-  // full /dashboard/packages page, which has the full editor (vehicle
-  // types, deposits per package, descriptions, etc.). The inline mini
-  // form was creating two ways to do the same thing — the new
-  // behaviour is simpler and matches how "Open the full packages
-  // page" used to work.
+  // Custom-service flow jumps out of the slide-out panel to the full
+  // /dashboard/packages page, which has the proper editor (vehicle
+  // types, deposits per package, descriptions, etc.). ?newPackage=1
+  // is the specific signal that the packages page should auto-open
+  // the "new package" modal so the user lands inside the form, not
+  // staring at the page header. The onboarding "Create Your First
+  // Package" CTA deliberately doesn't pass this flag — it lands users
+  // on the page itself so they can survey templates first.
   const openPackagesPage = () => {
     onClosePanel();
-    router.push("/dashboard/packages?setup=services");
+    router.push("/dashboard/packages?newPackage=1");
   };
 
   return (
