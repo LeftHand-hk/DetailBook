@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { getUser, getBookings, getPackages } from "@/lib/storage";
 import type { User, Booking, Package } from "@/types";
 import EmptyState, { EmptyIcons } from "@/components/EmptyState";
@@ -13,15 +14,34 @@ const statusColors: Record<string, string> = {
   cancelled: "bg-red-100 text-red-700 border border-red-200",
 };
 
+// Minimal shape of one step from /api/onboarding/status — we ignore
+// title/description/etc. that the API also returns and just read
+// `id` + `done` for the dashboard's Setup Progress Card.
+type SetupStepId = "business_info" | "working_hours" | "services" | "deposits" | "share_link";
+interface SetupStep { id: SetupStepId; done: boolean }
+
 export default function DashboardPage() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [bookings, setBookings] = useState<Booking[]>(() => {
     if (typeof window === "undefined") return [];
     try { return getBookings() || []; } catch { return []; }
   });
   const [, setPackages] = useState<Package[]>([]);
+  const [setupSteps, setSetupSteps] = useState<SetupStep[] | null>(null);
   const [copied, setCopied] = useState(false);
   const [mounted, setMounted] = useState(false);
+
+  // Re-fetched after any state-mutating action (mark share_link, etc.)
+  // so the card reflects new completions instantly.
+  const refreshSetup = useCallback(async () => {
+    try {
+      const r = await fetch("/api/onboarding/status", { cache: "no-store" });
+      if (!r.ok) return;
+      const data = await r.json();
+      if (Array.isArray(data?.steps)) setSetupSteps(data.steps as SetupStep[]);
+    } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
     setUser(getUser());
@@ -49,7 +69,9 @@ export default function DashboardPage() {
         setBookings(getBookings());
       }
     });
-  }, []);
+
+    refreshSetup();
+  }, [refreshSetup]);
 
   const isPro = user?.plan === "pro";
   const today = new Date().toISOString().split("T")[0];
@@ -73,13 +95,40 @@ export default function DashboardPage() {
   const completedCount = bookings.filter(b => b.status === "completed").length;
   const completionRate = bookings.length > 0 ? Math.round((completedCount / bookings.length) * 100) : 0;
 
+  // Trial-day computation drives whether the "Unlock Pro Features"
+  // upsell card renders. Mirrors the trial banner in dashboard/layout
+  // — both stay hidden in the first 9 days so new users aren't hit
+  // with two payment CTAs before they've seen any value.
+  const trialDaysLeft = (() => {
+    if (!user?.trialEndsAt) return null;
+    const diff = new Date(user.trialEndsAt).getTime() - Date.now();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return days; // can go negative; the consumer treats <=0 as expired
+  })();
+  // "Early trial" = first 9 days of a 14-day trial → daysLeft > 5.
+  // After day 10 (daysLeft <= 5) or after expiry, the upsell shows
+  // again.
+  const isEarlyTrial = trialDaysLeft !== null && trialDaysLeft > 5;
+
+  // Mark the share_link onboarding step as done whenever the user
+  // copies their booking link from the dashboard. The SetupProgressCard
+  // also marks the same step when its "Share your booking link" row is
+  // clicked, so the two stay in sync.
+  const markShareLinkDone = useCallback(() => {
+    fetch("/api/onboarding/status", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ markStep: "share_link" }),
+    }).then(() => refreshSetup()).catch(() => { /* ignore */ });
+  }, [refreshSetup]);
+
   const handleCopyLink = () => {
-    if (user) {
-      const url = `${window.location.origin}/book/${user.slug}`;
-      navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+    if (!user) return;
+    const url = `${window.location.origin}/book/${user.slug}`;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    markShareLinkDone();
   };
 
   const formatDate = (date: string) =>
@@ -108,6 +157,8 @@ export default function DashboardPage() {
   });
   const maxRev = Math.max(...last7.map((d) => d.rev), 1);
   const weekTotal = last7.reduce((s, d) => s + d.rev, 0);
+
+  const hasNoBookings = bookings.length === 0;
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
@@ -148,24 +199,37 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Stat Cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {(() => {
-          const empty = bookings.length === 0;
-          return [
-            { label: "Total Bookings", value: empty ? "—" : String(bookings.length), sub: empty ? "Awaiting first booking" : `${pendingBookings.length} pending` },
-            { label: "This Month", value: empty ? "—" : `$${monthRevenue.toLocaleString()}`, sub: "Completed revenue" },
-            { label: "Deposits", value: empty ? "—" : `$${totalDeposits.toLocaleString()}`, sub: "Collected upfront" },
-            { label: "Completion", value: empty ? "—" : `${completionRate}%`, sub: empty ? "Will appear after first job" : `${completedCount} of ${bookings.length} jobs` },
-          ];
-        })().map((stat, i) => (
-          <div key={i} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{stat.label}</p>
-            <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900 mt-2">{stat.value}</p>
-            <p className="text-xs text-gray-500 font-medium mt-1">{stat.sub}</p>
-          </div>
-        ))}
-      </div>
+      {/* ── Stats / Setup Progress (mutually exclusive) ──
+          With 0 bookings the 4 stat cards all read "—" which gives the
+          dashboard a dead-empty feel and gives the user no idea what to
+          do next. While they have no bookings we replace the row with a
+          single Setup Progress Card that visibly counts down the steps
+          to a working booking link. Once a real booking lands, the
+          stats take over and the card disappears. */}
+      {hasNoBookings ? (
+        <SetupProgressCard
+          steps={setupSteps}
+          user={user}
+          onCopyLink={handleCopyLink}
+          copied={copied}
+          router={router}
+        />
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {[
+            { label: "Total Bookings", value: String(bookings.length), sub: `${pendingBookings.length} pending` },
+            { label: "This Month", value: `$${monthRevenue.toLocaleString()}`, sub: "Completed revenue" },
+            { label: "Deposits", value: `$${totalDeposits.toLocaleString()}`, sub: "Collected upfront" },
+            { label: "Completion", value: `${completionRate}%`, sub: `${completedCount} of ${bookings.length} jobs` },
+          ].map((stat, i) => (
+            <div key={i} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{stat.label}</p>
+              <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900 mt-2">{stat.value}</p>
+              <p className="text-xs text-gray-500 font-medium mt-1">{stat.sub}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Main Grid ── */}
       <div className="grid lg:grid-cols-3 gap-5 mb-6">
@@ -295,8 +359,12 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Pro Upgrade (only for Starter users) ── */}
-      {!isPro && (
+      {/* ── Pro Upgrade (only for Starter users, AND only after day 9 of
+          the trial). Doubling up the orange "Subscribe Now" banner at
+          the top with this card on day 1 was the loudest payment
+          pressure source pushing new users to bounce — they're paired
+          on the same schedule now. ── */}
+      {!isPro && !isEarlyTrial && (
         <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 sm:p-8 mb-6 shadow-lg shadow-blue-600/20">
           <div className="absolute -right-12 -top-12 w-48 h-48 bg-white/10 rounded-full" />
           <div className="absolute -left-8 -bottom-8 w-32 h-32 bg-white/5 rounded-full" />
@@ -320,6 +388,181 @@ export default function DashboardPage() {
         </div>
       )}
 
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Setup Progress Card — shown ONLY to users with zero bookings. Replaces
+// the placeholder "—" stats row with a 4-step checklist that gives the
+// user a tangible "next thing to do" until their booking link starts
+// pulling traffic.
+
+// The 4 dashboard-facing steps. Maps to subset of the steps from
+// /api/onboarding/status (which has 5 — we hide "deposits" because the
+// brief asked for these four specifically).
+const CARD_STEP_DEFS: { id: SetupStepId; label: string; href: string; emoji: string }[] = [
+  { id: "business_info", label: "Business profile created", href: "/dashboard/settings",       emoji: "🏢" },
+  { id: "services",      label: "Add your first service package", href: "/dashboard/packages?setup=services", emoji: "🧴" },
+  { id: "working_hours", label: "Set your working hours",   href: "/dashboard/settings",       emoji: "⏰" },
+  { id: "share_link",    label: "Share your booking link",  href: "",                          emoji: "🔗" },
+];
+
+function SetupProgressCard({
+  steps,
+  user,
+  onCopyLink,
+  copied,
+  router,
+}: {
+  steps: SetupStep[] | null;
+  user: User | null;
+  onCopyLink: () => void;
+  copied: boolean;
+  router: ReturnType<typeof useRouter>;
+}) {
+  // While the onboarding status request is in flight we render a thin
+  // skeleton instead of pretending everything is incomplete.
+  if (!steps) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6 h-44 shimmer" />
+    );
+  }
+
+  const doneById = new Map(steps.map((s) => [s.id, s.done]));
+  const rows = CARD_STEP_DEFS.map((def) => ({ ...def, done: Boolean(doneById.get(def.id)) }));
+  const completed = rows.filter((r) => r.done).length;
+  const percent = Math.round((completed / rows.length) * 100);
+  const allDone = completed === rows.length;
+  const firstIncompleteIdx = rows.findIndex((r) => !r.done);
+
+  // "All four steps done but still no bookings" gets a celebratory
+  // variant — the booking page is ready, the user just needs to keep
+  // sharing the link.
+  if (allDone) {
+    return (
+      <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl border border-green-200 shadow-sm p-5 sm:p-6 mb-6">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md shadow-green-200">
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-extrabold text-gray-900">Setup Complete!</h2>
+            <p className="text-sm text-gray-600 mt-0.5">
+              Your booking page is ready. Share your link to get your first booking.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={onCopyLink}
+          className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 font-bold text-sm px-5 py-2.5 rounded-xl transition-colors ${
+            copied
+              ? "bg-green-100 text-green-700 border border-green-200"
+              : "bg-green-600 hover:bg-green-700 text-white shadow-sm shadow-green-600/30"
+          }`}
+        >
+          {copied ? (
+            <>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+              Copied!
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+              Copy Booking Link
+            </>
+          )}
+        </button>
+        {user?.slug && (
+          <p className="mt-3 text-xs font-mono text-green-700 break-all">
+            {typeof window !== "undefined" ? window.location.origin : "https://detailbookapp.com"}/book/{user.slug}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  const handleRowClick = (row: typeof rows[number]) => {
+    if (row.id === "share_link") {
+      onCopyLink();
+      return;
+    }
+    if (row.done) return;
+    router.push(row.href);
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-6">
+      <div className="p-5 sm:p-6 border-b border-gray-50">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="text-2xl">🚀</span>
+            <h2 className="text-lg font-extrabold text-gray-900 truncate">Get Your First Booking</h2>
+          </div>
+          <span className="flex-shrink-0 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-full">
+            {percent}% complete
+          </span>
+        </div>
+        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500 rounded-full"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      </div>
+
+      <ul className="divide-y divide-gray-50">
+        {rows.map((row, idx) => {
+          const isActive = idx === firstIncompleteIdx;
+          return (
+            <li key={row.id}>
+              <button
+                type="button"
+                onClick={() => handleRowClick(row)}
+                disabled={row.done && row.id !== "share_link"}
+                className={`w-full flex items-center gap-3 px-5 sm:px-6 py-3.5 text-left transition-colors ${
+                  row.done
+                    ? "bg-gray-50/50"
+                    : isActive
+                      ? "bg-blue-50/40 hover:bg-blue-50"
+                      : "hover:bg-gray-50"
+                } ${row.done && row.id !== "share_link" ? "cursor-default" : "cursor-pointer"}`}
+              >
+                <span className={`flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+                  row.done
+                    ? "bg-green-500 text-white shadow-sm shadow-green-200"
+                    : isActive
+                      ? "bg-blue-100 border-2 border-blue-300 text-blue-600"
+                      : "bg-white border-2 border-gray-200 text-gray-300"
+                }`}>
+                  {row.done ? (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <span className="text-xs font-bold">{idx + 1}</span>
+                  )}
+                </span>
+                <span className={`flex-1 text-sm font-semibold truncate ${
+                  row.done ? "text-gray-400 line-through" : isActive ? "text-blue-700" : "text-gray-700"
+                }`}>
+                  {row.label}
+                </span>
+                {!row.done && (
+                  <svg className={`flex-shrink-0 w-4 h-4 ${isActive ? "text-blue-500" : "text-gray-300"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                )}
+                {row.done && row.id === "share_link" && (
+                  <span className="flex-shrink-0 text-[11px] font-semibold text-gray-400 group-hover:text-gray-600">Copy again</span>
+                )}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
