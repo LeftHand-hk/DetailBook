@@ -169,7 +169,7 @@ export default function AboutPage() {
             Ready to try it?
           </h2>
           <p className="text-gray-400 text-lg mb-8">
-            Start your free 15-day trial. No credit card required. See for yourself why this is different.
+            Start your free 14-day trial. No credit card required. See for yourself why this is different.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link

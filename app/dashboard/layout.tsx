@@ -405,33 +405,65 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         )}
 
-        {/* Trial Banner — only show if NOT actively subscribed */}
-        {isOnTrial && (user as any)?.subscriptionStatus !== "active" && (
-          <div className={`flex-shrink-0 flex items-center justify-between gap-3 px-4 py-2.5 text-sm ${
-            trialDaysLeft <= 3
-              ? "bg-red-50 border-b border-red-100 text-red-700"
-              : "bg-amber-50 border-b border-amber-100 text-amber-700"
-          }`}>
-            <div className="flex items-center gap-2">
-              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>
-                <strong>{trialDaysLeft} day{trialDaysLeft !== 1 ? "s" : ""}</strong> left in your free trial.
-                {trialDaysLeft <= 3 && " Your account will be limited when the trial ends."}
-              </span>
+        {/* Trial Banner — three states, only shown when not subscribed:
+              · Days 1-9  (daysLeft >= 6): neutral grey strip, no CTA. Early-
+                trial users were dropping off when we hit them with a
+                "Subscribe Now" button on day 1, so we hold pressure back
+                until day 10.
+              · Days 10-14 (daysLeft 1-5): amber/red urgency banner with
+                Subscribe CTA. Day 1-3 left flips to red.
+              · After expiry (daysLeft 0): red "Your trial has ended" banner.
+              isOnTrial is true while daysLeft > 0; we add an explicit
+              ended check below for the case where the trial has run out
+              but the user hasn't been suspended yet. */}
+        {(user as any)?.subscriptionStatus !== "active" && trialDaysLeft !== null && (
+          (isOnTrial && trialDaysLeft > 5) ? (
+            <div className="flex-shrink-0 flex items-center justify-center gap-2 px-4 py-1.5 text-xs bg-gray-50 border-b border-gray-100 text-gray-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+              <span>Free trial active · <strong className="text-gray-700">{trialDaysLeft} days left</strong></span>
             </div>
-            <Link
-              href="/dashboard/billing"
-              className={`flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${
-                trialDaysLeft <= 3
-                  ? "bg-red-600 text-white hover:bg-red-700"
-                  : "bg-amber-600 text-white hover:bg-amber-700"
-              }`}
-            >
-              Subscribe Now →
-            </Link>
-          </div>
+          ) : isOnTrial ? (
+            <div className={`flex-shrink-0 flex items-center justify-between gap-3 px-4 py-2.5 text-sm ${
+              trialDaysLeft <= 3
+                ? "bg-red-50 border-b border-red-100 text-red-700"
+                : "bg-amber-50 border-b border-amber-100 text-amber-700"
+            }`}>
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>
+                  <strong>{trialDaysLeft} day{trialDaysLeft !== 1 ? "s" : ""}</strong> left in your free trial.
+                  {trialDaysLeft <= 3 && " Your account will be limited when the trial ends."}
+                </span>
+              </div>
+              <Link
+                href="/dashboard/billing"
+                className={`flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${
+                  trialDaysLeft <= 3
+                    ? "bg-red-600 text-white hover:bg-red-700"
+                    : "bg-amber-600 text-white hover:bg-amber-700"
+                }`}
+              >
+                Subscribe Now →
+              </Link>
+            </div>
+          ) : (
+            <div className="flex-shrink-0 flex items-center justify-between gap-3 px-4 py-2.5 text-sm bg-red-50 border-b border-red-100 text-red-700">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Your trial has ended. Subscribe to keep your booking page live.</span>
+              </div>
+              <Link
+                href="/dashboard/billing"
+                className="flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
+              >
+                Subscribe Now →
+              </Link>
+            </div>
+          )
         )}
 
         {/* Setup banner — sticky-top inside the scroll area. The component

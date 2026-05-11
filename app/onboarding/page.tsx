@@ -1,18 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getUser, setUser, isLoggedIn, syncFromServer } from "@/lib/storage";
-import { trackEvent } from "@/lib/meta-pixel";
 import type { User } from "@/types";
 import Logo from "@/components/Logo";
-import type { Paddle } from "@paddle/paddle-js";
 
+// Onboarding is now a 2-step flow — pricing was removed from the forced
+// path (it was breaking the "no credit card" promise from the signup
+// page and causing immediate drop-off). New signups always start on
+// Starter; users only see plan choices when they explicitly visit
+// /dashboard/billing.
+//
+//   Step 0 — Business Details (operation type first, then fields)
+//   Step 1 — "Account created!" → nudges into package creation
 const STEPS = [
   { id: 0, label: "Business Details", icon: "🏢" },
-  { id: 1, label: "Choose Plan",      icon: "💎" },
-  { id: 2, label: "All Set",          icon: "🚀" },
+  { id: 1, label: "All Set",          icon: "🚀" },
 ];
 
 const US_STATES = [
@@ -22,22 +27,26 @@ const US_STATES = [
   "VA","WA","WV","WI","WY",
 ];
 
+type ServiceType = "mobile" | "shop" | "both";
+
 export default function OnboardingPage() {
   const router = useRouter();
-  const [step, setStep]           = useState(0);
+  const [step, setStep] = useState(0);
+  const [user, setUserState] = useState<User | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // Fire CompleteRegistration exactly once when the user lands here straight
-  // from /signup. The signup page sets a sessionStorage flag rather than a
-  // URL query param: a query param forces us to call history.replaceState
-  // to clean it up, and fbevents.js auto-tracks that URL change as a
-  // duplicate PageView. sessionStorage keeps the URL untouched.
+  // Fire CompleteRegistration once when the user lands here straight
+  // from /signup. sessionStorage flag is set by the signup form (URL
+  // query-param version would have forced a history.replaceState which
+  // fbevents.js was double-counting as a PageView).
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.fbq !== "function") return;
     let justSignedUp = false;
     try {
       justSignedUp = sessionStorage.getItem("dB_justSignedUp") === "1";
       if (justSignedUp) sessionStorage.removeItem("dB_justSignedUp");
-    } catch { /* private mode — skip */ }
+    } catch { /* private mode */ }
     if (!justSignedUp) return;
 
     window.fbq("track", "CompleteRegistration", {
@@ -47,62 +56,8 @@ export default function OnboardingPage() {
       currency: "USD",
     });
   }, []);
-  const [user, setUserState]      = useState<User | null>(null);
-  const [copied, setCopied]       = useState(false);
-  const [saving, setSaving]       = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<"starter" | "pro" | null>(null);
-  const [paddle, setPaddle] = useState<Paddle | null>(null);
-  const selectedPlanRef = useRef<"starter" | "pro">("starter");
 
-  useEffect(() => {
-    const token = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN;
-    if (!token) return;
-    import("@paddle/paddle-js").then(({ initializePaddle }) => {
-      initializePaddle({
-        environment: (process.env.NEXT_PUBLIC_PADDLE_ENV as "sandbox" | "production") || "production",
-        token,
-        async eventCallback(event) {
-          if (event.name === "checkout.completed") {
-            const planValue = selectedPlanRef.current === "pro" ? 50 : 29;
-            // predicted_ltv estimates ~10 months of retention. Tune as we
-            // accumulate real cohort retention data; Meta uses this as a
-            // bid signal for value-optimised campaigns.
-            const predictedLtv = planValue * 10;
-            trackEvent("Subscribe", {
-              value: planValue,
-              currency: "USD",
-              predicted_ltv: predictedLtv,
-            });
-            // Activation is server-side only. Poll for webhook briefly,
-            // then ask the server to verify directly with Paddle's API.
-            const phase1 = Date.now() + 15_000;
-            let activated = false;
-            while (Date.now() < phase1) {
-              try {
-                const r = await fetch("/api/user", { cache: "no-store" });
-                if (r.ok) {
-                  const d = await r.json();
-                  if (d.user?.subscriptionStatus === "active") { activated = true; break; }
-                }
-              } catch { /* keep polling */ }
-              await new Promise((res) => setTimeout(res, 2000));
-            }
-            if (!activated) {
-              try {
-                await fetch("/api/subscription/sync", { method: "POST" });
-              } catch { /* ignore — billing page has retry */ }
-            }
-            try { sessionStorage.setItem("dB_showTour", "1"); } catch { /* private mode */ }
-            router.push("/dashboard");
-          } else if (event.name === "checkout.error") {
-            console.error("[Paddle] checkout.error", event);
-          }
-        },
-      }).then((instance) => { if (instance) setPaddle(instance); });
-    });
-  }, [router]);
-
-  // Step 1 — business details
+  // Step 0 — business details. serviceType drives which fields show.
   const [bizForm, setBizForm] = useState({
     businessName: "",
     email: "",
@@ -111,34 +66,60 @@ export default function OnboardingPage() {
     city: "",
     state: "FL",
     zip: "",
-    serviceType: "mobile" as "mobile" | "shop" | "both",
+    serviceArea: "",
+    serviceType: "mobile" as ServiceType,
   });
 
+  // Prefill from local user data first (fast), then fall back to a
+  // server sync if the localStorage copy is missing businessName —
+  // covers the case where the signup form's syncFromServer failed
+  // mid-redirect and left the cache empty.
   useEffect(() => {
     if (!isLoggedIn()) { router.push("/login"); return; }
-    const u = getUser();
-    if (u) {
+
+    const applyUser = (u: User | null) => {
+      if (!u) return;
       setUserState(u);
       setBizForm((prev) => ({
         ...prev,
-        businessName: u.businessName || "",
-        email: u.email || "",
-        phone: u.phone || "",
-        city: u.city || "",
+        businessName: u.businessName || prev.businessName,
+        email: u.email || prev.email,
+        phone: u.phone || prev.phone,
+        city: u.city || prev.city,
+        serviceType: ((u as any).serviceType as ServiceType) || prev.serviceType,
       }));
+    };
+
+    const cached = getUser();
+    applyUser(cached);
+
+    if (!cached?.businessName) {
+      // localStorage was empty — pull from server before the form mounts
+      // its empty state.
+      syncFromServer()
+        .then(() => applyUser(getUser()))
+        .catch(() => { /* form falls back to manual entry */ });
     }
   }, [router]);
 
-  // ── Step 1 submit ──────────────────────────────────────────────────────────
+  // ── Step 0 submit ──────────────────────────────────────────────────────
   const handleStep1 = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
 
-    const fullAddress = `${bizForm.address}, ${bizForm.city}, ${bizForm.state} ${bizForm.zip}`.trim();
     const slug = bizForm.businessName
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
+
+    // For mobile-only operators we still send the serviceArea (free
+    // text) but skip the structured street/zip fields. Shops send all
+    // four. "Both" sends both sets — address fields for the shop, the
+    // service-area text for the mobile zone.
+    const isMobileOnly = bizForm.serviceType === "mobile";
+    const fullAddress = isMobileOnly
+      ? bizForm.serviceArea.trim()
+      : `${bizForm.address}, ${bizForm.city}, ${bizForm.state} ${bizForm.zip}`.trim();
 
     try {
       const res = await fetch("/api/user", {
@@ -147,9 +128,12 @@ export default function OnboardingPage() {
         body: JSON.stringify({
           businessName: bizForm.businessName,
           phone: bizForm.phone,
-          city: `${bizForm.city}, ${bizForm.state}`,
+          city: isMobileOnly ? bizForm.city : `${bizForm.city}, ${bizForm.state}`,
           address: fullAddress,
           serviceType: bizForm.serviceType,
+          serviceAreas: bizForm.serviceArea
+            ? [bizForm.serviceArea.trim()]
+            : undefined,
           slug,
         }),
       });
@@ -164,7 +148,7 @@ export default function OnboardingPage() {
     } catch {
       if (user) {
         const slug2 = bizForm.businessName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-        const updated = { ...user, ...bizForm, address: `${bizForm.address}, ${bizForm.city}, ${bizForm.state} ${bizForm.zip}`, slug: slug2 };
+        const updated = { ...user, ...bizForm, address: fullAddress, slug: slug2 };
         setUser(updated); setUserState(updated);
       }
     }
@@ -173,84 +157,8 @@ export default function OnboardingPage() {
     setStep(1);
   };
 
-  // ── Step 2 — free trial path ───────────────────────────────────────────────
-  const handleStep3 = async () => {
-    if (!selectedPlan) return;
-    setSaving(true);
-    try {
-      await fetch("/api/user", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: selectedPlan }),
-      });
-      await syncFromServer();
-      const u = getUser();
-      if (u) setUserState(u);
-    } catch {
-      if (user) {
-        const updated = { ...user, plan: selectedPlan };
-        setUser(updated); setUserState(updated);
-      }
-    }
-    setSaving(false);
-    setStep(2);
-  };
-
-  // ── Pay Now path — open Paddle first, activate only after payment ──────────
-  const handlePayNow = async () => {
-    if (!selectedPlan || !user) return;
-    selectedPlanRef.current = selectedPlan;
-
-    try {
-      // If user re-entered onboarding with an existing Paddle sub
-      // (paid OR trialing-with-link), switch plan via PATCH instead
-      // of opening a new Checkout. This avoids losing their existing
-      // sub if they close the new checkout without paying.
-      const status = (user as any).subscriptionStatus;
-      const hasLinkedSub = Boolean(status) && status !== "canceled";
-
-      if (hasLinkedSub) {
-        const res = await fetch("/api/subscription/change-plan", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ plan: selectedPlan }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          alert(data.error || "Could not change plan. Please contact support.");
-          return;
-        }
-        try { sessionStorage.setItem("dB_showTour", "1"); } catch { /* private mode */ }
-        router.push("/dashboard");
-        return;
-      }
-
-      const priceId = selectedPlan === "pro"
-        ? process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID
-        : process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
-      if (!priceId) {
-        alert(`Payment is not configured (missing ${selectedPlan} price ID). Please contact support.`);
-        console.error("[Paddle] price ID missing for plan:", selectedPlan);
-        return;
-      }
-      if (!paddle) {
-        alert("Payment system is still loading. Please wait a moment and try again.");
-        return;
-      }
-
-      paddle.Checkout.open({
-        items: [{ priceId, quantity: 1 }],
-        customer: { email: user.email },
-        customData: { userId: (user as any).id },
-      });
-    } catch (err) {
-      console.error("[Paddle] handlePayNow threw:", err);
-      alert("Could not change plan. Please refresh the page and try again.");
-    }
-  };
-
   const bookingUrl = user
-    ? `${typeof window !== "undefined" ? window.location.origin : "https://detailbook.app"}/book/${user.slug}`
+    ? `${typeof window !== "undefined" ? window.location.origin : "https://detailbookapp.com"}/book/${user.slug}`
     : "";
 
   const handleCopy = () => {
@@ -261,33 +169,31 @@ export default function OnboardingPage() {
     }
   };
 
-  // Compute the actual trial length (promo codes can extend it beyond 15 days)
+  // Trial length: derived from the real trialEndsAt so promo codes that
+  // extend it (e.g. 1-month, 3-month) show the correct number on the
+  // "Account created!" page. Default to 14 days for the standard path.
   const trialDays = (() => {
-    if (!user?.trialEndsAt) return 15;
+    if (!user?.trialEndsAt) return 14;
     const diff = new Date(user.trialEndsAt).getTime() - Date.now();
     const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    return days > 0 ? days : 15;
+    return days > 0 ? days : 14;
   })();
-  const trialLabel = trialDays >= 28 && trialDays <= 31
-    ? "1-month"
-    : trialDays >= 58 && trialDays <= 62
-    ? "2-month"
-    : trialDays >= 88 && trialDays <= 93
-    ? "3-month"
-    : `${trialDays}-day`;
-  const trialLabelCapitalized = trialLabel.charAt(0).toUpperCase() + trialLabel.slice(1);
+
+  const showShopFields = bizForm.serviceType === "shop" || bizForm.serviceType === "both";
+  const showMobileFields = bizForm.serviceType === "mobile" || bizForm.serviceType === "both";
 
   return (
     <div className="min-h-screen bg-[#f8f9fc] flex flex-col">
-      {/* Header */}
+      {/* Header — no "Skip setup" anymore. A small progress chip keeps
+          the user oriented without offering an escape hatch. */}
       <header className="bg-white border-b border-gray-100 px-4 py-4 sticky top-0 z-20">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <Logo size="sm" href="/" darkText />
-          <div className="flex items-center gap-4">
-            <span className="text-xs text-gray-400 hidden sm:block">Step {step + 1} of {STEPS.length}</span>
-            <Link href="/dashboard" className="text-sm text-gray-400 hover:text-gray-700 font-medium transition-colors">
-              Skip setup →
-            </Link>
+          <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-full px-3 py-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+            <span className="text-xs font-semibold text-blue-700">
+              Step {step + 1} of {STEPS.length}
+            </span>
           </div>
         </div>
       </header>
@@ -330,7 +236,7 @@ export default function OnboardingPage() {
             </div>
           </div>
 
-          {/* ── STEP 1: Business Details ─────────────────────────────────────── */}
+          {/* ── STEP 0: Business Details ─────────────────────────────────── */}
           {step === 0 && (
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-8 pt-8 pb-6 border-b border-gray-50">
@@ -344,104 +250,7 @@ export default function OnboardingPage() {
               </div>
 
               <form onSubmit={handleStep1} className="px-8 py-7 space-y-5">
-                {/* Business Name + Phone */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      Business Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={bizForm.businessName}
-                      onChange={(e) => setBizForm({ ...bizForm, businessName: e.target.value })}
-                      placeholder="e.g. Mike's Mobile Detailing"
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white placeholder-gray-400 text-sm transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      Business Email <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      value={bizForm.email}
-                      onChange={(e) => setBizForm({ ...bizForm, email: e.target.value })}
-                      placeholder="mike@yourbusiness.com"
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white placeholder-gray-400 text-sm transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      Phone Number <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      value={bizForm.phone}
-                      onChange={(e) => setBizForm({ ...bizForm, phone: e.target.value })}
-                      placeholder="(555) 123-4567"
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white placeholder-gray-400 text-sm transition-all"
-                    />
-                  </div>
-                </div>
-
-                {/* Address */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    Street Address <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={bizForm.address}
-                    onChange={(e) => setBizForm({ ...bizForm, address: e.target.value })}
-                    placeholder="123 Main Street"
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white placeholder-gray-400 text-sm transition-all"
-                  />
-                </div>
-
-                {/* City / State / ZIP */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <div className="col-span-2 sm:col-span-1">
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      City <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={bizForm.city}
-                      onChange={(e) => setBizForm({ ...bizForm, city: e.target.value })}
-                      placeholder="Miami"
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white placeholder-gray-400 text-sm transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">State</label>
-                    <select
-                      value={bizForm.state}
-                      onChange={(e) => setBizForm({ ...bizForm, state: e.target.value })}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white text-sm transition-all"
-                    >
-                      {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">ZIP Code</label>
-                    <input
-                      type="text"
-                      value={bizForm.zip}
-                      onChange={(e) => setBizForm({ ...bizForm, zip: e.target.value })}
-                      placeholder="33101"
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white placeholder-gray-400 text-sm transition-all"
-                    />
-                  </div>
-                </div>
-
-                {/* Service Type */}
+                {/* Operation type FIRST — drives the fields below. */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     How do you operate? <span className="text-red-500">*</span>
@@ -470,6 +279,147 @@ export default function OnboardingPage() {
                   </div>
                 </div>
 
+                {/* Business Name (pre-filled) + Phone — always required */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Business Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={bizForm.businessName}
+                      onChange={(e) => setBizForm({ ...bizForm, businessName: e.target.value })}
+                      placeholder="e.g. Mike's Mobile Detailing"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white placeholder-gray-400 text-sm transition-all"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Phone Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={bizForm.phone}
+                      onChange={(e) => setBizForm({ ...bizForm, phone: e.target.value })}
+                      placeholder="(555) 123-4567"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white placeholder-gray-400 text-sm transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Shop / Both: structured address fields */}
+                {showShopFields && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Street Address <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required={showShopFields}
+                        value={bizForm.address}
+                        onChange={(e) => setBizForm({ ...bizForm, address: e.target.value })}
+                        placeholder="123 Main Street"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white placeholder-gray-400 text-sm transition-all"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      <div className="col-span-2 sm:col-span-1">
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                          City <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required={showShopFields}
+                          value={bizForm.city}
+                          onChange={(e) => setBizForm({ ...bizForm, city: e.target.value })}
+                          placeholder="Miami"
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white placeholder-gray-400 text-sm transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                          State <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={bizForm.state}
+                          onChange={(e) => setBizForm({ ...bizForm, state: e.target.value })}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white text-sm transition-all"
+                        >
+                          {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                          ZIP Code <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required={showShopFields}
+                          value={bizForm.zip}
+                          onChange={(e) => setBizForm({ ...bizForm, zip: e.target.value })}
+                          placeholder="33101"
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white placeholder-gray-400 text-sm transition-all"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Mobile / Both: free-text service area + optional city/state
+                    so the booking page can still show a friendly location label. */}
+                {showMobileFields && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Service Area <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required={showMobileFields}
+                        value={bizForm.serviceArea}
+                        onChange={(e) => setBizForm({ ...bizForm, serviceArea: e.target.value })}
+                        placeholder="e.g. Miami & Surrounding Areas"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white placeholder-gray-400 text-sm transition-all"
+                      />
+                      <p className="text-[11px] text-gray-400 mt-1.5">Where you&apos;ll travel to. Shown to customers on your booking page.</p>
+                    </div>
+
+                    {bizForm.serviceType === "mobile" && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                            City <span className="text-gray-400 font-normal">(optional)</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={bizForm.city}
+                            onChange={(e) => setBizForm({ ...bizForm, city: e.target.value })}
+                            placeholder="Miami"
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white placeholder-gray-400 text-sm transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                            State <span className="text-gray-400 font-normal">(optional)</span>
+                          </label>
+                          <select
+                            value={bizForm.state}
+                            onChange={(e) => setBizForm({ ...bizForm, state: e.target.value })}
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white text-sm transition-all"
+                          >
+                            {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
                 <div className="pt-2">
                   <button
                     type="submit"
@@ -479,7 +429,7 @@ export default function OnboardingPage() {
                     {saving ? (
                       <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> Saving...</>
                     ) : (
-                      <>Continue to Plan <span>→</span></>
+                      <>Continue <span>→</span></>
                     )}
                   </button>
                 </div>
@@ -487,168 +437,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* ── STEP 2: Choose Plan ──────────────────────────────────────────── */}
+          {/* ── STEP 1: Account created — push toward package creation ──── */}
           {step === 1 && (
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-8 pt-8 pb-6 border-b border-gray-50">
-                <div className="flex items-center gap-3 mb-1">
-                  <div className="w-10 h-10 bg-purple-50 rounded-2xl flex items-center justify-center text-xl">💎</div>
-                  <div>
-                    <h1 className="text-xl font-black text-gray-900">Choose Your Plan</h1>
-                    <p className="text-gray-400 text-sm">Your {trialLabel} free trial includes all features. Pick the plan you want after.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="px-8 py-7">
-                <div className="grid sm:grid-cols-2 gap-4 mb-6">
-                  {/* Starter */}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPlan("starter")}
-                    className={`text-left rounded-2xl border-2 p-5 transition-all ${
-                      selectedPlan === "starter"
-                        ? "border-blue-500 bg-blue-50 shadow-lg shadow-blue-100"
-                        : "border-gray-200 bg-gray-50 hover:border-blue-300"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="font-black text-gray-900 text-lg">Starter</span>
-                      <div className={`w-5 h-5 rounded-full border-2 transition-all flex items-center justify-center ${
-                        selectedPlan === "starter" ? "border-blue-500 bg-blue-500" : "border-gray-300"
-                      }`}>
-                        {selectedPlan === "starter" && (
-                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                    </div>
-                    <div className="mb-3">
-                      <span className="text-3xl font-black text-gray-900">$29</span>
-                      <span className="text-gray-400 text-sm">/month</span>
-                    </div>
-                    <p className="text-gray-500 text-xs mb-4">Perfect for solo detailers just getting started.</p>
-                    <ul className="space-y-2">
-                      {[
-                        "Custom booking page",
-                        "Up to 5 service packages",
-                        "Deposit collection",
-                        "Email reminders",
-                        "Calendar dashboard",
-                        "Analytics overview",
-                        "Before/after photo upload",
-                      ].map((f) => (
-                        <li key={f} className="flex items-center gap-2 text-xs text-gray-600">
-                          <svg className="w-3.5 h-3.5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                          </svg>
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                  </button>
-
-                  {/* Pro */}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPlan("pro")}
-                    className={`text-left rounded-2xl border-2 p-5 relative transition-all ${
-                      selectedPlan === "pro"
-                        ? "border-blue-500 bg-gradient-to-b from-blue-600 to-indigo-700 shadow-lg shadow-blue-200"
-                        : "border-blue-300 bg-gradient-to-b from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
-                    }`}
-                  >
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <span className="bg-gradient-to-r from-amber-400 to-orange-500 text-slate-900 text-[10px] font-black px-3 py-1 rounded-full shadow-md">
-                        RECOMMENDED
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="font-black text-white text-lg">Pro</span>
-                      <div className={`w-5 h-5 rounded-full border-2 transition-all flex items-center justify-center ${
-                        selectedPlan === "pro" ? "border-white bg-white" : "border-white/50"
-                      }`}>
-                        {selectedPlan === "pro" && (
-                          <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                    </div>
-                    <div className="mb-3">
-                      <span className="text-3xl font-black text-white">$50</span>
-                      <span className="text-blue-200 text-sm">/month</span>
-                    </div>
-                    <p className="text-blue-200 text-xs mb-4">For serious detailers ready to scale their business.</p>
-                    <ul className="space-y-2">
-                      {[
-                        "Everything in Starter",
-                        "SMS reminders",
-                        "Multiple staff & calendars",
-                        "Google Calendar sync",
-                        "Advanced analytics",
-                        "Priority support",
-                      ].map((f) => (
-                        <li key={f} className="flex items-center gap-2 text-xs text-white">
-                          <svg className="w-3.5 h-3.5 text-blue-200 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                          </svg>
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                  </button>
-                </div>
-
-                <div className="bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 mb-6 flex items-start gap-3">
-                  <svg className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p className="text-gray-500 text-xs leading-relaxed">
-                    Your <strong className="text-gray-700">{trialLabel} free trial</strong> starts on the Starter plan. You won&apos;t be charged until your trial ends and you choose to continue. Cancel anytime.
-                  </p>
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setStep(0)}
-                    className="flex-1 border border-gray-200 bg-white text-gray-600 font-semibold py-3.5 rounded-xl hover:bg-gray-50 transition-colors text-sm"
-                  >
-                    ← Back
-                  </button>
-                  <div className="flex-[2] flex flex-col gap-2">
-                    <button
-                      type="button"
-                      onClick={handlePayNow}
-                      disabled={!selectedPlan || saving}
-                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-lg shadow-blue-200 disabled:shadow-none"
-                    >
-                      {saving ? (
-                        <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> Loading...</>
-                      ) : !selectedPlan ? (
-                        "Select a plan to continue"
-                      ) : (
-                        <>💳 Pay Now — ${selectedPlan === "starter" ? "29" : "50"}/mo</>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleStep3}
-                      disabled={!selectedPlan || saving}
-                      className="w-full bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 font-semibold py-3 rounded-xl transition-all text-sm"
-                    >
-                      {!selectedPlan ? "Select a plan first" : `Start ${trialLabelCapitalized} Free Trial →`}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── STEP 3: All Set ──────────────────────────────────────────────── */}
-          {step === 2 && (
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-8 pt-10 pb-6 text-center">
                 {/* Animated checkmark */}
@@ -661,25 +451,24 @@ export default function OnboardingPage() {
                   </div>
                 </div>
 
-                <h1 className="text-2xl font-black text-gray-900 mb-2">You&apos;re all set! 🎉</h1>
-                <p className="text-gray-400 text-sm mb-2">
-                  Your booking page is live. Start sharing it with customers!
+                <h1 className="text-2xl font-black text-gray-900 mb-2">
+                  Account created!
+                </h1>
+                <p className="text-gray-500 text-sm mb-2 max-w-sm mx-auto leading-relaxed">
+                  Let&apos;s add your first service package — that&apos;s the one piece your booking page needs before you can share it with customers.
                 </p>
-                {selectedPlan && (
-                  <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full ${
-                    selectedPlan === "pro"
-                      ? "bg-blue-100 text-blue-700"
-                      : "bg-gray-100 text-gray-600"
-                  }`}>
-                    {selectedPlan === "pro" ? "💎 Pro Plan" : "⚡ Starter Plan"} · {trialLabel} free trial active
-                  </span>
-                )}
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-blue-100 text-blue-700">
+                  ⚡ Free trial active · {trialDays} days
+                </span>
               </div>
 
               <div className="px-8 pb-8">
-                {/* Booking URL */}
+                {/* Booking URL — informational only. We removed the
+                    "Preview Your Booking Page" CTA because the page is
+                    still empty at this point, and previewing it confused
+                    early users into thinking something was broken. */}
                 <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-5">
-                  <p className="text-[10px] text-gray-400 font-bold mb-2 uppercase tracking-wider">Your Booking Link</p>
+                  <p className="text-[10px] text-gray-400 font-bold mb-2 uppercase tracking-wider">Your Booking Link (ready once you add a package)</p>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 text-sm text-blue-600 font-mono truncate">{bookingUrl}</code>
                     <button
@@ -695,40 +484,31 @@ export default function OnboardingPage() {
                   </div>
                 </div>
 
-                {/* Checklist */}
-                <div className="grid sm:grid-cols-2 gap-3 mb-6">
-                  {[
-                    { icon: "✅", label: "Booking page live" },
-                    { icon: "🎯", label: `Trial active (${trialDays} days)` },
-                  ].map(({ icon, label }) => (
-                    <div key={label} className="bg-green-50 border border-green-100 rounded-xl px-3 py-2.5 flex items-center gap-2">
-                      <span className="text-lg">{icon}</span>
-                      <span className="text-xs font-semibold text-green-700">{label}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Actions */}
+                {/* Primary CTA → straight to package creation. ?setup=services
+                    tells /dashboard/packages to open the "new package" modal
+                    immediately so the user lands in the flow they're being
+                    nudged into. */}
                 <div className="space-y-3">
                   <Link
-                    href={`/book/${user?.slug}`}
-                    target="_blank"
-                    className="flex items-center justify-center gap-2 w-full border-2 border-blue-200 text-blue-600 font-bold py-3.5 rounded-xl hover:bg-blue-50 transition-colors text-sm"
+                    href="/dashboard/packages?setup=services"
+                    onClick={() => {
+                      try { sessionStorage.setItem("dB_showTour", "1"); } catch { /* private mode */ }
+                    }}
+                    className="flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-colors text-sm shadow-lg shadow-blue-200"
                   >
+                    Create Your First Package
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                     </svg>
-                    Preview Your Booking Page
                   </Link>
                   <Link
                     href="/dashboard"
                     onClick={() => {
                       try { sessionStorage.setItem("dB_showTour", "1"); } catch { /* private mode */ }
                     }}
-                    className="flex items-center justify-center gap-2 w-full bg-gray-900 hover:bg-gray-800 text-white font-bold py-3.5 rounded-xl transition-colors text-sm"
+                    className="flex items-center justify-center gap-2 w-full text-gray-500 hover:text-gray-700 font-semibold py-2 rounded-xl transition-colors text-xs"
                   >
-                    Go to Dashboard →
+                    Skip for now — go to Dashboard
                   </Link>
                 </div>
               </div>

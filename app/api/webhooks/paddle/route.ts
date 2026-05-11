@@ -191,7 +191,7 @@ export async function POST(req: NextRequest) {
 
         // Always end Paddle's trial immediately when a subscription is
         // created via our checkout. Reasoning: users already get a
-        // 15-day in-app trial (managed by us, no card required). Once
+        // 14-day in-app trial (managed by us, no card required). Once
         // they reach checkout and enter a card, they intend to pay —
         // Paddle's price-config trial would just be a second free
         // window, which is not what we want. /activate triggers the

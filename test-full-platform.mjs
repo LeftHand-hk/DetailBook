@@ -738,7 +738,7 @@ async function main() {
   const now = new Date();
   const daysLeft = Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24));
   check(daysLeft > 0, `Trial: ${daysLeft} days remaining`);
-  check(daysLeft <= 15, `Trial: within 15-day window`);
+  check(daysLeft <= 14, `Trial: within 14-day window`);
 
   // Test expired trial
   await prisma.user.update({

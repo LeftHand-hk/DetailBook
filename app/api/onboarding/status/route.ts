@@ -11,10 +11,16 @@ type StepId =
 
 type ProgressJson = Partial<Record<StepId, boolean>>;
 
+// Activation order — services BEFORE working_hours. The "create your
+// first package" step is the one users actually need to see value
+// from the product, so we put it second (right after the auto-
+// completed business profile). Working hours is administrative and
+// can wait — burying it earlier in the flow was contributing to
+// drop-off before users reached the package step.
 const STEP_ORDER: StepId[] = [
   "business_info",
-  "working_hours",
   "services",
+  "working_hours",
   "deposits",
   "share_link",
 ];
@@ -86,20 +92,20 @@ export async function GET() {
       done: stepDone.business_info,
     },
     {
+      id: "services" as const,
+      title: "Add your first service package",
+      description: "Each package is a service customers can book — name, price, how long it takes. You need at least one before your link is usable.",
+      estimate: "2 min",
+      optional: false,
+      done: stepDone.services,
+    },
+    {
       id: "working_hours" as const,
       title: "Set your working hours",
       description: "The days and time slots customers can book. Bookings outside these hours are blocked automatically.",
       estimate: "1 min",
       optional: false,
       done: stepDone.working_hours,
-    },
-    {
-      id: "services" as const,
-      title: "Add your service packages",
-      description: "Each package is a service customers can book — name, price, how long it takes. You need at least one.",
-      estimate: "2 min",
-      optional: false,
-      done: stepDone.services,
     },
     {
       id: "deposits" as const,

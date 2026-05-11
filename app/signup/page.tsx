@@ -114,7 +114,7 @@ export default function SignupPage() {
         <div className="relative z-10 flex-1 flex flex-col justify-center py-12">
           <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 text-blue-300 text-xs font-semibold px-3 py-1.5 rounded-full mb-6 w-fit uppercase tracking-widest">
             <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-            15-day free trial
+            14-day free trial
           </div>
           <h2 className="text-4xl font-black text-white leading-snug mb-4">
             The booking platform<br />
@@ -193,7 +193,7 @@ export default function SignupPage() {
           <div className="w-full max-w-[400px]">
             <div className="mb-8">
               <h1 className="text-2xl font-black text-gray-900 mb-1.5">Start your free trial</h1>
-              <p className="text-gray-400 text-sm">15 days free · No credit card required</p>
+              <p className="text-gray-400 text-sm">14 days free · No credit card required</p>
             </div>
 
             {error && (
