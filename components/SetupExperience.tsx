@@ -153,15 +153,14 @@ export default function SetupExperience() {
     }).catch(() => {});
   }, []);
 
-  // One-shot prompt that nudges the user to customise their booking
-  // page (logo, banner, intro) the moment they finish the Setup Guide.
-  // Backed by User.hasSeenCustomizePrompt — see prisma/schema.prisma.
+  // Prompt that nudges the user to customise their booking page (logo,
+  // banner, intro) the moment they hit Finish at Step 5. One-shot by
+  // construction: the Setup Guide itself is gated by
+  // `onboardingCompletedAt`, which finishSetup sets atomically below,
+  // so Finish can only ever fire once per user — no need for a
+  // separate "already shown" flag.
   const [customizePromptOpen, setCustomizePromptOpen] = useState(false);
 
-  // Finish: mark share_link done, dismiss the banner, suppress the
-  // celebration flash, and close the panel. If this is the first time
-  // the user finishes setup, also pop the "Customize My Page" modal
-  // (and mark hasSeenCustomizePrompt so we never repeat).
   const finishSetup = useCallback(async () => {
     completionFlashedRef.current = true;
     setShowCompleteFlash(false);
@@ -181,18 +180,10 @@ export default function SetupExperience() {
       };
     });
     setPanelOpen(false);
-
-    // Decide whether to show the customise prompt before issuing the
-    // PATCHes. Local cache is authoritative for the flag (kept fresh
-    // via syncFromServer after signup + on focus). Worst case the
-    // modal shows twice if the cache is stale — small annoyance,
-    // not a bug.
-    const cached = getUser() as { hasSeenCustomizePrompt?: boolean } | null;
-    const showPrompt = !cached?.hasSeenCustomizePrompt;
-    if (showPrompt) setCustomizePromptOpen(true);
+    setCustomizePromptOpen(true);
 
     try {
-      const pendingFetches: Promise<unknown>[] = [
+      await Promise.all([
         fetch("/api/onboarding/status", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -203,27 +194,7 @@ export default function SetupExperience() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ dismissed: true }),
         }),
-      ];
-      if (showPrompt) {
-        // Persist the seen flag immediately so refreshing the page or
-        // re-clicking Finish (e.g. user re-opens the guide via the
-        // floating button) doesn't show the modal twice.
-        pendingFetches.push(
-          fetch("/api/user", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ hasSeenCustomizePrompt: true }),
-          }),
-        );
-        try {
-          // Update local cache so subsequent reads of getUser() reflect
-          // the new value without a syncFromServer round-trip.
-          const { setUser } = await import("@/lib/storage");
-          const current = getUser();
-          if (current) setUser({ ...current, hasSeenCustomizePrompt: true } as any);
-        } catch { /* ignore */ }
-      }
-      await Promise.all(pendingFetches);
+      ]);
     } catch { /* optimistic; server reconciles on next focus */ }
   }, []);
 
@@ -249,8 +220,28 @@ export default function SetupExperience() {
 
   if (!status) return null;
 
-  const hideEverything = status.completedAt && !showCompleteFlash;
-  if (hideEverything) return null;
+  // The banner + panel hide as soon as setup is fully complete.
+  // The customize-prompt modal must NOT — it's the next thing the
+  // user sees after clicking Finish, and that's literally when
+  // completedAt gets set. Rendering the modal outside this gate
+  // keeps it visible after finishSetup wipes the guide UI.
+  const hideGuide = status.completedAt && !showCompleteFlash;
+
+  const promptModal = (
+    <CustomizePromptModal
+      open={customizePromptOpen}
+      onCustomize={() => {
+        setCustomizePromptOpen(false);
+        router.push("/dashboard/booking-page");
+      }}
+      onSkip={() => {
+        setCustomizePromptOpen(false);
+        router.push("/dashboard");
+      }}
+    />
+  );
+
+  if (hideGuide) return promptModal;
 
   return (
     <>
@@ -273,17 +264,7 @@ export default function SetupExperience() {
         router={router}
       />
 
-      <CustomizePromptModal
-        open={customizePromptOpen}
-        onCustomize={() => {
-          setCustomizePromptOpen(false);
-          router.push("/dashboard/booking-page");
-        }}
-        onSkip={() => {
-          setCustomizePromptOpen(false);
-          router.push("/dashboard");
-        }}
-      />
+      {promptModal}
     </>
   );
 }
