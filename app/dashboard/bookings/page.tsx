@@ -34,6 +34,19 @@ export default function BookingsPage() {
   const [range, setRange] = useState<RangeType>("all");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Booking | null>(null);
+
+  // Lock the page underneath while the booking detail drawer is open.
+  // Without this, scrolling inside the drawer bled through to the
+  // dashboard scroll position on mobile — the drag-handle row up top
+  // made it feel like the header was "stuck" while everything else
+  // moved.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (!selected) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [selected]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [isPro, setIsPro] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -525,8 +538,13 @@ export default function BookingsPage() {
                 <div className="w-10 h-1.5 bg-gray-300 rounded-full" />
               </div>
 
-              {/* Sticky header */}
-              <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+              {/* Header — was `sticky top-0` with backdrop blur, but
+                  the panel itself is a flex column and the scrolling
+                  happens in the sibling content row below, so sticky
+                  was redundant. The translucent backdrop also made
+                  the status badge + X look "ghost-stuck" while
+                  content moved underneath. Solid white, no sticky. */}
+              <div className="bg-white border-b border-gray-100 px-5 py-3 flex items-center justify-between flex-shrink-0">
                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold capitalize ${statusColors[selected.status]}`}>
                   <div className={`w-1.5 h-1.5 rounded-full ${statusDots[selected.status]}`} />
                   {selected.status}

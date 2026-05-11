@@ -130,8 +130,10 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   // The actual status the API stored for the new booking. "confirmed" for card
   // payments, "pending" for manual / cash / no-deposit. Drives the final screen.
   const [bookingStatusReturned, setBookingStatusReturned] = useState<"confirmed" | "pending" | null>(null);
-  // Country code for phone input. Temporary +383 (Kosovo) for testing alongside +1.
-  const [phoneCountry, setPhoneCountry] = useState<"+1" | "+383">("+1");
+  // US-only at the moment — the customer base is US auto detailing.
+  // The country selector previously offered +383 (Kosovo) so the
+  // founder could test from KS, but it was bleeding into real
+  // customer-facing pages and confusing US visitors. Removed.
   // Stripe embedded modal state. We hold the booking payload in memory and only
   // create the booking on the server AFTER the customer pays — so closing the
   // modal leaves zero side effects.
@@ -1469,35 +1471,55 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
             {/* Trust indicators */}
             <div className="mt-8 bg-gradient-to-r from-slate-900 to-blue-950 rounded-2xl p-5">
               <p className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-4">Why customers love us</p>
-              {/* Enhancement 3: Expanded trust indicators for Pro */}
-              {isPro ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {[
-                    { icon: "\u{1F4AF}", label: "100% Satisfaction Guaranteed" },
-                    { icon: "\u{1F4DC}", label: "Licensed & Insured" },
-                    { icon: "\u2705", label: "Background Checked" },
-                    { icon: "\u{1F33F}", label: "Eco-Friendly Products" },
-                  ].map(({ icon, label }) => (
-                    <div key={label} className="text-center">
-                      <div className="text-2xl mb-1">{icon}</div>
-                      <p className="text-white/70 text-xs font-medium">{label}</p>
+              {(() => {
+                // Use the real average rating from the reviews the
+                // owner added, if any \u2014 falls back to the static
+                // "5 Star Rated" pitch when there are zero reviews so
+                // brand new pages still read confidently. One decimal
+                // place (e.g. "4.8 Star Rated").
+                const ratingLabel = (() => {
+                  if (!reviews || reviews.length === 0) return "5 Star Rated";
+                  const sum = reviews.reduce((s, r) => s + (r.rating || 0), 0);
+                  const avg = sum / reviews.length;
+                  const rounded = Math.round(avg * 10) / 10;
+                  return `${rounded} Star Rated`;
+                })();
+
+                if (isPro) {
+                  // Pro indicators \u2014 same 4 trust badges as before,
+                  // just slot the dynamic rating label into the
+                  // satisfaction column.
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {[
+                        { icon: "\u2B50", label: ratingLabel },
+                        { icon: "\u{1F4DC}", label: "Licensed & Insured" },
+                        { icon: "\u2705", label: "Background Checked" },
+                        { icon: "\u{1F33F}", label: "Eco-Friendly Products" },
+                      ].map(({ icon, label }) => (
+                        <div key={label} className="text-center">
+                          <div className="text-2xl mb-1">{icon}</div>
+                          <p className="text-white/70 text-xs font-medium">{label}</p>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {[
-                    { icon: "\u{1F6E1}\uFE0F", label: "Fully Insured" },
-                    { icon: "\u2B50", label: "5-Star Rated" },
-                    { icon: "\u{1F697}", label: "Quality Guaranteed" },
-                  ].map(({ icon, label }) => (
-                    <div key={label} className="text-center">
-                      <div className="text-2xl mb-1">{icon}</div>
-                      <p className="text-white/70 text-xs font-medium">{label}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
+                  );
+                }
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {[
+                      { icon: "\u{1F6E1}\uFE0F", label: "Fully Insured" },
+                      { icon: "\u2B50", label: ratingLabel },
+                      { icon: "\u{1F697}", label: "Quality Guaranteed" },
+                    ].map(({ icon, label }) => (
+                      <div key={label} className="text-center">
+                        <div className="text-2xl mb-1">{icon}</div>
+                        <p className="text-white/70 text-xs font-medium">{label}</p>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Enhancement 5: Review Highlights for Pro */}
@@ -1965,45 +1987,25 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Phone Number</label>
                     <div className="flex items-stretch border border-gray-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">
-                      <select
-                        value={phoneCountry}
-                        onChange={(e) => {
-                          const next = e.target.value as "+1" | "+383";
-                          setPhoneCountry(next);
-                          // Reset the phone value so the new format applies cleanly.
-                          setForm({ ...form, customerPhone: "" });
-                        }}
-                        className="bg-gray-50 border-r border-gray-200 text-sm text-gray-700 font-semibold pl-3 pr-2 focus:outline-none cursor-pointer"
-                        aria-label="Country code"
-                      >
-                        <option value="+1">🇺🇸 +1</option>
-                        <option value="+383">🇽🇰 +383</option>
-                      </select>
+                      <span className="bg-gray-50 border-r border-gray-200 text-sm text-gray-700 font-semibold pl-3 pr-3 flex items-center select-none">
+                        🇺🇸 +1
+                      </span>
                       <input
                         type="tel"
                         required
                         inputMode="numeric"
                         autoComplete="tel-national"
-                        value={form.customerPhone.replace(new RegExp(`^\\${phoneCountry}\\s?`), "")}
+                        value={form.customerPhone.replace(/^\+1\s?/, "")}
                         onChange={(e) => {
-                          const maxDigits = phoneCountry === "+1" ? 10 : 9;
-                          const digits = e.target.value.replace(/\D/g, "").slice(0, maxDigits);
+                          const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
                           let local = "";
-                          if (digits.length === 0) {
-                            local = "";
-                          } else if (phoneCountry === "+1") {
-                            if (digits.length <= 3) local = `(${digits}`;
-                            else if (digits.length <= 6) local = `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
-                            else local = `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-                          } else {
-                            // +383: format as "XX XXX XXX" / "XX XXX XXXX"
-                            if (digits.length <= 2) local = digits;
-                            else if (digits.length <= 5) local = `${digits.slice(0, 2)} ${digits.slice(2)}`;
-                            else local = `${digits.slice(0, 2)} ${digits.slice(2, 5)} ${digits.slice(5)}`;
-                          }
-                          setForm({ ...form, customerPhone: local ? `${phoneCountry} ${local}` : "" });
+                          if (digits.length === 0) local = "";
+                          else if (digits.length <= 3) local = `(${digits}`;
+                          else if (digits.length <= 6) local = `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+                          else local = `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+                          setForm({ ...form, customerPhone: local ? `+1 ${local}` : "" });
                         }}
-                        placeholder={phoneCountry === "+1" ? "(555) 123-4567" : "49 384 457"}
+                        placeholder="(555) 123-4567"
                         className="flex-1 px-4 py-3 text-gray-900 focus:outline-none placeholder-gray-300 text-sm"
                       />
                     </div>
