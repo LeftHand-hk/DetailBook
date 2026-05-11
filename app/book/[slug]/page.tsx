@@ -7,6 +7,7 @@ import { usePlatformName } from "@/components/PlatformName";
 import StripeDepositModal from "@/components/StripeDepositModal";
 import SquareDepositModal from "@/components/SquareDepositModal";
 import PublicPhotoGallery, { type PublicPhoto } from "@/components/PublicPhotoGallery";
+import PublicReviews, { type PublicReview } from "@/components/PublicReviews";
 
 const TIMES = [
   "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM",
@@ -119,6 +120,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   const [selectedServiceMode, setSelectedServiceMode] = useState<"mobile" | "shop" | null>(null);
   const [bookedSlots, setBookedSlots] = useState<{ date: string; time: string; staffId: string | null }[]>([]);
   const [photos, setPhotos] = useState<PublicPhoto[]>([]);
+  const [reviews, setReviews] = useState<PublicReview[]>([]);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
   const [stripeDepositPaid, setStripeDepositPaid] = useState(false);
   const [smsConsent, setSmsConsent] = useState(false);
@@ -162,6 +164,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
           // Photos are NOT in the main payload (they're base64-heavy
           // and were blocking first paint). They land via a separate
           // request right after — see the second useEffect below.
+          if (Array.isArray(data.reviews)) setReviews(data.reviews as PublicReview[]);
           // Build user object from API response (more up-to-date than localStorage)
           setUser(data);
         } else {
@@ -1450,6 +1453,18 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                 />
               </div>
             )}
+
+            {/* Customer reviews — sit between the gallery and the
+                trust-badges strip. Section disappears entirely when
+                there are no reviews so the booking page doesn't pick
+                up an empty band. */}
+            <PublicReviews
+              reviews={reviews}
+              layout={(user as any).reviewsLayout || "carousel"}
+              showStars={(user as any).reviewsShowStars ?? true}
+              showAvatars={(user as any).reviewsShowAvatars ?? true}
+              showDates={(user as any).reviewsShowDates ?? true}
+            />
 
             {/* Trust indicators */}
             <div className="mt-8 bg-gradient-to-r from-slate-900 to-blue-950 rounded-2xl p-5">

@@ -69,6 +69,7 @@ export async function PUT(request: NextRequest) {
       "emailConfirmations", "smsConfirmations", "smsRemindersEnabled", "emailRemindersEnabled",
       "hasSeenCustomizePrompt",
       "galleryLayout", "galleryShowTitle", "galleryTitle",
+      "reviewsLayout", "reviewsShowStars", "reviewsShowAvatars", "reviewsShowDates",
     ];
 
     const updateData: Record<string, unknown> = {};

@@ -5,6 +5,7 @@ import { getUser, setUser } from "@/lib/storage";
 import type { User } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
 import PhotoGalleryEditor from "@/components/PhotoGalleryEditor";
+import ReviewsEditor from "@/components/ReviewsEditor";
 
 const INPUT_CLASS =
   "w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all placeholder-gray-300";
@@ -81,6 +82,13 @@ export default function BookingPagePage() {
   const [galleryLayout, setGalleryLayout] = useState<"grid" | "carousel" | "masonry">("grid");
   const [galleryShowTitle, setGalleryShowTitle] = useState(true);
   const [galleryTitle, setGalleryTitle] = useState("Our Work");
+  // Customer Reviews display settings. Same pattern as gallery — the
+  // reviews themselves are managed by <ReviewsEditor /> against the
+  // /api/reviews endpoints; these four flags ride the user autosave.
+  const [reviewsLayout, setReviewsLayout] = useState<"carousel" | "grid" | "list">("carousel");
+  const [reviewsShowStars, setReviewsShowStars] = useState(true);
+  const [reviewsShowAvatars, setReviewsShowAvatars] = useState(true);
+  const [reviewsShowDates, setReviewsShowDates] = useState(true);
   // Business Profile state
   const [businessName, setBusinessName] = useState("");
   const [ownerName, setOwnerName] = useState("");
@@ -121,6 +129,10 @@ export default function BookingPagePage() {
       setGalleryLayout((u as any).galleryLayout || "grid");
       setGalleryShowTitle((u as any).galleryShowTitle ?? true);
       setGalleryTitle((u as any).galleryTitle || "Our Work");
+      setReviewsLayout((u as any).reviewsLayout || "carousel");
+      setReviewsShowStars((u as any).reviewsShowStars ?? true);
+      setReviewsShowAvatars((u as any).reviewsShowAvatars ?? true);
+      setReviewsShowDates((u as any).reviewsShowDates ?? true);
       setBusinessName(u.businessName || "");
       setOwnerName(u.name || "");
       setBio(u.bio || "");
@@ -164,6 +176,10 @@ export default function BookingPagePage() {
         galleryLayout,
         galleryShowTitle,
         galleryTitle,
+        reviewsLayout,
+        reviewsShowStars,
+        reviewsShowAvatars,
+        reviewsShowDates,
         businessName,
         name: ownerName,
         bio,
@@ -180,7 +196,7 @@ export default function BookingPagePage() {
     }, 600);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug, customMessage, advanceBookingDays, bookingPageTheme, accentColor, bookingPageTitle, bookingPageSubtitle, showRating, showSocialLinks, showServiceAreas, showBusinessHours, showTrustBadges, thankYouMessage, termsText, instagram, facebook, website, phone, bannerImage, bannerOverlayOpacity, serviceLayout, galleryLayout, galleryShowTitle, galleryTitle, businessName, ownerName, bio, address, yearsInBusiness, logo, serviceAreasText]);
+  }, [slug, customMessage, advanceBookingDays, bookingPageTheme, accentColor, bookingPageTitle, bookingPageSubtitle, showRating, showSocialLinks, showServiceAreas, showBusinessHours, showTrustBadges, thankYouMessage, termsText, instagram, facebook, website, phone, bannerImage, bannerOverlayOpacity, serviceLayout, galleryLayout, galleryShowTitle, galleryTitle, reviewsLayout, reviewsShowStars, reviewsShowAvatars, reviewsShowDates, businessName, ownerName, bio, address, yearsInBusiness, logo, serviceAreasText]);
 
   const isPro = user?.plan === "pro";
 
@@ -443,6 +459,18 @@ export default function BookingPagePage() {
         onLayoutChange={setGalleryLayout}
         onShowTitleChange={setGalleryShowTitle}
         onTitleChange={setGalleryTitle}
+      />
+
+      {/* ── Card: Customer Reviews (between Photo Gallery and Service Layout) ── */}
+      <ReviewsEditor
+        layout={reviewsLayout}
+        showStars={reviewsShowStars}
+        showAvatars={reviewsShowAvatars}
+        showDates={reviewsShowDates}
+        onLayoutChange={setReviewsLayout}
+        onShowStarsChange={setReviewsShowStars}
+        onShowAvatarsChange={setReviewsShowAvatars}
+        onShowDatesChange={setReviewsShowDates}
       />
 
       {/* ── Card: Service Layout ── */}

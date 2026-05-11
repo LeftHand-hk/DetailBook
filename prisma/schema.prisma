@@ -121,6 +121,14 @@ model User {
   galleryShowTitle   Boolean @default(true)
   galleryTitle       String  @default("Our Work")
 
+  // Customer reviews display preferences. Review rows live in
+  // BusinessReview below. reviewsLayout values: "carousel" (default,
+  // auto-rotates), "grid" (2 cols desktop), "list" (vertical).
+  reviewsLayout      String  @default("carousel")
+  reviewsShowStars   Boolean @default(true)
+  reviewsShowAvatars Boolean @default(true)
+  reviewsShowDates   Boolean @default(true)
+
   // Welcome email sequence (4 emails: Day 0, Day 2, Day 5, Day 13). Each
   // *At column is the timestamp of decision (sent OR explicitly skipped).
   // For Day 2 in particular, `welcomeEmailDay2Skipped` distinguishes
@@ -155,11 +163,43 @@ model User {
   emailLogs EmailLog[]
   feedback Feedback[]
   photos   BusinessPhoto[]
+  reviews  BusinessReview[]
 
   @@index([email])
   @@index([slug])
   @@index([createdAt])
   @@index([lastLoginAt])
+}
+
+// Customer testimonials shown on the public /book/<slug> page below
+// the services list. Owners manage them by hand on /dashboard/booking-
+// page (no public-review-form yet — pasting in vouches from email /
+// social DMs is the realistic path for early customers).
+// `serviceId` is intentionally NOT a real FK so we don't break a row
+// when a package is deleted; instead we resolve the service name at
+// read time against the live package list and silently drop it if
+// it's gone.
+model BusinessReview {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customerName String
+  rating       Int      @default(5)
+  // Brief asks for max 300 chars; we enforce at the API and don't use
+  // @db.Text here — keeps the string in the row's main page.
+  reviewText   String
+  // Optional. Null = "don't display a date".
+  reviewDate   DateTime?
+  // Loose pointer to a Package row. Not an FK because we want reviews
+  // to survive package deletions; the public page resolves the name
+  // at render time.
+  serviceId    String?
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, displayOrder])
 }
 
 // Portfolio photos shown on the public /book/<slug> page. Two shapes:

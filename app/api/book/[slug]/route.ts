@@ -27,6 +27,9 @@ export async function GET(
           select: { id: true, name: true, role: true, color: true, avatar: true },
           orderBy: { createdAt: "asc" },
         },
+        reviews: {
+          orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+        },
       },
     });
 
@@ -104,6 +107,13 @@ export async function GET(
       galleryLayout: (user as any).galleryLayout ?? "grid",
       galleryShowTitle: (user as any).galleryShowTitle ?? true,
       galleryTitle: (user as any).galleryTitle ?? "Our Work",
+      // Reviews are small enough (text only, max 10 × ~300 chars) that
+      // we ship them inline — no need for a deferred fetch like photos.
+      reviews: (user as any).reviews ?? [],
+      reviewsLayout: (user as any).reviewsLayout ?? "carousel",
+      reviewsShowStars: (user as any).reviewsShowStars ?? true,
+      reviewsShowAvatars: (user as any).reviewsShowAvatars ?? true,
+      reviewsShowDates: (user as any).reviewsShowDates ?? true,
       bookedSlots,
       // Expose payment methods (strip secret keys for security)
       paymentMethods: (() => {

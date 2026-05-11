@@ -88,6 +88,12 @@ export interface User {
   galleryLayout?: "grid" | "carousel" | "masonry";
   galleryShowTitle?: boolean;
   galleryTitle?: string;
+  // Customer reviews display preferences. Reviews live in
+  // BusinessReview — these four flags decide how they render.
+  reviewsLayout?: "carousel" | "grid" | "list";
+  reviewsShowStars?: boolean;
+  reviewsShowAvatars?: boolean;
+  reviewsShowDates?: boolean;
 }
 
 export interface Staff {
