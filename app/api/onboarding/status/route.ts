@@ -6,7 +6,6 @@ type StepId =
   | "business_info"
   | "working_hours"
   | "services"
-  | "deposits"
   | "share_link";
 
 type ProgressJson = Partial<Record<StepId, boolean>>;
@@ -15,13 +14,14 @@ type ProgressJson = Partial<Record<StepId, boolean>>;
 // first package" step is the one users actually need to see value
 // from the product, so we put it second (right after the auto-
 // completed business profile). Working hours is administrative and
-// can wait — burying it earlier in the flow was contributing to
-// drop-off before users reached the package step.
+// can wait. Deposits used to live here as an optional step but was
+// the loudest source of friction (payment config before a single
+// customer existed) — it's been moved to Settings → Payments and
+// surfaced contextually after the user's first booking instead.
 const STEP_ORDER: StepId[] = [
   "business_info",
   "services",
   "working_hours",
-  "deposits",
   "share_link",
 ];
 
@@ -45,7 +45,6 @@ export async function GET() {
       onboardingCompletedAt: true,
       onboardingDismissed: true,
       businessHours: true,
-      requireDeposit: true,
       _count: { select: { packages: true } },
     },
   });
@@ -64,9 +63,6 @@ export async function GET() {
     business_info: true,
     working_hours: Boolean(progress.working_hours) || hasBusinessHours,
     services: Boolean(progress.services) || user._count.packages > 0,
-    // Deposits is optional: counts as done if the user explicitly
-    // configured (toggled on or off via the panel) OR enabled it.
-    deposits: Boolean(progress.deposits) || user.requireDeposit,
     share_link: Boolean(progress.share_link),
   };
 
@@ -74,7 +70,6 @@ export async function GET() {
   const newlyDone: Partial<Record<StepId, boolean>> = {};
   if (!progress.working_hours && stepDone.working_hours) newlyDone.working_hours = true;
   if (!progress.services && stepDone.services) newlyDone.services = true;
-  if (!progress.deposits && stepDone.deposits) newlyDone.deposits = true;
   if (Object.keys(newlyDone).length) {
     await prisma.user.update({
       where: { id: session.id },
@@ -94,7 +89,7 @@ export async function GET() {
     {
       id: "services" as const,
       title: "Add your first service package",
-      description: "Each package is a service customers can book — name, price, how long it takes. You need at least one before your link is usable.",
+      description: "Each package is a service customers can book.",
       estimate: "2 min",
       optional: false,
       done: stepDone.services,
@@ -106,14 +101,6 @@ export async function GET() {
       estimate: "1 min",
       optional: false,
       done: stepDone.working_hours,
-    },
-    {
-      id: "deposits" as const,
-      title: "Turn on deposits (recommended)",
-      description: "Require customers to pay part of the price upfront when they book. Cuts no-shows in half.",
-      estimate: "1 min",
-      optional: true,
-      done: stepDone.deposits,
     },
     {
       id: "share_link" as const,

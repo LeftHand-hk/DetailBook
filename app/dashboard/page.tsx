@@ -31,6 +31,14 @@ export default function DashboardPage() {
   const [setupSteps, setSetupSteps] = useState<SetupStep[] | null>(null);
   const [copied, setCopied] = useState(false);
   const [mounted, setMounted] = useState(false);
+  // Persisted dismissal of the post-first-booking "consider deposits"
+  // nudge. Once dismissed we never show it again on this device.
+  const [depositTipDismissed, setDepositTipDismissed] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setDepositTipDismissed(localStorage.getItem("deposit_tip_dismissed") === "1");
+  }, []);
 
   // Re-fetched after any state-mutating action (mark share_link, etc.)
   // so the card reflects new completions instantly.
@@ -228,6 +236,43 @@ export default function DashboardPage() {
               <p className="text-xs text-gray-500 font-medium mt-1">{stat.sub}</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Pro-tip nudge — only after the user has felt a real booking,
+          and only if they haven't already turned deposits on. This used
+          to live in the Setup Guide as an optional step but interrupted
+          new users before they had any sense of the no-show problem
+          deposits actually solve. Surfacing it here, in context, lands
+          much better. */}
+      {!hasNoBookings && !(user as any)?.requireDeposit && !depositTipDismissed && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 mb-6 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-amber-900 flex items-center gap-2 min-w-0">
+            <span aria-hidden>💡</span>
+            <span className="truncate-multiline">
+              <strong>Pro tip:</strong> Detailers who require deposits get 50% fewer no-shows.
+            </span>
+          </p>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Link
+              href="/dashboard/payments"
+              className="text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Set up deposits →
+            </Link>
+            <button
+              onClick={() => {
+                setDepositTipDismissed(true);
+                try { localStorage.setItem("deposit_tip_dismissed", "1"); } catch { /* private mode */ }
+              }}
+              aria-label="Dismiss"
+              className="w-7 h-7 flex items-center justify-center rounded-md text-amber-700/60 hover:text-amber-900 hover:bg-amber-100 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
       )}
 

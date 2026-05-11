@@ -8,7 +8,6 @@ type StepId =
   | "business_info"
   | "working_hours"
   | "services"
-  | "deposits"
   | "share_link";
 
 type Step = {
@@ -352,10 +351,8 @@ function SetupPanel({
 }) {
   const [expandedStep, setExpandedStep] = useState<StepId | null>(null);
 
-  // Auto-expand the first incomplete step in display order, including
-  // optional ones — users want to walk through every step in sequence
-  // (e.g. deposits before share link) and decide for themselves whether
-  // to skip.
+  // Auto-expand the first incomplete step in display order so the
+  // user lands on whatever they still need to do.
   useEffect(() => {
     if (!open) return;
     const firstIncomplete = status.steps.find((s) => !s.done);
@@ -564,9 +561,7 @@ function StepBody({
     case "working_hours":
       return <WorkingHoursBody done={step.done} onSaved={onRefresh} />;
     case "services":
-      return <ServicesBody done={step.done} onSaved={onRefresh} router={router} onClosePanel={onClosePanel} />;
-    case "deposits":
-      return <DepositsBody done={step.done} onSaved={onRefresh} onMarkDone={onMarkDone} router={router} onClosePanel={onClosePanel} />;
+      return <ServicesBody done={step.done} onSaved={onRefresh} router={router} onClosePanel={onClosePanel} onMarkDone={onMarkDone} />;
     case "share_link":
       return <ShareLinkBody done={step.done} onMarkDone={onMarkDone} onFinish={onFinish} />;
   }
@@ -640,14 +635,43 @@ function WorkingHoursBody({ done, onSaved }: { done: boolean; onSaved: () => Pro
     setHours(next);
   };
 
+  // Top action row + a footer copy of the same Save button. The form
+  // is pre-filled with sensible defaults (Mon-Sat 9-6, Sunday closed)
+  // so most users just need to tap Save and move on — keeping the
+  // button at the top of the form makes that path obvious without
+  // scrolling past 7 day pickers first.
+  const SaveAction = ({ idForLabel }: { idForLabel?: string }) => (
+    <div className="flex items-center justify-between gap-2">
+      <button
+        onClick={save}
+        disabled={saving}
+        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+        aria-label={idForLabel}
+      >
+        {saving ? "Saving..." : done ? "Update hours" : "Save hours"}
+      </button>
+      {savedAt && (
+        <span className="text-xs text-green-600 font-semibold flex items-center gap-1">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+          </svg>
+          Saved
+        </span>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-3">
-      <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-        <p className="text-[11px] text-blue-800 leading-relaxed">
-          Customers can only book inside these hours. Anything outside is blocked from your booking page automatically.
-          Untick a day if you&apos;re closed.
-        </p>
-      </div>
+      <p className="text-sm font-semibold text-gray-900 leading-snug">
+        We&apos;ve set sensible defaults. Tap <span className="text-blue-700">Save</span> to continue, or adjust if needed.
+      </p>
+
+      <SaveAction idForLabel="Save working hours (top)" />
+
+      <p className="text-[11px] text-gray-500 leading-relaxed">
+        Customers can only book inside these hours; anything outside is blocked automatically. Untick a day if you&apos;re closed.
+      </p>
 
       <button
         type="button"
@@ -699,23 +723,7 @@ function WorkingHoursBody({ done, onSaved }: { done: boolean; onSaved: () => Pro
         })}
       </div>
 
-      <div className="flex items-center justify-between gap-2">
-        <button
-          onClick={save}
-          disabled={saving}
-          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
-        >
-          {saving ? "Saving..." : done ? "Update hours" : "Save hours"}
-        </button>
-        {savedAt && (
-          <span className="text-xs text-green-600 font-semibold flex items-center gap-1">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-            </svg>
-            Saved
-          </span>
-        )}
-      </div>
+      <SaveAction idForLabel="Save working hours (bottom)" />
     </div>
   );
 }
@@ -723,58 +731,52 @@ function WorkingHoursBody({ done, onSaved }: { done: boolean; onSaved: () => Pro
 // ── Step 3: Services ─────────────────────────────────────────────────────────
 
 function ServicesBody({
-  done, onSaved, router, onClosePanel,
+  done, onSaved, router, onClosePanel, onMarkDone,
 }: {
   done: boolean;
   onSaved: () => Promise<Status | null>;
   router: Router;
   onClosePanel: () => void;
+  onMarkDone: () => void;
 }) {
   const [form, setForm] = useState({ name: "", description: "", price: "", duration: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [addedCount, setAddedCount] = useState(0);
-  // Synchronous guard against double-click — setSaving is async so a
-  // fast second click could fire the POST again before the disabled
-  // button re-renders. Confirmed in production: one user clicked Add
-  // twice and the same package was created twice. The ref locks the
-  // critical section the moment submit() runs.
+  const [addedName, setAddedName] = useState<string | null>(null);
+  const [customOpen, setCustomOpen] = useState(false);
+  // Synchronous double-click guard — setSaving is async so two fast
+  // clicks can fire the POST twice. Already cost us a duplicate row
+  // in production once; ref locks the critical section immediately.
   const submittingRef = useRef(false);
+  // Suppress unused-var warning — router/onClosePanel are kept so a
+  // future "Open full page" link can be added back without changing
+  // the prop wiring.
+  void router; void onClosePanel;
 
-  const applyTemplate = (t: typeof SERVICE_TEMPLATES[number]) => {
-    setForm({ name: t.name, description: t.description, price: t.price, duration: t.duration });
-    setError("");
-  };
-
-  const submit = async () => {
+  const createPackage = async (data: {
+    name: string; description: string; price: number; duration: number;
+  }, opts: { advance?: boolean } = {}) => {
     if (submittingRef.current) return;
-    setError("");
-    if (!form.name || !form.price || !form.duration) {
-      setError("Name, price, and duration are required.");
-      return;
-    }
     submittingRef.current = true;
     setSaving(true);
+    setError("");
     try {
       const res = await fetch("/api/packages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name,
-          description: form.description,
-          price: parseFloat(form.price),
-          duration: parseInt(form.duration, 10),
-          deposit: 0,
-          active: true,
-        }),
+        body: JSON.stringify({ ...data, deposit: 0, active: true }),
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error || "Could not save service.");
+        const body = await res.json().catch(() => ({}));
+        setError(body.error || "Could not save service.");
       } else {
-        setAddedCount((c) => c + 1);
+        setAddedName(data.name);
         setForm({ name: "", description: "", price: "", duration: "" });
         await onSaved();
+        // Auto-advance: marks "services" done in onboardingProgress so
+        // the panel collapses this row and expands the next incomplete
+        // step (working_hours).
+        if (opts.advance) onMarkDone();
       }
     } finally {
       setSaving(false);
@@ -782,248 +784,139 @@ function ServicesBody({
     }
   };
 
-  const openFullPage = () => {
-    onClosePanel();
-    router.push("/dashboard/packages?setup=services");
+  const handleTemplate = (t: typeof SERVICE_TEMPLATES[number]) => {
+    createPackage(
+      {
+        name: t.name,
+        description: t.description,
+        price: parseFloat(t.price),
+        duration: parseInt(t.duration, 10),
+      },
+      { advance: true },
+    );
   };
 
-  return (
-    <div className="space-y-4">
-      {/* What is a package — explainer for first-time users */}
-      <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-        <p className="text-xs font-bold text-blue-900 mb-1">What&apos;s a package?</p>
-        <p className="text-[11px] text-blue-800 leading-relaxed">
-          A package is one of the services a customer can book — like &quot;Full Detail&quot; or &quot;Ceramic Coating&quot;.
-          You set the name, price, and how long it takes. Customers pick a package on your booking page,
-          and the calendar blocks off the right amount of time automatically.
-        </p>
-      </div>
-
-      <button
-        onClick={openFullPage}
-        className="w-full flex items-center justify-between gap-2 bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50/40 rounded-lg px-3 py-2.5 text-left transition-all group"
-      >
-        <div>
-          <p className="text-xs font-semibold text-gray-900">Open the full packages page</p>
-          <p className="text-[11px] text-gray-500 mt-0.5">More room to add, edit, vehicle types, and reorder.</p>
-        </div>
-        <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-      </button>
-
-      <div>
-        <p className="text-xs font-semibold text-gray-700 mb-2">Tap one to start with a common service</p>
-        <div className="grid grid-cols-2 gap-2">
-          {SERVICE_TEMPLATES.map((t) => (
-            <button
-              key={t.name}
-              onClick={() => applyTemplate(t)}
-              className="text-left bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50/40 rounded-lg p-3 transition-all"
-            >
-              <p className="text-xs font-bold text-gray-900">{t.name}</p>
-              <p className="text-[11px] text-gray-500 mt-0.5">
-                ${t.price} · {t.duration} min
-              </p>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="border-t border-gray-200 pt-4 space-y-2.5">
-        <input
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          placeholder="Service name"
-          className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        />
-        <textarea
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
-          placeholder="Short description (optional)"
-          rows={2}
-          className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-        />
-        <div className="grid grid-cols-2 gap-2">
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">$</span>
-            <input
-              type="number"
-              value={form.price}
-              onChange={(e) => setForm({ ...form, price: e.target.value })}
-              placeholder="Price"
-              className="w-full pl-7 pr-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          <div className="relative">
-            <input
-              type="number"
-              value={form.duration}
-              onChange={(e) => setForm({ ...form, duration: e.target.value })}
-              placeholder="Duration"
-              className="w-full pl-3 pr-12 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">min</span>
-          </div>
-        </div>
-        {error && <p className="text-xs text-red-600">{error}</p>}
-        <button
-          onClick={submit}
-          disabled={saving}
-          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold py-2 rounded-lg transition-colors"
-        >
-          {saving ? "Adding..." : "Add this service"}
-        </button>
-        {(addedCount > 0 || done) && (
-          <p className="text-xs text-green-600 font-semibold flex items-center gap-1">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-            </svg>
-            {addedCount > 0
-              ? `${addedCount} service${addedCount === 1 ? "" : "s"} added`
-              : "Services configured"}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Step 4: Deposits ─────────────────────────────────────────────────────────
-
-function DepositsBody({
-  done, onSaved, onMarkDone, router, onClosePanel,
-}: {
-  done: boolean;
-  onSaved: () => Promise<Status | null>;
-  onMarkDone: () => void;
-  router: Router;
-  onClosePanel: () => void;
-}) {
-  const u = (typeof window !== "undefined" ? getUser() : null) as any;
-  const [enabled, setEnabled] = useState<boolean>(Boolean(u?.requireDeposit));
-  const [saving, setSaving] = useState(false);
-  const [savedAt, setSavedAt] = useState<number | null>(null);
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      await fetch("/api/user", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requireDeposit: enabled }),
-      });
-      setSavedAt(Date.now());
-      await onSaved();
-    } finally {
-      setSaving(false);
+  const submitCustom = async () => {
+    if (!form.name || !form.price || !form.duration) {
+      setError("Name, price, and duration are required.");
+      return;
     }
-  };
-
-  const openFullPage = () => {
-    onClosePanel();
-    router.push("/dashboard/payments?setup=deposits");
-  };
-
-  const openPackages = () => {
-    onClosePanel();
-    router.push("/dashboard/packages?setup=services");
+    await createPackage(
+      {
+        name: form.name,
+        description: form.description,
+        price: parseFloat(form.price),
+        duration: parseInt(form.duration, 10),
+      },
+      { advance: true },
+    );
   };
 
   return (
-    <div className="space-y-3 text-sm">
-      <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-        <p className="text-xs font-bold text-blue-900 mb-1">Why deposits matter</p>
-        <p className="text-[11px] text-blue-800 leading-relaxed">
-          A deposit is part of the price the customer pays at booking time — usually 20-30%. They&apos;re much less likely
-          to skip an appointment they&apos;ve already paid for. You set the amount on each package.
-        </p>
-      </div>
+    <div className="space-y-3">
+      <p className="text-xs font-semibold text-gray-700">Pick a common service to start:</p>
 
-      <button
-        onClick={openFullPage}
-        className="w-full flex items-center justify-between gap-2 bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50/40 rounded-lg px-3 py-2.5 text-left transition-all group"
-      >
-        <div>
-          <p className="text-xs font-semibold text-gray-900">Open the payment settings page</p>
-          <p className="text-[11px] text-gray-500 mt-0.5">Pick how you want to get paid.</p>
-        </div>
-        <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-      </button>
-
-      <div className="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between">
-        <div>
-          <p className="text-sm font-semibold text-gray-900">Ask for a deposit when booking</p>
-          <p className="text-xs text-gray-500 mt-0.5">People show up when they&apos;ve already paid something.</p>
-        </div>
-        <button
-          role="switch"
-          aria-checked={enabled}
-          onClick={() => setEnabled((v) => !v)}
-          className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors ${
-            enabled ? "bg-blue-600" : "bg-gray-200"
-          }`}
-        >
-          <span
-            className={`inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform mt-0.5 ${
-              enabled ? "translate-x-5" : "translate-x-0.5"
-            }`}
-          />
-        </button>
-      </div>
-
-      {enabled && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
-          <svg className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-blue-900">Now set the deposit on each service</p>
-            <p className="text-[11px] text-blue-800 mt-0.5">
-              Each service can have its own deposit amount — open packages to set it.
+      <div className="grid grid-cols-2 gap-2">
+        {SERVICE_TEMPLATES.map((t) => (
+          <button
+            key={t.name}
+            onClick={() => handleTemplate(t)}
+            disabled={saving}
+            className="text-left bg-white border border-gray-200 hover:border-blue-400 hover:bg-blue-50/40 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg p-3 transition-all"
+          >
+            <p className="text-xs font-bold text-gray-900">{t.name}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              ${t.price} · {t.duration} min
             </p>
+          </button>
+        ))}
+      </div>
+
+      {addedName && (
+        <p className="text-xs text-green-600 font-semibold flex items-center gap-1">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+          </svg>
+          {addedName} added
+        </p>
+      )}
+
+      {!customOpen ? (
+        <button
+          onClick={() => setCustomOpen(true)}
+          className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+        >
+          + Create custom service
+        </button>
+      ) : (
+        <div className="border-t border-gray-200 pt-3 space-y-2.5">
+          <input
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            placeholder="Service name"
+            className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          <textarea
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            placeholder="Short description (optional)"
+            rows={2}
+            className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">$</span>
+              <input
+                type="number"
+                value={form.price}
+                onChange={(e) => setForm({ ...form, price: e.target.value })}
+                placeholder="Price"
+                className="w-full pl-7 pr-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div className="relative">
+              <input
+                type="number"
+                value={form.duration}
+                onChange={(e) => setForm({ ...form, duration: e.target.value })}
+                placeholder="Duration"
+                className="w-full pl-3 pr-12 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">min</span>
+            </div>
+          </div>
+          {error && <p className="text-xs text-red-600">{error}</p>}
+          <div className="flex items-center gap-2">
             <button
-              onClick={openPackages}
-              className="text-xs font-semibold text-blue-700 hover:text-blue-900 mt-1.5"
+              onClick={submitCustom}
+              disabled={saving}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold py-2 rounded-lg transition-colors"
             >
-              Open packages →
+              {saving ? "Adding..." : "Add this service"}
+            </button>
+            <button
+              onClick={() => { setCustomOpen(false); setError(""); }}
+              className="text-xs font-semibold text-gray-500 hover:text-gray-700 px-2"
+            >
+              Cancel
             </button>
           </div>
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-2 pt-1">
-        <button
-          onClick={save}
-          disabled={saving}
-          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
-        >
-          {saving ? "Saving..." : done ? "Update" : "Save"}
-        </button>
-        {!done && (
-          <button
-            onClick={onMarkDone}
-            className="text-xs font-semibold text-gray-500 hover:text-gray-700"
-          >
-            Do this later
-          </button>
-        )}
-        {savedAt && (
-          <span className="text-xs text-green-600 font-semibold flex items-center gap-1">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-            </svg>
-            Saved
-          </span>
-        )}
-      </div>
+      {done && !addedName && (
+        <p className="text-xs text-green-600 font-semibold flex items-center gap-1">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+          </svg>
+          Services configured
+        </p>
+      )}
     </div>
   );
 }
 
-// ── Step 5: Share Link ───────────────────────────────────────────────────────
+// ── Step 4: Share Link ───────────────────────────────────────────────────────
 
 function ShareLinkBody({
   done, onMarkDone, onFinish,
