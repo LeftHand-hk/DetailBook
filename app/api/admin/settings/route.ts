@@ -62,6 +62,7 @@ export async function PUT(request: NextRequest) {
       cryptoWalletAddress,
       cryptoNetwork,
       cryptoAcceptedCoins,
+      adsCampaignStartDate,
     } = body;
 
     const data: Record<string, unknown> = {};
@@ -87,6 +88,16 @@ export async function PUT(request: NextRequest) {
     if (cryptoWalletAddress !== undefined) data.cryptoWalletAddress = cryptoWalletAddress;
     if (cryptoNetwork !== undefined) data.cryptoNetwork = cryptoNetwork;
     if (cryptoAcceptedCoins !== undefined) data.cryptoAcceptedCoins = cryptoAcceptedCoins;
+    // adsCampaignStartDate: accepts ISO string or empty/null. The admin
+    // metrics page passes "" when the founder wants to clear it.
+    if (adsCampaignStartDate !== undefined) {
+      if (adsCampaignStartDate === null || adsCampaignStartDate === "") {
+        data.adsCampaignStartDate = null;
+      } else {
+        const d = new Date(adsCampaignStartDate);
+        if (!isNaN(d.getTime())) data.adsCampaignStartDate = d;
+      }
+    }
 
     // Upsert to handle case where settings don't exist yet
     const settings = await prisma.platformSettings.upsert({

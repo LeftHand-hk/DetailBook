@@ -381,5 +381,11 @@ model PlatformSettings {
   cryptoNetwork        String?
   cryptoAcceptedCoins  Json?
 
+  // Date the Meta Ads campaign first started serving impressions.
+  // Drives the "Since Ads Started" preset in the admin metrics page so
+  // test/dev users from before the campaign can be excluded from
+  // activation maths. Null = preset hidden until the founder sets it.
+  adsCampaignStartDate DateTime?
+
   updatedAt DateTime @updatedAt
 }

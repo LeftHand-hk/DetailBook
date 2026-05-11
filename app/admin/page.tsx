@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
-// Overview was removed from the admin nav. Visiting /admin lands on the
-// Users list (the new default entry point).
+// /admin is the founder dashboard root → land on the metrics overview.
+// Users list lives one click away in the sidebar.
 export default function AdminIndex() {
-  redirect("/admin/users");
+  redirect("/admin/metrics");
 }
