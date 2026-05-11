@@ -97,8 +97,17 @@ export default function SetupExperience() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const onFocus = () => fetchStatus();
+    // Custom event fired by pages that mutate onboarding-relevant
+    // state (e.g. /dashboard/packages after creating a package) so
+    // the banner reflects the new completion immediately, instead of
+    // waiting for the next window focus / route change.
+    const onSetupChanged = () => fetchStatus();
     window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+    window.addEventListener("detailbook:setup-changed", onSetupChanged);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("detailbook:setup-changed", onSetupChanged);
+    };
   }, [fetchStatus]);
 
   // Auto-open panel once when arriving from onboarding. The trigger is a

@@ -81,6 +81,17 @@ export default function DashboardPage() {
     refreshSetup();
   }, [refreshSetup]);
 
+  // Other pages (e.g. /dashboard/packages) dispatch
+  // "detailbook:setup-changed" after mutating setup state. Listen so
+  // the Setup Progress Card here also refreshes without a hard reload
+  // — most users land back on the dashboard after creating a package.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onChanged = () => refreshSetup();
+    window.addEventListener("detailbook:setup-changed", onChanged);
+    return () => window.removeEventListener("detailbook:setup-changed", onChanged);
+  }, [refreshSetup]);
+
   const isPro = user?.plan === "pro";
   const today = new Date().toISOString().split("T")[0];
   const todayBookings = bookings.filter((b) => b.date === today);
@@ -127,7 +138,16 @@ export default function DashboardPage() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ markStep: "share_link" }),
-    }).then(() => refreshSetup()).catch(() => { /* ignore */ });
+    })
+      .then(() => {
+        refreshSetup();
+        // Also notify the SetupExperience banner at the top of the
+        // dashboard layout so its share_link step flips to ✅ in sync.
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("detailbook:setup-changed"));
+        }
+      })
+      .catch(() => { /* ignore */ });
   }, [refreshSetup]);
 
   const handleCopyLink = () => {

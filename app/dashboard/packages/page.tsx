@@ -202,6 +202,13 @@ export default function PackagesPage() {
     setSaving(false);
     submittingRef.current = false;
     setShowModal(false);
+
+    // Tell the SetupExperience banner to refetch its status so the
+    // "Add your first service package" step flips to ✅ immediately,
+    // instead of waiting for the next window focus or route change.
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("detailbook:setup-changed"));
+    }
   };
 
   const handleToggle = async (id: string) => {
