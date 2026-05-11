@@ -68,6 +68,22 @@ export default function PackagesPage() {
       .then((r) => r.ok ? r.json() : [])
       .then((data: Package[]) => setPackagesState(data))
       .catch(() => setPackagesState(getPackages()));
+
+    // Auto-open the "new package" modal when arriving from the Setup
+    // Guide's "+ Create custom service" link (which redirects here
+    // instead of expanding an inline form). One-shot read on mount —
+    // a refresh shouldn't re-trigger the modal so we strip the param.
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("setup") === "services") {
+        setEditing(null);
+        setForm(EMPTY_FORM);
+        setShowModal(true);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("setup");
+        window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      }
+    }
   }, []);
 
   const isStarter = user?.plan === "starter";

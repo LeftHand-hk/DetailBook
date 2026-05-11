@@ -739,23 +739,15 @@ function ServicesBody({
   onClosePanel: () => void;
   onMarkDone: () => void;
 }) {
-  const [form, setForm] = useState({ name: "", description: "", price: "", duration: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [addedName, setAddedName] = useState<string | null>(null);
-  const [customOpen, setCustomOpen] = useState(false);
   // Synchronous double-click guard — setSaving is async so two fast
   // clicks can fire the POST twice. Already cost us a duplicate row
   // in production once; ref locks the critical section immediately.
   const submittingRef = useRef(false);
-  // Suppress unused-var warning — router/onClosePanel are kept so a
-  // future "Open full page" link can be added back without changing
-  // the prop wiring.
-  void router; void onClosePanel;
 
-  const createPackage = async (data: {
-    name: string; description: string; price: number; duration: number;
-  }, opts: { advance?: boolean } = {}) => {
+  const handleTemplate = async (t: typeof SERVICE_TEMPLATES[number]) => {
     if (submittingRef.current) return;
     submittingRef.current = true;
     setSaving(true);
@@ -764,19 +756,24 @@ function ServicesBody({
       const res = await fetch("/api/packages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, deposit: 0, active: true }),
+        body: JSON.stringify({
+          name: t.name,
+          description: t.description,
+          price: parseFloat(t.price),
+          duration: parseInt(t.duration, 10),
+          deposit: 0,
+          active: true,
+        }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         setError(body.error || "Could not save service.");
       } else {
-        setAddedName(data.name);
-        setForm({ name: "", description: "", price: "", duration: "" });
+        setAddedName(t.name);
         await onSaved();
         // Auto-advance: marks "services" done in onboardingProgress so
-        // the panel collapses this row and expands the next incomplete
-        // step (working_hours).
-        if (opts.advance) onMarkDone();
+        // the panel collapses this row and expands working_hours.
+        onMarkDone();
       }
     } finally {
       setSaving(false);
@@ -784,32 +781,15 @@ function ServicesBody({
     }
   };
 
-  const handleTemplate = (t: typeof SERVICE_TEMPLATES[number]) => {
-    createPackage(
-      {
-        name: t.name,
-        description: t.description,
-        price: parseFloat(t.price),
-        duration: parseInt(t.duration, 10),
-      },
-      { advance: true },
-    );
-  };
-
-  const submitCustom = async () => {
-    if (!form.name || !form.price || !form.duration) {
-      setError("Name, price, and duration are required.");
-      return;
-    }
-    await createPackage(
-      {
-        name: form.name,
-        description: form.description,
-        price: parseFloat(form.price),
-        duration: parseInt(form.duration, 10),
-      },
-      { advance: true },
-    );
+  // Custom-service flow now jumps out of the slide-out panel to the
+  // full /dashboard/packages page, which has the full editor (vehicle
+  // types, deposits per package, descriptions, etc.). The inline mini
+  // form was creating two ways to do the same thing — the new
+  // behaviour is simpler and matches how "Open the full packages
+  // page" used to work.
+  const openPackagesPage = () => {
+    onClosePanel();
+    router.push("/dashboard/packages?setup=services");
   };
 
   return (
@@ -832,6 +812,8 @@ function ServicesBody({
         ))}
       </div>
 
+      {error && <p className="text-xs text-red-600">{error}</p>}
+
       {addedName && (
         <p className="text-xs text-green-600 font-semibold flex items-center gap-1">
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -841,68 +823,12 @@ function ServicesBody({
         </p>
       )}
 
-      {!customOpen ? (
-        <button
-          onClick={() => setCustomOpen(true)}
-          className="text-xs font-semibold text-blue-600 hover:text-blue-700"
-        >
-          + Create custom service
-        </button>
-      ) : (
-        <div className="border-t border-gray-200 pt-3 space-y-2.5">
-          <input
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="Service name"
-            className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          <textarea
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            placeholder="Short description (optional)"
-            rows={2}
-            className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-          />
-          <div className="grid grid-cols-2 gap-2">
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">$</span>
-              <input
-                type="number"
-                value={form.price}
-                onChange={(e) => setForm({ ...form, price: e.target.value })}
-                placeholder="Price"
-                className="w-full pl-7 pr-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div className="relative">
-              <input
-                type="number"
-                value={form.duration}
-                onChange={(e) => setForm({ ...form, duration: e.target.value })}
-                placeholder="Duration"
-                className="w-full pl-3 pr-12 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">min</span>
-            </div>
-          </div>
-          {error && <p className="text-xs text-red-600">{error}</p>}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={submitCustom}
-              disabled={saving}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold py-2 rounded-lg transition-colors"
-            >
-              {saving ? "Adding..." : "Add this service"}
-            </button>
-            <button
-              onClick={() => { setCustomOpen(false); setError(""); }}
-              className="text-xs font-semibold text-gray-500 hover:text-gray-700 px-2"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+      <button
+        onClick={openPackagesPage}
+        className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+      >
+        + Create custom service
+      </button>
 
       {done && !addedName && (
         <p className="text-xs text-green-600 font-semibold flex items-center gap-1">
