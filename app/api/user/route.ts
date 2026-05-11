@@ -67,6 +67,7 @@ export async function PUT(request: NextRequest) {
       "thankYouMessage", "termsText", "smsTemplates", "emailTemplates",
       "paymentMethods", "suspended",
       "emailConfirmations", "smsConfirmations", "smsRemindersEnabled", "emailRemindersEnabled",
+      "hasSeenCustomizePrompt",
     ];
 
     const updateData: Record<string, unknown> = {};

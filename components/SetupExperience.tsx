@@ -153,8 +153,15 @@ export default function SetupExperience() {
     }).catch(() => {});
   }, []);
 
+  // One-shot prompt that nudges the user to customise their booking
+  // page (logo, banner, intro) the moment they finish the Setup Guide.
+  // Backed by User.hasSeenCustomizePrompt — see prisma/schema.prisma.
+  const [customizePromptOpen, setCustomizePromptOpen] = useState(false);
+
   // Finish: mark share_link done, dismiss the banner, suppress the
-  // celebration flash, and close the panel so the experience never reappears.
+  // celebration flash, and close the panel. If this is the first time
+  // the user finishes setup, also pop the "Customize My Page" modal
+  // (and mark hasSeenCustomizePrompt so we never repeat).
   const finishSetup = useCallback(async () => {
     completionFlashedRef.current = true;
     setShowCompleteFlash(false);
@@ -174,8 +181,18 @@ export default function SetupExperience() {
       };
     });
     setPanelOpen(false);
+
+    // Decide whether to show the customise prompt before issuing the
+    // PATCHes. Local cache is authoritative for the flag (kept fresh
+    // via syncFromServer after signup + on focus). Worst case the
+    // modal shows twice if the cache is stale — small annoyance,
+    // not a bug.
+    const cached = getUser() as { hasSeenCustomizePrompt?: boolean } | null;
+    const showPrompt = !cached?.hasSeenCustomizePrompt;
+    if (showPrompt) setCustomizePromptOpen(true);
+
     try {
-      await Promise.all([
+      const pendingFetches: Promise<unknown>[] = [
         fetch("/api/onboarding/status", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -186,7 +203,27 @@ export default function SetupExperience() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ dismissed: true }),
         }),
-      ]);
+      ];
+      if (showPrompt) {
+        // Persist the seen flag immediately so refreshing the page or
+        // re-clicking Finish (e.g. user re-opens the guide via the
+        // floating button) doesn't show the modal twice.
+        pendingFetches.push(
+          fetch("/api/user", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ hasSeenCustomizePrompt: true }),
+          }),
+        );
+        try {
+          // Update local cache so subsequent reads of getUser() reflect
+          // the new value without a syncFromServer round-trip.
+          const { setUser } = await import("@/lib/storage");
+          const current = getUser();
+          if (current) setUser({ ...current, hasSeenCustomizePrompt: true } as any);
+        } catch { /* ignore */ }
+      }
+      await Promise.all(pendingFetches);
     } catch { /* optimistic; server reconciles on next focus */ }
   }, []);
 
@@ -234,6 +271,18 @@ export default function SetupExperience() {
         onRefresh={fetchStatus}
         onFinish={finishSetup}
         router={router}
+      />
+
+      <CustomizePromptModal
+        open={customizePromptOpen}
+        onCustomize={() => {
+          setCustomizePromptOpen(false);
+          router.push("/dashboard/booking-page");
+        }}
+        onSkip={() => {
+          setCustomizePromptOpen(false);
+          router.push("/dashboard");
+        }}
       />
     </>
   );
@@ -958,6 +1007,78 @@ function ShareLinkBody({
         <p className="text-[11px] text-gray-500 text-center mt-1.5">
           You won&apos;t see this checklist again.
         </p>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Customize prompt modal — appears once, right after Finish setup.
+//
+// Mobile-first: full-screen sheet under sm:, centered card on desktop.
+// Dismissal paths (Skip button, outside click, Escape key) all run
+// the same onSkip handler so the parent can route to /dashboard.
+// The "seen" flag is persisted by the parent BEFORE this opens, so
+// any of these dismissals is effectively the same as opening it.
+
+function CustomizePromptModal({
+  open, onCustomize, onSkip,
+}: {
+  open: boolean;
+  onCustomize: () => void;
+  onSkip: () => void;
+}) {
+  // Escape closes the modal. We attach to document so the listener
+  // works regardless of focus location inside the modal.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onSkip(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onSkip]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="customize-prompt-title"
+      onClick={onSkip}
+      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden animate-fadeIn"
+      >
+        <div className="p-6 sm:p-7 text-center">
+          <div className="text-4xl mb-3">🎉</div>
+          <h2 id="customize-prompt-title" className="text-xl sm:text-2xl font-extrabold text-gray-900 mb-2">
+            Setup complete!
+          </h2>
+          <p className="text-sm text-gray-600 mb-1.5">
+            Your booking page is live — but it&apos;s looking pretty plain right now.
+          </p>
+          <p className="text-sm text-gray-500 leading-relaxed mb-6">
+            Take 2 minutes to add your logo, a photo of your work, and a short intro. Customers trust polished pages — and they book more often.
+          </p>
+
+          <button
+            onClick={onCustomize}
+            className="w-full inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-3 rounded-xl transition-colors shadow-lg shadow-blue-600/20"
+          >
+            Customize My Page
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </button>
+          <button
+            onClick={onSkip}
+            className="mt-3 text-xs font-semibold text-gray-500 hover:text-gray-900 transition-colors"
+          >
+            Skip for now
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -108,6 +108,12 @@ model User {
   onboardingCompletedAt DateTime?
   onboardingProgress    Json?
 
+  // One-shot flag for the "Customize My Page" prompt shown after the
+  // user clicks Finish at the end of the Setup Guide. Flipped to true
+  // the first time the modal appears, regardless of which CTA the user
+  // takes (or if they dismiss with Esc / outside-click).
+  hasSeenCustomizePrompt Boolean  @default(false)
+
   // Welcome email sequence (4 emails: Day 0, Day 2, Day 5, Day 13). Each
   // *At column is the timestamp of decision (sent OR explicitly skipped).
   // For Day 2 in particular, `welcomeEmailDay2Skipped` distinguishes

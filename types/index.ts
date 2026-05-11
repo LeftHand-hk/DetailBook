@@ -78,6 +78,10 @@ export interface User {
     reminder24h: string;
     followUp: string;
   };
+  // One-shot flag for the "Customize My Page" modal shown after the
+  // Setup Guide's Finish button. True after the modal appears once,
+  // regardless of which CTA the user picks.
+  hasSeenCustomizePrompt?: boolean;
 }
 
 export interface Staff {
