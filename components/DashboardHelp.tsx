@@ -141,16 +141,21 @@ export default function DashboardHelp({ page }: { page: PageKey }) {
 
   return (
     <>
-      {/* ── Floating Help Button ── */}
+      {/* ── Floating Help Button — compact circular FAB.
+            The old pill-shaped "Need Help?" took up real estate over the
+            content and duplicated the page header. Now it's a 40px circle
+            sitting in the corner: tooltip on hover keeps it discoverable
+            without dominating the page. ── */}
       <button
         onClick={() => setOpen(true)}
+        aria-label="Need help?"
+        title="Need help?"
         style={{ bottom: bottomPx, right: 24 }}
-        className="fixed z-40 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white pl-4 pr-5 py-3 rounded-full shadow-xl shadow-blue-600/30 transition-all hover:scale-105"
+        className="group fixed z-40 w-10 h-10 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg shadow-blue-600/30 transition-all hover:scale-105"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <span className="text-sm font-semibold">Need Help?</span>
       </button>
 
       {/* ── Help Modal ── */}
