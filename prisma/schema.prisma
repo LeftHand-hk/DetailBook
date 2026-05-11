@@ -140,11 +140,36 @@ model User {
   supportTickets SupportTicket[]
   notifications Notification[]
   emailLogs EmailLog[]
+  feedback Feedback[]
 
   @@index([email])
   @@index([slug])
   @@index([createdAt])
   @@index([lastLoginAt])
+}
+
+// Free-form feedback from dashboard users — suggestions, product
+// reviews, and bug reports. One-shot submissions (no back-and-forth)
+// so this stays distinct from SupportTicket, which is a chat with the
+// platform team about account/billing issues. Admin reads them from
+// /admin/feedback.
+model Feedback {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // "suggestion" | "review" | "bug"
+  type      String
+  // Only set for type="review" — 1-5 stars. Null otherwise.
+  rating    Int?
+  message   String   @db.Text
+  // Admin marks "read" after they've seen it. Lets us bold-out
+  // unread items in the admin list.
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
 }
 
 // Audit log for every transactional email we attempt to send. One row
