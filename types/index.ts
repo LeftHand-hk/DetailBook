@@ -82,6 +82,12 @@ export interface User {
   // Setup Guide's Finish button. True after the modal appears once,
   // regardless of which CTA the user picks.
   hasSeenCustomizePrompt?: boolean;
+  // Photo gallery display preferences. Photos themselves live in a
+  // separate BusinessPhoto table — these three fields just control
+  // how the public booking page renders them.
+  galleryLayout?: "grid" | "carousel" | "masonry";
+  galleryShowTitle?: boolean;
+  galleryTitle?: string;
 }
 
 export interface Staff {

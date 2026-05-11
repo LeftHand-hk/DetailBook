@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { getUser, setUser } from "@/lib/storage";
 import type { User } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
+import PhotoGalleryEditor from "@/components/PhotoGalleryEditor";
 
 const INPUT_CLASS =
   "w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all placeholder-gray-300";
@@ -74,6 +75,12 @@ export default function BookingPagePage() {
   const [bannerOverlayOpacity, setBannerOverlayOpacity] = useState(60);
   const [serviceLayout, setServiceLayout] = useState<"cards" | "list" | "compact" | "featured" | "minimal">("cards");
   const bannerInputRef = useRef<HTMLInputElement>(null);
+  // Photo gallery — display options live on the user row; photos
+  // themselves are managed by <PhotoGalleryEditor /> against the
+  // /api/photos endpoints (separate from autosave).
+  const [galleryLayout, setGalleryLayout] = useState<"grid" | "carousel" | "masonry">("grid");
+  const [galleryShowTitle, setGalleryShowTitle] = useState(true);
+  const [galleryTitle, setGalleryTitle] = useState("Our Work");
   // Business Profile state
   const [businessName, setBusinessName] = useState("");
   const [ownerName, setOwnerName] = useState("");
@@ -111,6 +118,9 @@ export default function BookingPagePage() {
       setBannerImage(u.bannerImage);
       setBannerOverlayOpacity(u.bannerOverlayOpacity ?? 60);
       setServiceLayout(u.serviceLayout || "cards");
+      setGalleryLayout((u as any).galleryLayout || "grid");
+      setGalleryShowTitle((u as any).galleryShowTitle ?? true);
+      setGalleryTitle((u as any).galleryTitle || "Our Work");
       setBusinessName(u.businessName || "");
       setOwnerName(u.name || "");
       setBio(u.bio || "");
@@ -151,6 +161,9 @@ export default function BookingPagePage() {
         bannerImage,
         bannerOverlayOpacity,
         serviceLayout,
+        galleryLayout,
+        galleryShowTitle,
+        galleryTitle,
         businessName,
         name: ownerName,
         bio,
@@ -167,7 +180,7 @@ export default function BookingPagePage() {
     }, 600);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug, customMessage, advanceBookingDays, bookingPageTheme, accentColor, bookingPageTitle, bookingPageSubtitle, showRating, showSocialLinks, showServiceAreas, showBusinessHours, showTrustBadges, thankYouMessage, termsText, instagram, facebook, website, phone, bannerImage, bannerOverlayOpacity, serviceLayout, businessName, ownerName, bio, address, yearsInBusiness, logo, serviceAreasText]);
+  }, [slug, customMessage, advanceBookingDays, bookingPageTheme, accentColor, bookingPageTitle, bookingPageSubtitle, showRating, showSocialLinks, showServiceAreas, showBusinessHours, showTrustBadges, thankYouMessage, termsText, instagram, facebook, website, phone, bannerImage, bannerOverlayOpacity, serviceLayout, galleryLayout, galleryShowTitle, galleryTitle, businessName, ownerName, bio, address, yearsInBusiness, logo, serviceAreasText]);
 
   const isPro = user?.plan === "pro";
 
@@ -421,6 +434,16 @@ export default function BookingPagePage() {
           </div>
         </div>
       </div>
+
+      {/* ── Card: Photo Gallery (between Hero Banner and Service Layout) ── */}
+      <PhotoGalleryEditor
+        layout={galleryLayout}
+        showTitle={galleryShowTitle}
+        title={galleryTitle}
+        onLayoutChange={setGalleryLayout}
+        onShowTitleChange={setGalleryShowTitle}
+        onTitleChange={setGalleryTitle}
+      />
 
       {/* ── Card: Service Layout ── */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">

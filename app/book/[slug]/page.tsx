@@ -6,6 +6,7 @@ import type { User, Package, PackageAddon } from "@/types";
 import { usePlatformName } from "@/components/PlatformName";
 import StripeDepositModal from "@/components/StripeDepositModal";
 import SquareDepositModal from "@/components/SquareDepositModal";
+import PublicPhotoGallery, { type PublicPhoto } from "@/components/PublicPhotoGallery";
 
 const TIMES = [
   "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM",
@@ -117,6 +118,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   const [customerAddress, setCustomerAddress] = useState("");
   const [selectedServiceMode, setSelectedServiceMode] = useState<"mobile" | "shop" | null>(null);
   const [bookedSlots, setBookedSlots] = useState<{ date: string; time: string; staffId: string | null }[]>([]);
+  const [photos, setPhotos] = useState<PublicPhoto[]>([]);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
   const [stripeDepositPaid, setStripeDepositPaid] = useState(false);
   const [smsConsent, setSmsConsent] = useState(false);
@@ -157,6 +159,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
           if (data.serviceType) setServiceType(data.serviceType);
           if (data.packages) setPackages(data.packages.filter((p: any) => p.active));
           if (data.bookedSlots && Array.isArray(data.bookedSlots)) setBookedSlots(data.bookedSlots);
+          if (Array.isArray(data.photos)) setPhotos(data.photos as PublicPhoto[]);
           // Build user object from API response (more up-to-date than localStorage)
           setUser(data);
         } else {
@@ -1175,6 +1178,18 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
           </div>
         );
       })()}
+
+      {/* Photo gallery — sits between the hero/info header and the
+          services list. Renders nothing when the business has zero
+          photos so unfinished pages don't pick up an empty band. */}
+      {step === 0 && photos.length > 0 && (
+        <PublicPhotoGallery
+          photos={photos}
+          layout={(user as any).galleryLayout || "grid"}
+          showTitle={(user as any).galleryShowTitle ?? true}
+          title={(user as any).galleryTitle || "Our Work"}
+        />
+      )}
 
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-5">
 

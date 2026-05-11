@@ -21,6 +21,9 @@ export async function GET(
           select: { id: true, name: true, role: true, color: true, avatar: true },
           orderBy: { createdAt: "asc" },
         },
+        photos: {
+          orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+        },
       },
     });
 
@@ -92,6 +95,10 @@ export async function GET(
       timezone: (user as any).timezone ?? "America/New_York",
       packages: user.packages,
       staff: (user as any).staff ?? [],
+      photos: (user as any).photos ?? [],
+      galleryLayout: (user as any).galleryLayout ?? "grid",
+      galleryShowTitle: (user as any).galleryShowTitle ?? true,
+      galleryTitle: (user as any).galleryTitle ?? "Our Work",
       bookedSlots,
       // Expose payment methods (strip secret keys for security)
       paymentMethods: (() => {

@@ -114,6 +114,13 @@ model User {
   // takes (or if they dismiss with Esc / outside-click).
   hasSeenCustomizePrompt Boolean  @default(false)
 
+  // Photo gallery layout/display preferences. Photos themselves live
+  // in BusinessPhoto rows below. galleryLayout values: "grid",
+  // "carousel", "masonry".
+  galleryLayout      String  @default("grid")
+  galleryShowTitle   Boolean @default(true)
+  galleryTitle       String  @default("Our Work")
+
   // Welcome email sequence (4 emails: Day 0, Day 2, Day 5, Day 13). Each
   // *At column is the timestamp of decision (sent OR explicitly skipped).
   // For Day 2 in particular, `welcomeEmailDay2Skipped` distinguishes
@@ -147,11 +154,40 @@ model User {
   notifications Notification[]
   emailLogs EmailLog[]
   feedback Feedback[]
+  photos   BusinessPhoto[]
 
   @@index([email])
   @@index([slug])
   @@index([createdAt])
   @@index([lastLoginAt])
+}
+
+// Portfolio photos shown on the public /book/<slug> page. Two shapes:
+//   photoType = "single"        → photoUrl is the After / finished photo
+//   photoType = "before_after"  → photoUrl is the After, beforePhotoUrl is the Before
+// Both URL fields are base64 data URLs (@db.Text) — same storage
+// pattern as User.logo / coverImage / bannerImage. A future migration
+// to object storage is possible without touching this model's shape.
+model BusinessPhoto {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // "single" or "before_after"
+  photoType       String   @default("single")
+  // After-photo URL for before_after pairs, single-photo URL otherwise.
+  photoUrl        String   @db.Text
+  // Only set when photoType = "before_after".
+  beforePhotoUrl  String?  @db.Text
+  // Max 60 chars enforced in the API.
+  caption         String?
+  // Position in the gallery — smaller renders first. We re-pack on
+  // each reorder so gaps don't accumulate.
+  displayOrder    Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, displayOrder])
 }
 
 // Free-form feedback from dashboard users — suggestions, product
