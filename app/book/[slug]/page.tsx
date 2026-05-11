@@ -41,6 +41,21 @@ const PLACEHOLDER_REVIEWS = [
   { name: "Maria L.", rating: 5, quote: "They came right to my office and had my car spotless by the end of the day. 10/10 service." },
 ];
 
+// Mock service packages shown in Demo Mode when the owner views their
+// own booking page with zero real services. Cast to Package at the
+// render site — these are display-only and never POSTed anywhere.
+//
+// Demo Mode exists so new signups don't see "No services available"
+// on their own preview link (which made the product look broken and
+// was the single biggest contributor to drop-off in week-one cohort).
+const DEMO_SERVICES: Package[] = [
+  { id: "demo-1", name: "Basic Wash & Shine",       description: "Exterior hand wash, tire shine, and a quick interior wipe-down.", price: 45,  duration: 30,  active: true },
+  { id: "demo-2", name: "Full Interior Detail",     description: "Deep vacuum, leather conditioning, and crevice cleaning.",        price: 89,  duration: 60,  active: true },
+  { id: "demo-3", name: "Complete Detail Package",  description: "Full interior + exterior detail with premium products.",         price: 149, duration: 120, active: true },
+  { id: "demo-4", name: "Paint Correction",         description: "Multi-stage polish to remove swirls, scratches and oxidation.",  price: 249, duration: 300, active: true },
+  { id: "demo-5", name: "Ceramic Coating",          description: "Long-lasting ceramic protection with paint prep.",               price: 399, duration: 480, active: true },
+];
+
 function StarRating({ rating, count }: { rating: number; count: number }) {
   return (
     <div className="flex items-center gap-2">
@@ -77,6 +92,14 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState(0);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
+  // True when the logged-in viewer is the owner of this booking page.
+  // We use slug equality from the local storage cache — same machine
+  // login that produced the dashboard session.
+  const [viewerIsOwner, setViewerIsOwner] = useState(false);
+  // Dismissal of the demo-mode banner. Kept in component state only —
+  // we want it back on a hard refresh so the message keeps signalling
+  // "this is not your real page yet" until they actually fix it.
+  const [demoBannerDismissed, setDemoBannerDismissed] = useState(false);
   // IDs of the add-ons the customer has currently ticked. Reset whenever
   // the customer picks a different package so options from the previous
   // package don't leak into the booking.
@@ -115,6 +138,16 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   const [pendingSquareBookingData, setPendingSquareBookingData] = useState<any>(null);
 
   useEffect(() => {
+    // Detect whether the visitor is the business owner. Compares the
+    // locally cached logged-in user's slug to the URL slug. This is a
+    // soft signal (anyone with a matching localStorage key would also
+    // see Demo Mode) — fine because Demo Mode is harmless to a
+    // non-owner who happens to share the slug.
+    const localUser = getUser();
+    if (localUser?.slug && localUser.slug === slug) {
+      setViewerIsOwner(true);
+    }
+
     // Fetch public business data (staff + serviceType) from API
     fetch(`/api/book/${slug}`)
       .then((r) => r.ok ? r.json() : null)
@@ -566,8 +599,31 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     "Ceramic Coating": "\u{1F6E1}\uFE0F",
   };
 
+  // Demo Mode kicks in when the owner is previewing their own booking
+  // page with zero real services — instead of an empty "no services
+  // available" message we show their real business profile with mock
+  // services so they can see what the finished page will look like.
+  // External visitors hitting the same empty state get a contact-only
+  // fallback (rendered separately, further down).
+  const isDemoMode = viewerIsOwner && packages.length === 0;
+  // The list every layout iterates over. Real packages in the happy
+  // path; demo packages when in Demo Mode.
+  const displayPackages = isDemoMode ? DEMO_SERVICES : packages;
+
+  // Clicking a service card normally selects + advances. In Demo Mode
+  // we short-circuit — the demo packages aren't bookable, so we point
+  // the owner at the packages page to add real ones.
+  const handlePackageClick = (pkg: Package) => {
+    if (isDemoMode) {
+      window.alert("Add your real services to enable bookings. Tap '+ Add Your Services' at the top.");
+      return;
+    }
+    setSelectedPackage(pkg);
+    setStep(1);
+  };
+
   // Sort packages by price descending to identify "most popular" (most expensive) for Pro badge
-  const sortedPackages = [...packages].sort((a, b) => b.price - a.price);
+  const sortedPackages = [...displayPackages].sort((a, b) => b.price - a.price);
   const mostPopularId = sortedPackages.length > 0 ? sortedPackages[0].id : null;
 
   if (loading) {
@@ -875,6 +931,41 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   return (
     <div className="min-h-screen bg-gray-50">
 
+      {/* ── Demo Mode banner — only the owner sees this, only when
+            their booking page has 0 real services. Visually distinct
+            (amber/sticky) so the owner can never mistake their preview
+            for the live customer view. Dismissable per-session. ── */}
+      {isDemoMode && !demoBannerDismissed && (
+        <div className="sticky top-0 z-40 bg-amber-50 border-b border-amber-200 px-4 py-3 shadow-sm">
+          <div className="max-w-3xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-start gap-2 min-w-0">
+              <span className="text-lg flex-shrink-0" aria-hidden>👁️</span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-amber-900">Preview Mode</p>
+                <p className="text-xs text-amber-800/80 leading-snug">
+                  This is how your booking page will look. Customers won&apos;t see this — add your own services to make it live.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <a
+                href="/dashboard/packages?newPackage=1"
+                className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-2 rounded-lg transition-colors whitespace-nowrap"
+              >
+                + Add Your Services →
+              </a>
+              <button
+                onClick={() => setDemoBannerDismissed(true)}
+                aria-label="Dismiss"
+                className="text-amber-800/70 hover:text-amber-900 text-xs font-semibold px-2 py-2"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── HERO HEADER ── */}
       <div className="relative overflow-hidden">
         {/* Background: banner image or default gradient */}
@@ -1093,19 +1184,41 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
             <h2 className="text-2xl font-extrabold text-gray-900 mb-1">Choose a Service</h2>
             <p className="text-gray-500 text-sm mb-6">Select the service you&apos;d like to book.</p>
 
-            {packages.length === 0 ? (
-              <div className="text-center bg-white rounded-2xl border border-gray-100 p-12">
-                <p className="text-gray-500">No services available. Please check back later.</p>
+            {packages.length === 0 && !viewerIsOwner ? (
+              /* Public visitor hits an unfinished page — give them a
+                 way to reach the business directly instead of the old
+                 "No services available" dead end. */
+              <div className="bg-white rounded-2xl border border-gray-100 p-8 sm:p-10 text-center">
+                <h3 className="text-lg font-bold text-gray-900 mb-2">{user.businessName}</h3>
+                <p className="text-gray-500 text-sm mb-5 max-w-sm mx-auto">
+                  We&apos;re getting set up. Please contact us directly to book.
+                </p>
+                <div className="space-y-2 text-sm text-gray-700">
+                  {user.phone && (
+                    <a href={`tel:${user.phone}`} className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold rounded-xl transition-colors">
+                      <span aria-hidden>📞</span> {user.phone}
+                    </a>
+                  )}
+                  {(user.serviceAreas?.[0] || user.city || user.address) && (
+                    <p className="text-gray-500 flex items-center justify-center gap-2 mt-3">
+                      <span aria-hidden>📍</span>
+                      {user.serviceAreas?.[0] || user.city || user.address}
+                    </p>
+                  )}
+                </div>
               </div>
             ) : (user.serviceLayout || "cards") === "cards" ? (
               /* ── CARDS LAYOUT (2-column grid) ── */
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {packages.map((pkg, i) => (
-                  <button key={pkg.id} onClick={() => { setSelectedPackage(pkg); setStep(1); }}
+                {displayPackages.map((pkg, i) => (
+                  <button key={pkg.id} onClick={() => handlePackageClick(pkg)}
                     style={{ animationDelay: `${i * 100}ms`, animationFillMode: "both" }}
                     className="relative text-left bg-white border-2 border-gray-100 rounded-2xl p-4 transition-all duration-300 hover:border-blue-400 hover:shadow-xl hover:-translate-y-1.5 hover:scale-[1.02] group animate-fadeInUp overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 to-indigo-500/0 group-hover:from-blue-500/5 group-hover:to-indigo-500/10 transition-all duration-500 rounded-2xl" />
-                    {isPro && pkg.id === mostPopularId && (
+                    {isDemoMode && (
+                      <div className="absolute top-2 right-2 z-10 bg-amber-100 text-amber-700 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border border-amber-200">Example</div>
+                    )}
+                    {isPro && pkg.id === mostPopularId && !isDemoMode && (
                       <div className="absolute top-0 right-0 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-bl-xl rounded-tr-2xl shadow-md">Popular</div>
                     )}
                     <div className="relative">
@@ -1138,12 +1251,15 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
             ) : (user.serviceLayout) === "list" ? (
               /* ── LIST LAYOUT (full-width rows) ── */
               <div className="space-y-3">
-                {packages.map((pkg, i) => (
-                  <button key={pkg.id} onClick={() => { setSelectedPackage(pkg); setStep(1); }}
+                {displayPackages.map((pkg, i) => (
+                  <button key={pkg.id} onClick={() => handlePackageClick(pkg)}
                     style={{ animationDelay: `${i * 80}ms`, animationFillMode: "both" }}
                     className="w-full text-left bg-white border-2 border-gray-100 rounded-2xl p-5 transition-all duration-300 hover:border-blue-400 hover:shadow-lg hover:-translate-y-0.5 group animate-fadeInUp relative overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 to-indigo-500/0 group-hover:from-blue-500/[0.02] group-hover:to-indigo-500/[0.05] transition-all duration-500" />
-                    {isPro && pkg.id === mostPopularId && (
+                    {isDemoMode && (
+                      <div className="absolute top-2 right-2 z-10 bg-amber-100 text-amber-700 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border border-amber-200">Example</div>
+                    )}
+                    {isPro && pkg.id === mostPopularId && !isDemoMode && (
                       <div className="absolute top-0 right-0 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-bl-xl rounded-tr-2xl shadow-md">Popular</div>
                     )}
                     <div className="flex items-center gap-4 relative">
@@ -1178,11 +1294,14 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
             ) : (user.serviceLayout) === "compact" ? (
               /* ── COMPACT LAYOUT (minimal rows) ── */
               <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden divide-y divide-gray-50">
-                {packages.map((pkg, i) => (
-                  <button key={pkg.id} onClick={() => { setSelectedPackage(pkg); setStep(1); }}
+                {displayPackages.map((pkg, i) => (
+                  <button key={pkg.id} onClick={() => handlePackageClick(pkg)}
                     style={{ animationDelay: `${i * 60}ms`, animationFillMode: "both" }}
                     className="w-full text-left px-4 py-3.5 transition-all duration-200 hover:bg-blue-50/50 group animate-fadeInUp flex items-center gap-3 relative">
-                    {isPro && pkg.id === mostPopularId && (
+                    {isDemoMode && (
+                      <span className="absolute top-1 right-3 text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200 uppercase tracking-wider">Example</span>
+                    )}
+                    {isPro && pkg.id === mostPopularId && !isDemoMode && (
                       <span className="absolute top-1 right-3 text-[9px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Popular</span>
                     )}
                     <div className="w-9 h-9 bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg flex items-center justify-center text-base flex-shrink-0 group-hover:scale-110 transition-transform duration-200">
@@ -1207,13 +1326,16 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
             ) : (user.serviceLayout) === "featured" ? (
               /* ── FEATURED LAYOUT (first item large, rest in grid) ── */
               <div className="space-y-3">
-                {packages.slice(0, 1).map((pkg) => (
-                  <button key={pkg.id} onClick={() => { setSelectedPackage(pkg); setStep(1); }}
+                {displayPackages.slice(0, 1).map((pkg) => (
+                  <button key={pkg.id} onClick={() => handlePackageClick(pkg)}
                     style={{ animationFillMode: "both" }}
                     className="w-full text-left bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 group animate-fadeInUp relative overflow-hidden">
                     <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full" />
                     <div className="absolute -left-5 -bottom-5 w-24 h-24 bg-white/5 rounded-full" />
-                    {isPro && pkg.id === mostPopularId && (
+                    {isDemoMode && (
+                      <div className="absolute top-3 right-3 bg-amber-100 text-amber-700 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border border-amber-200">Example</div>
+                    )}
+                    {isPro && pkg.id === mostPopularId && !isDemoMode && (
                       <div className="absolute top-3 right-3 bg-white/20 text-white text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full backdrop-blur-sm">Popular</div>
                     )}
                     <div className="relative">
@@ -1239,12 +1361,15 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                     </div>
                   </button>
                 ))}
-                {packages.length > 1 && (
+                {displayPackages.length > 1 && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {packages.slice(1).map((pkg, i) => (
-                      <button key={pkg.id} onClick={() => { setSelectedPackage(pkg); setStep(1); }}
+                    {displayPackages.slice(1).map((pkg, i) => (
+                      <button key={pkg.id} onClick={() => handlePackageClick(pkg)}
                         style={{ animationDelay: `${(i + 1) * 100}ms`, animationFillMode: "both" }}
-                        className="text-left bg-white border-2 border-gray-100 rounded-2xl p-4 transition-all duration-300 hover:border-blue-400 hover:shadow-lg hover:-translate-y-1 group animate-fadeInUp">
+                        className="relative text-left bg-white border-2 border-gray-100 rounded-2xl p-4 transition-all duration-300 hover:border-blue-400 hover:shadow-lg hover:-translate-y-1 group animate-fadeInUp">
+                        {isDemoMode && (
+                          <div className="absolute top-2 right-2 z-10 bg-amber-100 text-amber-700 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border border-amber-200">Example</div>
+                        )}
                         <div className="w-10 h-10 bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl flex items-center justify-center text-lg mb-2 group-hover:scale-110 transition-transform duration-300">
                           {packageIcons[pkg.name] ?? "\u{1F697}"}
                         </div>
@@ -1262,11 +1387,14 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
             ) : (
               /* ── MINIMAL LAYOUT (text only, clean lines) ── */
               <div className="space-y-0">
-                {packages.map((pkg, i) => (
-                  <button key={pkg.id} onClick={() => { setSelectedPackage(pkg); setStep(1); }}
+                {displayPackages.map((pkg, i) => (
+                  <button key={pkg.id} onClick={() => handlePackageClick(pkg)}
                     style={{ animationDelay: `${i * 70}ms`, animationFillMode: "both" }}
                     className="w-full text-left py-5 transition-all duration-200 hover:pl-2 group animate-fadeInUp border-b border-gray-100 last:border-b-0 flex items-center justify-between gap-4 relative">
-                    {isPro && pkg.id === mostPopularId && (
+                    {isDemoMode && (
+                      <span className="absolute -top-2 right-0 text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200 uppercase tracking-wider">Example</span>
+                    )}
+                    {isPro && pkg.id === mostPopularId && !isDemoMode && (
                       <span className="absolute -top-2 left-0 text-[9px] font-bold text-amber-600 uppercase tracking-wider">Popular</span>
                     )}
                     <div className="flex-1 min-w-0">
