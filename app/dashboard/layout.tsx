@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { isLoggedIn, logout, getUser, initializeDemo, syncFromServer } from "@/lib/storage";
 import type { User } from "@/types";
 import { LogoIcon, LogoWordmark } from "@/components/Logo";
@@ -133,7 +133,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     initializeDemo();
     const u = getUser();
     setUserState(u);
-    setChecked(true);
+    // Only release the loading screen if we already have cached user
+    // data. After a fresh redirect from /onboarding the local cache can
+    // be empty — flashing the dashboard chrome with no user data looks
+    // half-broken, so we keep the loader up until syncFromServer lands.
+    if (u) setChecked(true);
 
     // Pull fresh data from the database
     syncFromServer()
@@ -161,13 +165,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             return;
           }
         }
+        setChecked(true);
       })
       .catch(() => {
-        // Server sync failed; local data remains as fallback
+        // Server sync failed; local data remains as fallback. Release
+        // the loader anyway so the user isn't stuck on a spinner.
+        setChecked(true);
       });
     // Run once on mount only — pathname changes shouldn't re-sync.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Reset the main scroll area to top on every route change. The dashboard
+  // uses a nested scroll container (not the window), so Next.js' default
+  // scroll restoration doesn't reach it. Without this, navigating from
+  // /onboarding back to /dashboard can land mid-page.
+  const mainRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (mainRef.current) mainRef.current.scrollTop = 0;
+    if (typeof window !== "undefined") window.scrollTo(0, 0);
+  }, [pathname]);
 
   const handleLogout = () => {
     logout();
@@ -176,13 +193,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!checked) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex items-center gap-3 text-gray-500">
-          <svg className="animate-spin w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-          Loading...
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center px-4">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="absolute inset-0 bg-blue-500/30 rounded-full blur-xl animate-pulse" />
+            <svg className="relative animate-spin w-10 h-10 text-blue-600" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </div>
+          <p className="text-gray-700 font-semibold text-sm">Preparing your dashboard…</p>
+          <p className="text-gray-400 text-xs">Loading bookings, calendar, and settings</p>
         </div>
       </div>
     );
@@ -498,7 +519,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <SetupExperience />
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto bg-gray-50/80">
+        <main ref={mainRef} className="flex-1 overflow-y-auto bg-gray-50/80">
           {children}
         </main>
       </div>
