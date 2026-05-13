@@ -58,16 +58,22 @@ export async function POST() {
       }
     }
 
-    // Suspend account locally regardless — user wanted out.
+    // If the in-app trial is still running, don't pull the rug out from
+    // under the user — keep their dashboard live until trial end. The
+    // Paddle cancel above already prevents the day-8 charge. They get
+    // suspended later either by trial expiry or by the post-trial
+    // subscription.canceled webhook.
+    const trialEndsMs = (user as any).trialEndsAt ? Date.parse((user as any).trialEndsAt) : NaN;
+    const stillInTrial = !Number.isNaN(trialEndsMs) && trialEndsMs > Date.now();
+
     await prisma.user.update({
       where: { id: session.id },
-      data: {
-        suspended: true,
-        subscriptionStatus: "canceled",
-      },
+      data: stillInTrial
+        ? { subscriptionStatus: "canceled" }
+        : { suspended: true, subscriptionStatus: "canceled" },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, keptActiveUntilTrialEnd: stillInTrial });
   } catch (err) {
     console.error("Cancel subscription error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

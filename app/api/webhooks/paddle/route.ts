@@ -126,39 +126,23 @@ export async function POST(req: NextRequest) {
       case "subscription.activated": {
         const customData = data.custom_data || {};
         const userId = customData.userId;
+        const fromOnboarding = customData.source === "onboarding";
         const plan = getPlanFromItems(data.items);
+        const isPaddleTrial = data.status === "trialing";
 
-        const updateData: Record<string, any> = {
-          paddleSubscriptionId: data.id,
-          paddleCustomerId: data.customer_id,
-          subscriptionStatus: "active",
-          trialEndsAt: "",
-          suspended: false,
-        };
-        if (plan) updateData.plan = plan;
-
-        let updatedUserId: string | null = null;
-        // Track whether this user is reactivating (was previously canceled).
-        // If so we end Paddle's trial below so they're billed immediately.
-        let wasSuspended = false;
+        // Resolve the user first so we can branch on whether they're
+        // already mid in-app-trial vs reactivating after a cancel.
+        let resolvedUser: { id: string; suspended: boolean; trialEndsAt: string | null } | null = null;
 
         if (userId) {
-          try {
-            const before = await prisma.user.findUnique({ where: { id: userId } });
-            wasSuspended = before?.suspended === true;
-            await prisma.user.update({ where: { id: userId }, data: updateData });
-            updatedUserId = userId;
-          } catch (e) {
-            console.warn("[Paddle webhook] update by custom_data.userId failed, trying customer_id:", e);
-          }
+          const u = await prisma.user.findUnique({ where: { id: userId } });
+          if (u) resolvedUser = { id: u.id, suspended: u.suspended === true, trialEndsAt: (u as any).trialEndsAt || null };
         }
 
-        if (!updatedUserId && data.customer_id) {
+        if (!resolvedUser && data.customer_id) {
           let existingUser = await prisma.user.findFirst({
             where: { paddleCustomerId: data.customer_id },
           });
-
-          // Fallback: if customer was never linked, look up by email via Paddle
           if (!existingUser) {
             const email = await fetchPaddleCustomerEmail(data.customer_id);
             if (email) {
@@ -168,15 +152,12 @@ export async function POST(req: NextRequest) {
               }
             }
           }
-
           if (existingUser) {
-            wasSuspended = existingUser.suspended === true;
-            await prisma.user.update({ where: { id: existingUser.id }, data: updateData });
-            updatedUserId = existingUser.id;
+            resolvedUser = { id: existingUser.id, suspended: existingUser.suspended === true, trialEndsAt: (existingUser as any).trialEndsAt || null };
           }
         }
 
-        if (!updatedUserId) {
+        if (!resolvedUser) {
           console.error(
             "[Paddle webhook] activation event received but NO user matched —",
             JSON.stringify({
@@ -185,18 +166,49 @@ export async function POST(req: NextRequest) {
               subId: data.id,
             })
           );
-        } else {
-          console.log("[Paddle webhook] activated user", updatedUserId, "plan=", plan || "(unchanged)");
+          break;
         }
 
-        // Always end Paddle's trial immediately when a subscription is
-        // created via our paid checkout (post-trial upgrade). Reasoning:
-        // the 7-day in-app trial is managed by us; once a user reaches
-        // checkout and enters payment, they intend to pay — Paddle's
-        // price-config trial would just be a second free window, which
-        // is not what we want. /activate triggers the first billing
-        // right now.
-        if (data.status === "trialing") {
+        const inAppTrialEnds = resolvedUser.trialEndsAt ? Date.parse(resolvedUser.trialEndsAt) : NaN;
+        const inAppTrialActive = !Number.isNaN(inAppTrialEnds) && inAppTrialEnds > Date.now();
+
+        // If this is the onboarding card-on-signup path AND the user's
+        // in-app trial is still running, let Paddle's native trial run
+        // alongside it. We save the sub linkage but keep the trial as
+        // the source of truth. The day-8 charge fires automatically.
+        // If the user is past their in-app trial (paid upgrade flow) or
+        // was suspended (reactivating), end Paddle's trial immediately.
+        const letPaddleTrialRun = isPaddleTrial && inAppTrialActive && (fromOnboarding || !resolvedUser.suspended);
+
+        const updateData: Record<string, any> = {
+          paddleSubscriptionId: data.id,
+          paddleCustomerId: data.customer_id,
+          suspended: false,
+        };
+        if (plan) updateData.plan = plan;
+
+        if (letPaddleTrialRun) {
+          updateData.subscriptionStatus = "trialing";
+          // Keep trialEndsAt as the in-app one — already aligned to day 8.
+        } else {
+          updateData.subscriptionStatus = "active";
+          updateData.trialEndsAt = "";
+        }
+
+        await prisma.user.update({ where: { id: resolvedUser.id }, data: updateData });
+        console.log(
+          "[Paddle webhook] linked subscription",
+          JSON.stringify({
+            userId: resolvedUser.id,
+            plan: plan || "(unchanged)",
+            paddleStatus: data.status,
+            mode: letPaddleTrialRun ? "let_paddle_trial_run" : "activate_immediately",
+          })
+        );
+
+        // Only force-activate Paddle when we're skipping the trial
+        // window (post-trial subscribers / reactivations).
+        if (isPaddleTrial && !letPaddleTrialRun) {
           try {
             const apiKey = process.env.PADDLE_API_KEY?.replace(/^["']|["']$/g, "")?.trim();
             if (apiKey) {
@@ -208,10 +220,7 @@ export async function POST(req: NextRequest) {
                 const err = await res.json().catch(() => ({}));
                 console.warn("[Paddle webhook] /activate failed:", res.status, err);
               } else {
-                console.log(
-                  "[Paddle webhook] ended Paddle trial",
-                  JSON.stringify({ userId: updatedUserId, wasSuspended })
-                );
+                console.log("[Paddle webhook] ended Paddle trial for", resolvedUser.id);
               }
             }
           } catch (e) {

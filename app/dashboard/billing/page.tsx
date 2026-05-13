@@ -739,20 +739,24 @@ export default function BillingPage() {
       </div>
 
       {/* === Danger zone — cancel === */}
-      {isSubscribed && (
+      {(isSubscribed || user?.subscriptionStatus === "trialing") && (
         <div className="bg-white rounded-2xl border border-red-200 p-5">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h3 className="font-bold text-gray-900 mb-1">Cancel subscription</h3>
+              <h3 className="font-bold text-gray-900 mb-1">
+                {user?.subscriptionStatus === "trialing" ? "Cancel before trial ends" : "Cancel subscription"}
+              </h3>
               <p className="text-sm text-gray-500">
-                Your account will be disabled immediately. Data is preserved — resubscribe to restore access.
+                {user?.subscriptionStatus === "trialing"
+                  ? `You won't be charged. Your trial keeps running${trialDaysLeft ? ` for ${trialDaysLeft} more day${trialDaysLeft === 1 ? "" : "s"}` : ""} and your data stays put.`
+                  : "Your account will be disabled immediately. Data is preserved — resubscribe to restore access."}
               </p>
             </div>
             <button
               onClick={() => setShowCancelModal(true)}
               className="self-start sm:self-auto px-4 py-2.5 text-sm font-semibold text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition-colors flex-shrink-0"
             >
-              Cancel subscription
+              {user?.subscriptionStatus === "trialing" ? "Cancel trial" : "Cancel subscription"}
             </button>
           </div>
         </div>
@@ -782,9 +786,15 @@ export default function BillingPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <h3 className="text-lg font-bold text-gray-900 text-center mb-2">Cancel Subscription?</h3>
+            <h3 className="text-lg font-bold text-gray-900 text-center mb-2">
+              {user?.subscriptionStatus === "trialing" ? "Cancel trial?" : "Cancel Subscription?"}
+            </h3>
             <p className="text-sm text-gray-500 text-center mb-6">
-              Your account will be <strong>paused</strong> immediately and you&apos;ll lose access to bookings, calendar, and dashboard. Your data stays safe — you can reactivate any time.
+              {user?.subscriptionStatus === "trialing" ? (
+                <>You won&apos;t be charged. Your trial keeps running{trialDaysLeft ? ` for ${trialDaysLeft} more day${trialDaysLeft === 1 ? "" : "s"}` : ""} and your data stays safe.</>
+              ) : (
+                <>Your account will be <strong>paused</strong> immediately and you&apos;ll lose access to bookings, calendar, and dashboard. Your data stays safe — you can reactivate any time.</>
+              )}
             </p>
             <div className="flex gap-3">
               <button

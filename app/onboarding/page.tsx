@@ -1,22 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import type { Paddle } from "@paddle/paddle-js";
 import { getUser, setUser, isLoggedIn, syncFromServer } from "@/lib/storage";
 import type { User } from "@/types";
 import Logo from "@/components/Logo";
 
-// Onboarding is a 2-step flow. New signups always start on Starter;
-// users only see plan choices when they explicitly visit
-// /dashboard/billing. Card-on-signup capture happens between Business
-// Details and "All Set" via a dedicated /onboarding/payment page.
+// Onboarding is a 3-step flow. New signups always start on Starter
+// (Pro upgrade is in /dashboard/billing). Card capture in step 1
+// creates a Paddle subscription with Paddle's native 7-day trial —
+// nothing is charged until day 8 unless the user cancels.
 //
 //   Step 0 — Business Details (operation type first, then fields)
-//   Step 1 — "Account created!" → nudges into package creation
+//   Step 1 — Add Card to activate the 7-day trial (Paddle Checkout)
+//   Step 2 — "All Set!" → nudges into package creation
 const STEPS = [
   { id: 0, label: "Business Details", icon: "🏢" },
-  { id: 1, label: "All Set",          icon: "🚀" },
+  { id: 1, label: "Add Card",         icon: "💳" },
+  { id: 2, label: "All Set",          icon: "🚀" },
 ];
 
 const US_STATES = [
@@ -34,6 +37,12 @@ export default function OnboardingPage() {
   const [user, setUserState] = useState<User | null>(null);
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [paddle, setPaddle] = useState<Paddle | null>(null);
+  const [paddleLoading, setPaddleLoading] = useState(true);
+  const [openingCheckout, setOpeningCheckout] = useState(false);
+  const [waitingForCard, setWaitingForCard] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
+  const checkoutOpenedAt = useRef<number | null>(null);
 
   // Fire CompleteRegistration once when the user lands here straight
   // from /signup. sessionStorage flag is set by the signup form (URL
@@ -154,6 +163,101 @@ export default function OnboardingPage() {
 
     setSaving(false);
     setStep(1);
+  };
+
+  // ── Paddle Checkout init ───────────────────────────────────────────────
+  // We initialise lazily on mount (regardless of step) so by the time the
+  // user reaches step 1 the SDK is already warmed up. checkout.completed
+  // is the only signal we trust for advancing to step 2 — the webhook
+  // will land server-side, but client-advance shouldn't wait on that.
+  useEffect(() => {
+    const token = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN;
+    if (!token) { setPaddleLoading(false); return; }
+    let cancelled = false;
+    import("@paddle/paddle-js").then(({ initializePaddle }) => {
+      initializePaddle({
+        environment: (process.env.NEXT_PUBLIC_PADDLE_ENV as "sandbox" | "production") || "production",
+        token,
+        eventCallback(event) {
+          if (event.name === "checkout.completed") {
+            // Mark waiting so the UI shows "saving card…" until the
+            // webhook lands and we can re-sync the user.
+            setWaitingForCard(true);
+            // Server-side sync to pick up the new paddleSubscriptionId
+            // ASAP, then advance to step 2.
+            (async () => {
+              for (let attempt = 0; attempt < 10; attempt++) {
+                try {
+                  await fetch("/api/subscription/sync", { method: "POST" });
+                  await syncFromServer();
+                } catch { /* ignore */ }
+                const u = getUser();
+                if (u && ((u as any).paddleSubscriptionId || (u as any).subscriptionStatus === "trialing")) {
+                  if (!cancelled) {
+                    setUserState(u);
+                    setWaitingForCard(false);
+                    setStep(2);
+                  }
+                  return;
+                }
+                await new Promise((r) => setTimeout(r, 1500));
+              }
+              // Webhook didn't land in time — still advance so the user
+              // isn't stuck on a spinner. The dashboard will pick up the
+              // sub once the webhook fires (or via background sync).
+              if (!cancelled) {
+                setWaitingForCard(false);
+                setStep(2);
+              }
+            })();
+          } else if (event.name === "checkout.error") {
+            const ev: any = event;
+            const detail =
+              ev?.data?.error?.detail ||
+              ev?.error?.detail ||
+              ev?.data?.message ||
+              "Could not load checkout. Try again or contact support.";
+            setPaymentError(`Paddle: ${detail}`);
+            setOpeningCheckout(false);
+          } else if (event.name === "checkout.closed") {
+            // User dismissed without paying. Re-enable the button.
+            setOpeningCheckout(false);
+          }
+        },
+      }).then((instance) => {
+        if (cancelled) return;
+        if (instance) setPaddle(instance);
+        setPaddleLoading(false);
+      }).catch((err) => {
+        console.error("[Paddle] initializePaddle threw:", err);
+        if (!cancelled) setPaddleLoading(false);
+      });
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleOpenCheckout = () => {
+    setPaymentError("");
+    const priceId = process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
+    if (!paddle) {
+      setPaymentError("Payment system still loading — try again in a second.");
+      return;
+    }
+    if (!priceId) {
+      setPaymentError("Payment is not configured. Please contact support.");
+      return;
+    }
+    if (!user) {
+      setPaymentError("Account not loaded. Refresh and try again.");
+      return;
+    }
+    setOpeningCheckout(true);
+    checkoutOpenedAt.current = Date.now();
+    paddle.Checkout.open({
+      items: [{ priceId, quantity: 1 }],
+      customer: { email: user.email },
+      customData: { userId: user.id, source: "onboarding" },
+    });
   };
 
   const bookingUrl = user
@@ -436,8 +540,79 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* ── STEP 1: Account created — push toward package creation ──── */}
+          {/* ── STEP 1: Add card to activate Paddle's 7-day trial ────────── */}
           {step === 1 && (
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-8 pt-8 pb-6 border-b border-gray-50">
+                <div className="flex items-center gap-3 mb-1">
+                  <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-xl">💳</div>
+                  <div>
+                    <h1 className="text-xl font-black text-gray-900">Add Card to Activate Trial</h1>
+                    <p className="text-gray-400 text-sm">7 days free. Cancel anytime. No charge until day 8.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-8 py-7 space-y-5">
+                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5">
+                  <div className="flex items-baseline justify-between mb-3">
+                    <span className="text-sm font-bold text-blue-900">Starter Plan</span>
+                    <div>
+                      <span className="text-2xl font-black text-blue-900">$29</span>
+                      <span className="text-sm text-blue-700">/month</span>
+                    </div>
+                  </div>
+                  <ul className="space-y-2 text-sm text-blue-900">
+                    {[
+                      "Today: $0 — your card is saved, nothing is charged",
+                      "Day 8: $29 charged automatically if you keep going",
+                      "Cancel anytime in Settings → Billing before day 8",
+                    ].map((line) => (
+                      <li key={line} className="flex items-start gap-2">
+                        <svg className="w-4 h-4 mt-0.5 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>{line}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {paymentError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
+                    {paymentError}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleOpenCheckout}
+                  disabled={openingCheckout || paddleLoading || waitingForCard}
+                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-lg shadow-blue-200"
+                >
+                  {waitingForCard ? (
+                    <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> Saving card…</>
+                  ) : openingCheckout ? (
+                    <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> Opening secure checkout…</>
+                  ) : paddleLoading ? (
+                    <>Loading…</>
+                  ) : (
+                    <>Add Card & Start 7-Day Trial <span>→</span></>
+                  )}
+                </button>
+
+                <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
+                  <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  Card processed securely by Paddle · PCI-DSS compliant
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── STEP 2: Account created — push toward package creation ──── */}
+          {step === 2 && (
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-8 pt-10 pb-6 text-center">
                 {/* Animated checkmark */}
@@ -451,14 +626,19 @@ export default function OnboardingPage() {
                 </div>
 
                 <h1 className="text-2xl font-black text-gray-900 mb-2">
-                  Account created!
+                  You&apos;re all set!
                 </h1>
-                <p className="text-gray-500 text-sm mb-2 max-w-sm mx-auto leading-relaxed">
-                  Let&apos;s add your first service package — that&apos;s the one piece your booking page needs before you can share it with customers.
+                <p className="text-gray-500 text-sm mb-4 max-w-sm mx-auto leading-relaxed">
+                  Your 7-day trial is active and your card is saved. Now let&apos;s add your first service package so you can start taking bookings.
                 </p>
-                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-blue-100 text-blue-700">
-                  ⚡ Free trial active · {trialDays} days
-                </span>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-blue-100 text-blue-700">
+                    ⚡ Trial active · {trialDays} days
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-gray-100 text-gray-600">
+                    Card saved · cancel anytime
+                  </span>
+                </div>
               </div>
 
               <div className="px-8 pb-8">
