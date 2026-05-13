@@ -7,11 +7,10 @@ import { getUser, setUser, isLoggedIn, syncFromServer } from "@/lib/storage";
 import type { User } from "@/types";
 import Logo from "@/components/Logo";
 
-// Onboarding is now a 2-step flow — pricing was removed from the forced
-// path (it was breaking the "no credit card" promise from the signup
-// page and causing immediate drop-off). New signups always start on
-// Starter; users only see plan choices when they explicitly visit
-// /dashboard/billing.
+// Onboarding is a 2-step flow. New signups always start on Starter;
+// users only see plan choices when they explicitly visit
+// /dashboard/billing. Card-on-signup capture happens between Business
+// Details and "All Set" via a dedicated /onboarding/payment page.
 //
 //   Step 0 — Business Details (operation type first, then fields)
 //   Step 1 — "Account created!" → nudges into package creation
@@ -171,12 +170,12 @@ export default function OnboardingPage() {
 
   // Trial length: derived from the real trialEndsAt so promo codes that
   // extend it (e.g. 1-month, 3-month) show the correct number on the
-  // "Account created!" page. Default to 14 days for the standard path.
+  // "Account created!" page. Default to 7 days for the standard path.
   const trialDays = (() => {
-    if (!user?.trialEndsAt) return 14;
+    if (!user?.trialEndsAt) return 7;
     const diff = new Date(user.trialEndsAt).getTime() - Date.now();
     const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    return days > 0 ? days : 14;
+    return days > 0 ? days : 7;
   })();
 
   const showShopFields = bizForm.serviceType === "shop" || bizForm.serviceType === "both";

@@ -124,10 +124,10 @@ export default function DashboardPage() {
     const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
     return days; // can go negative; the consumer treats <=0 as expired
   })();
-  // "Early trial" = first 9 days of a 14-day trial → daysLeft > 5.
-  // After day 10 (daysLeft <= 5) or after expiry, the upsell shows
+  // "Early trial" = first 5 days of a 7-day trial → daysLeft > 2.
+  // From day 6 onward (daysLeft <= 2) or after expiry, the upsell shows
   // again.
-  const isEarlyTrial = trialDaysLeft !== null && trialDaysLeft > 5;
+  const isEarlyTrial = trialDaysLeft !== null && trialDaysLeft > 2;
 
   // Mark the share_link onboarding step as done whenever the user
   // copies their booking link from the dashboard. The SetupProgressCard

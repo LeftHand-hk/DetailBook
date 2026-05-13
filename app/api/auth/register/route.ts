@@ -77,13 +77,13 @@ export async function POST(request: NextRequest) {
 
     const hashedPassword = await hashPassword(password);
 
-    // Default 14-day trial; promo codes of type "free_months" extend this.
+    // Default 7-day trial; promo codes of type "free_months" extend this.
     const trialEndsAt = new Date();
     if (promoData?.discountType === "free_months") {
       const months = Math.max(1, Math.min(3, Math.round(promoData.discountValue)));
       trialEndsAt.setMonth(trialEndsAt.getMonth() + months);
     } else {
-      trialEndsAt.setDate(trialEndsAt.getDate() + 14);
+      trialEndsAt.setDate(trialEndsAt.getDate() + 7);
     }
 
     // If the free_months promo applies to a specific plan, grant that plan for the trial.

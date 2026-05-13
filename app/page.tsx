@@ -53,7 +53,7 @@ export default function LandingPage() {
   ];
 
   const faqs = [
-    { q: "Do I need a credit card to start?", a: "No! You can start your 14-day free trial without entering any payment info. We'll remind you before the trial ends." },
+    { q: "Do I need a credit card to start?", a: "Yes — we ask for a card up front so your trial activates without interruption. You won't be charged during the 7-day trial, and you can cancel anytime from your Settings page before day 8." },
     { q: "Do you take a cut of my bookings or deposits?", a: "Never. The monthly subscription is the only thing you pay us — no per-booking fees, no commission, no hidden cuts. When a customer pays a deposit by card, the money goes straight to your own Stripe/Square account. The only fees are the standard processor fees Stripe or Square charge directly." },
     { q: "Can my customers pay the deposit online?", a: "Yes. On both Starter and Pro, customers can pay the deposit straight from your booking page. We support card payments via Stripe, plus PayPal, Cash App, Square, bank transfer, and pay-cash-on-arrival — turn on whichever methods fit your business." },
     { q: "What happens if I exceed 5 packages on Starter?", a: "You'll be prompted to upgrade to Pro. All your existing packages stay active — you just can't add more until you upgrade." },
@@ -271,7 +271,7 @@ export default function LandingPage() {
           </div>
 
           <p className="text-white/35 text-sm animate-fadeInUp delay-400">
-            No credit card required · 14-day free trial · Cancel anytime
+            7-day free trial · Card required · Cancel anytime
           </p>
         </div>
 
@@ -473,8 +473,8 @@ export default function LandingPage() {
               },
               {
                 icon: "🆓",
-                title: "14-day free trial, no card",
-                desc: "Try the full platform with no credit card. Cancel any time, keep your data.",
+                title: "7-day free trial",
+                desc: "Try the full platform with one click to cancel. Card required, no charge until day 8.",
               },
             ].map((pillar, i) => (
               <div key={i} className="bg-gray-50 border border-gray-100 rounded-2xl p-6 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
@@ -506,7 +506,7 @@ export default function LandingPage() {
             <div className="hidden md:block absolute top-8 left-[16%] right-[16%] h-px bg-gradient-to-r from-transparent via-blue-500/30 to-transparent pointer-events-none" />
 
             {[
-              { num: "1", title: "Create your account", desc: "Enter your business name and you're in. No credit card needed for the 14-day trial." },
+              { num: "1", title: "Create your account", desc: "Enter your business name, add your card to start the 7-day trial. No charge until day 8." },
               { num: "2", title: "Add your service packages", desc: "List the details you offer — basic wash, full detail, ceramic coating. Set price, duration, and deposit." },
               { num: "3", title: "Share your booking link", desc: "Send your DetailBook link via SMS, IG bio, or your website. Customers book and pay deposits 24/7." },
             ].map((step) => (
@@ -585,7 +585,7 @@ export default function LandingPage() {
         <div className="relative max-w-4xl mx-auto">
           <div className="text-center mb-8">
             <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-4">Simple, Transparent Pricing</h2>
-            <p className="text-gray-400 text-xl">Start free for 14 days. No credit card required.</p>
+            <p className="text-gray-400 text-xl">Start free for 7 days. Card required, cancel anytime.</p>
           </div>
 
           {/* Grandfather pricing notice */}
@@ -659,13 +659,13 @@ export default function LandingPage() {
               </ul>
               <Link href="/signup" onClick={() => trackEvent("Lead")}
                 className="block w-full text-center bg-white text-blue-700 hover:bg-blue-50 font-black py-3.5 rounded-xl transition-all duration-200 hover:-translate-y-0.5">
-                Try Pro — Free for 14 Days
+                Try Pro — Free for 7 Days
               </Link>
             </div>
           </div>
 
           <p className="text-center text-gray-500 mt-8 text-sm">
-            Both plans include a 14-day free trial. Cancel anytime. No setup fees.
+            Both plans include a 7-day free trial. Card required. Cancel anytime. No setup fees.
           </p>
         </div>
       </section>
@@ -746,7 +746,7 @@ export default function LandingPage() {
           <div className="flex flex-wrap justify-center gap-8 mb-12">
             {[
               { value: "5 min",  label: "Setup time" },
-              { value: "14 days", label: "Free trial" },
+              { value: "7 days", label: "Free trial" },
               { value: "$0",     label: "To get started" },
             ].map(({ value, label }) => (
               <div key={label} className="text-center">
@@ -770,7 +770,7 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          <p className="text-white/25 text-sm">No credit card · 14-day free trial · Setup in 5 minutes · Cancel anytime</p>
+          <p className="text-white/25 text-sm">7-day free trial · Card required · Setup in 5 minutes · Cancel anytime</p>
         </div>
       </section>
 

@@ -345,7 +345,7 @@ It also creates a paper trail: confirmation messages, deposit collection, and re
 
 **Step 1: Sign Up for DetailBook**
 
-Go to detailbook.app and start your free 30-day trial. No credit card required.
+Go to detailbook.app and start your free 7-day trial. Card required, cancel anytime.
 
 **Step 2: Set Up Your Services**
 
@@ -521,7 +521,7 @@ export default function BlogPostPage({ params }: { params: { slug: string } }) {
                   Ready to try DetailBook free?
                 </h3>
                 <p className="text-gray-400 mb-6">
-                  Start your free 14-day trial. No credit card required.
+                  Start your free 7-day trial. Card required, cancel anytime.
                 </p>
                 <Link
                   href="/signup"

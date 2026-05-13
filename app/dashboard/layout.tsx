@@ -405,50 +405,63 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         )}
 
-        {/* Trial Banner — three states, only shown when not subscribed:
-              · Days 1-9  (daysLeft >= 6): neutral grey strip, no CTA. Early-
-                trial users were dropping off when we hit them with a
-                "Subscribe Now" button on day 1, so we hold pressure back
-                until day 10.
-              · Days 10-14 (daysLeft 1-5): amber/red urgency banner with
-                Subscribe CTA. Day 1-3 left flips to red.
-              · After expiry (daysLeft 0): red "Your trial has ended" banner.
-              isOnTrial is true while daysLeft > 0; we add an explicit
-              ended check below for the case where the trial has run out
-              but the user hasn't been suspended yet. */}
-        {(user as any)?.subscriptionStatus !== "active" && trialDaysLeft !== null && (
-          (isOnTrial && trialDaysLeft > 5) ? (
-            <div className="flex-shrink-0 flex items-center justify-center gap-2 px-4 py-1.5 text-xs bg-gray-50 border-b border-gray-100 text-gray-500">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-              <span>Free trial active · <strong className="text-gray-700">{trialDaysLeft} days left</strong></span>
-            </div>
-          ) : isOnTrial ? (
-            <div className={`flex-shrink-0 flex items-center justify-between gap-3 px-4 py-2.5 text-sm ${
-              trialDaysLeft <= 3
-                ? "bg-red-50 border-b border-red-100 text-red-700"
-                : "bg-amber-50 border-b border-amber-100 text-amber-700"
-            }`}>
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+        {/* Trial Banner — four states, only shown when not subscribed:
+              · Day 1-5 (daysLeft >= 3): neutral grey strip with day count
+                and a heads-up that the card is charged on day 8.
+              · Day 6   (daysLeft == 2): amber "1 day left · cancel anytime"
+                with a Manage subscription link.
+              · Day 7   (daysLeft == 1): red "Last day · you'll be charged
+                tomorrow unless you cancel" with a Manage subscription link.
+              · Expired (daysLeft <= 0): red "Your trial has ended" banner. */}
+        {(user as any)?.subscriptionStatus !== "active" && trialDaysLeft !== null && (() => {
+          const dayN = 8 - trialDaysLeft;
+          if (isOnTrial && trialDaysLeft >= 3) {
+            return (
+              <div className="flex-shrink-0 flex items-center justify-center gap-2 px-4 py-1.5 text-xs bg-gray-50 border-b border-gray-100 text-gray-500">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                 <span>
-                  <strong>{trialDaysLeft} day{trialDaysLeft !== 1 ? "s" : ""}</strong> left in your free trial.
-                  {trialDaysLeft <= 3 && " Your account will be limited when the trial ends."}
+                  <strong className="text-gray-700">Day {dayN} of 7</strong> · Your card will be charged $29 on day 8 unless you cancel.
                 </span>
               </div>
-              <Link
-                href="/dashboard/billing"
-                className={`flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${
-                  trialDaysLeft <= 3
-                    ? "bg-red-600 text-white hover:bg-red-700"
-                    : "bg-amber-600 text-white hover:bg-amber-700"
-                }`}
-              >
-                Subscribe Now →
-              </Link>
-            </div>
-          ) : (
+            );
+          }
+          if (isOnTrial && trialDaysLeft === 2) {
+            return (
+              <div className="flex-shrink-0 flex items-center justify-between gap-3 px-4 py-2.5 text-sm bg-amber-50 border-b border-amber-100 text-amber-700">
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span><strong>1 day left</strong> in your trial. Cancel anytime from Settings.</span>
+                </div>
+                <Link
+                  href="/dashboard/billing"
+                  className="flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+                >
+                  Manage subscription →
+                </Link>
+              </div>
+            );
+          }
+          if (isOnTrial) {
+            return (
+              <div className="flex-shrink-0 flex items-center justify-between gap-3 px-4 py-2.5 text-sm bg-red-50 border-b border-red-100 text-red-700">
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span><strong>Last day of trial.</strong> You&apos;ll be charged tomorrow unless you cancel.</span>
+                </div>
+                <Link
+                  href="/dashboard/billing"
+                  className="flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
+                >
+                  Manage subscription →
+                </Link>
+              </div>
+            );
+          }
+          return (
             <div className="flex-shrink-0 flex items-center justify-between gap-3 px-4 py-2.5 text-sm bg-red-50 border-b border-red-100 text-red-700">
               <div className="flex items-center gap-2">
                 <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -463,8 +476,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 Subscribe Now →
               </Link>
             </div>
-          )
-        )}
+          );
+        })()}
 
         {/* Setup banner — sticky-top inside the scroll area. The component
             also renders the slide-out side panel as a fixed overlay. */}

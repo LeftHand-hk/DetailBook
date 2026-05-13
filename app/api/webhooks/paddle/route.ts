@@ -190,12 +190,12 @@ export async function POST(req: NextRequest) {
         }
 
         // Always end Paddle's trial immediately when a subscription is
-        // created via our checkout. Reasoning: users already get a
-        // 14-day in-app trial (managed by us, no card required). Once
-        // they reach checkout and enter a card, they intend to pay —
-        // Paddle's price-config trial would just be a second free
-        // window, which is not what we want. /activate triggers the
-        // first billing right now.
+        // created via our paid checkout (post-trial upgrade). Reasoning:
+        // the 7-day in-app trial is managed by us; once a user reaches
+        // checkout and enters payment, they intend to pay — Paddle's
+        // price-config trial would just be a second free window, which
+        // is not what we want. /activate triggers the first billing
+        // right now.
         if (data.status === "trialing") {
           try {
             const apiKey = process.env.PADDLE_API_KEY?.replace(/^["']|["']$/g, "")?.trim();

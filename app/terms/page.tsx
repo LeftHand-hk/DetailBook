@@ -42,7 +42,7 @@ You must be at least 18 years of age to create an account. Accounts are personal
     title: "4. Payment Terms",
     content: `**Subscription fees:** Access to paid features requires a paid subscription. Subscription fees are charged monthly or annually in advance. All fees are non-refundable unless otherwise stated or required by applicable law.
 
-**Free trial:** We offer a 14-day free trial on the Starter plan for new accounts. No credit card is required to start a trial. At the end of the trial period, you must subscribe to continue using paid features.
+**Free trial:** We offer a 7-day free trial on the Starter plan for new accounts. A valid payment method is required to activate the trial. You will not be charged during the trial; if you do not cancel before the trial ends, your subscription begins automatically and your card is charged for the first month.
 
 **Payment processing:** Subscription payments are processed by Stripe. By subscribing, you authorize us to charge your payment method on a recurring basis until you cancel.
 
