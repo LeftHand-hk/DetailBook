@@ -29,15 +29,27 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [showPass, setShowPass] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
 
-    if (!form.businessName || !form.name || !form.email || !form.password) {
+    // iOS Safari autofill and password managers can fill inputs without
+    // firing React onChange events, so form state may be stale at submit.
+    // Read DOM values directly so an autofilled password isn't treated
+    // as empty.
+    const formEl = e.currentTarget;
+    const get = (n: string) => (formEl.elements.namedItem(n) as HTMLInputElement | null)?.value;
+    const businessName = (get("businessName") ?? form.businessName).trim();
+    const name = (get("name") ?? form.name).trim();
+    const email = (get("email") ?? form.email).trim();
+    const password = get("password") ?? form.password;
+    setForm((f) => ({ ...f, businessName, name, email, password }));
+
+    if (!businessName || !name || !email || !password) {
       setError("All fields are required.");
       return;
     }
-    if (form.password.length < 6) {
+    if (password.length < 6) {
       setError("Password must be at least 6 characters.");
       return;
     }
@@ -55,10 +67,10 @@ export default function SignupPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          businessName: form.businessName,
-          name: form.name,
-          email: form.email,
-          password: form.password,
+          businessName,
+          name,
+          email,
+          password,
           timezone: detectedTimezone,
         }),
       });
@@ -211,6 +223,8 @@ export default function SignupPage() {
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">Business Name</label>
                   <input
                     type="text"
+                    name="businessName"
+                    autoComplete="organization"
                     required
                     value={form.businessName}
                     onChange={(e) => setForm({ ...form, businessName: e.target.value })}
@@ -222,6 +236,8 @@ export default function SignupPage() {
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">Your Full Name</label>
                   <input
                     type="text"
+                    name="name"
+                    autoComplete="name"
                     required
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -235,6 +251,8 @@ export default function SignupPage() {
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email Address</label>
                 <input
                   type="email"
+                  name="email"
+                  autoComplete="email"
                   required
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -248,6 +266,8 @@ export default function SignupPage() {
                 <div className="relative">
                   <input
                     type={showPass ? "text" : "password"}
+                    name="password"
+                    autoComplete="new-password"
                     required
                     value={form.password}
                     onChange={(e) => setForm({ ...form, password: e.target.value })}

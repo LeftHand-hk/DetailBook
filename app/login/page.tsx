@@ -13,10 +13,23 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [showPass, setShowPass] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
-    if (!form.email || !form.password) {
+
+    // iOS Safari autofill and many password managers fill inputs WITHOUT
+    // firing React onChange events. That leaves form state stale and a
+    // tap on "Sign In" silently fails the empty-field guard below. Read
+    // values straight off the DOM so the autofilled values always win.
+    const formEl = e.currentTarget;
+    const emailEl = formEl.elements.namedItem("email") as HTMLInputElement | null;
+    const passEl = formEl.elements.namedItem("password") as HTMLInputElement | null;
+    const email = (emailEl?.value ?? form.email).trim();
+    const password = passEl?.value ?? form.password;
+    if (emailEl && form.email !== emailEl.value) setForm((f) => ({ ...f, email: emailEl.value }));
+    if (passEl && form.password !== passEl.value) setForm((f) => ({ ...f, password: passEl.value }));
+
+    if (!email || !password) {
       setError("Email and password are required.");
       return;
     }
@@ -25,7 +38,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.email, password: form.password }),
+        body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -202,6 +215,8 @@ export default function LoginPage() {
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email Address</label>
                 <input
                   type="email"
+                  name="email"
+                  autoComplete="username"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   placeholder="you@yourbusiness.com"
@@ -217,6 +232,8 @@ export default function LoginPage() {
                 <div className="relative">
                   <input
                     type={showPass ? "text" : "password"}
+                    name="password"
+                    autoComplete="current-password"
                     value={form.password}
                     onChange={(e) => setForm({ ...form, password: e.target.value })}
                     placeholder="••••••••"

@@ -82,6 +82,12 @@ export default function OnboardingPage() {
   // server sync if the localStorage copy is missing businessName —
   // covers the case where the signup form's syncFromServer failed
   // mid-redirect and left the cache empty.
+  //
+  // Also resumes the user at the right step if they bounced mid-flow
+  // and came back via login: step 0 if business details aren't saved,
+  // step 1 if business details exist but Paddle card isn't captured,
+  // dashboard if both are done.
+  const stepResolved = useRef(false);
   useEffect(() => {
     if (!isLoggedIn()) { router.push("/login"); return; }
 
@@ -96,6 +102,23 @@ export default function OnboardingPage() {
         city: u.city || prev.city,
         serviceType: ((u as any).serviceType as ServiceType) || prev.serviceType,
       }));
+
+      // Resume detection runs once — after that the user drives the flow
+      // via form submits and the Paddle checkout callback. Without the
+      // guard a fresh sync that lands while the user is mid-checkout
+      // would yank them back to step 0.
+      if (!stepResolved.current) {
+        stepResolved.current = true;
+        const hasPaddle = Boolean((u as any).paddleCustomerId);
+        const hasBusinessDetails = Boolean((u as any).serviceType);
+        if (hasPaddle) {
+          router.replace("/dashboard");
+          return;
+        }
+        if (hasBusinessDetails) {
+          setStep(1);
+        }
+      }
     };
 
     const cached = getUser();

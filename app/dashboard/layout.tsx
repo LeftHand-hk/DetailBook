@@ -145,6 +145,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           // reactivate. Avoid redirect loops by allowing /dashboard/billing.
           if ((freshUser as any).suspended === true && pathname !== "/dashboard/billing") {
             router.replace("/dashboard/billing");
+            return;
+          }
+          // New signups (card-on-signup flow) must complete onboarding
+          // before reaching the dashboard. Cutoff prevents grandfathered
+          // legacy accounts from being re-routed. Heuristic for "done":
+          // user has both serviceType (step 0 saved) and paddleCustomerId
+          // (step 1 / Paddle Checkout completed).
+          const NEW_FLOW_SHIP_DATE = new Date("2026-05-13T00:00:00Z");
+          const createdAt = (freshUser as any).createdAt;
+          const isNewSignup = createdAt && new Date(createdAt) >= NEW_FLOW_SHIP_DATE;
+          const hasPaddle = Boolean((freshUser as any).paddleCustomerId);
+          if (isNewSignup && !hasPaddle) {
+            router.replace("/onboarding");
+            return;
           }
         }
       })
