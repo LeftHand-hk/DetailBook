@@ -271,7 +271,7 @@ export default function LandingPage() {
           </div>
 
           <p className="text-white/35 text-sm animate-fadeInUp delay-400">
-            7-day free trial · Card required · Cancel anytime
+            7-day free trial · Cancel anytime
           </p>
         </div>
 
@@ -474,7 +474,7 @@ export default function LandingPage() {
               {
                 icon: "🆓",
                 title: "7-day free trial",
-                desc: "Try the full platform with one click to cancel. Card required, no charge until day 8.",
+                desc: "Try the full platform with one click to cancel. No charge until day 8.",
               },
             ].map((pillar, i) => (
               <div key={i} className="bg-gray-50 border border-gray-100 rounded-2xl p-6 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
@@ -585,7 +585,7 @@ export default function LandingPage() {
         <div className="relative max-w-4xl mx-auto">
           <div className="text-center mb-8">
             <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-4">Simple, Transparent Pricing</h2>
-            <p className="text-gray-400 text-xl">Start free for 7 days. Card required, cancel anytime.</p>
+            <p className="text-gray-400 text-xl">Start free for 7 days. Cancel anytime.</p>
           </div>
 
           {/* Grandfather pricing notice */}
@@ -665,7 +665,7 @@ export default function LandingPage() {
           </div>
 
           <p className="text-center text-gray-500 mt-8 text-sm">
-            Both plans include a 7-day free trial. Card required. Cancel anytime. No setup fees.
+            Both plans include a 7-day free trial. Cancel anytime. No setup fees.
           </p>
         </div>
       </section>
@@ -770,7 +770,7 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          <p className="text-white/25 text-sm">7-day free trial · Card required · Setup in 5 minutes · Cancel anytime</p>
+          <p className="text-white/25 text-sm">7-day free trial · Setup in 5 minutes · Cancel anytime</p>
         </div>
       </section>
 
