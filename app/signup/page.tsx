@@ -83,13 +83,11 @@ export default function SignupPage() {
       login();
       await syncFromServer();
       setLoading(false);
-      // Mark the just-signed-up state in sessionStorage instead of a URL
-      // query param. A URL flag (?signup=true) forced /onboarding to call
-      // history.replaceState to clean it up, which fbevents.js detected
-      // as a route change and fired a duplicate PageView in Meta Pixel
-      // Helper. sessionStorage keeps the URL stable, so no auto-tracking
-      // ghost event.
-      try { sessionStorage.setItem("dB_justSignedUp", "1"); } catch { /* private mode */ }
+      // Pixel events are deliberately NOT fired here — the conversion
+      // event (CompleteRegistration) lives in /onboarding's Paddle
+      // checkout.completed callback, and the top-of-funnel Lead fires
+      // after Business Details. Firing at signup-form submission was
+      // making Meta optimise for users who never reached the card step.
       router.push("/onboarding");
     } catch {
       setError("Something went wrong. Please try again.");

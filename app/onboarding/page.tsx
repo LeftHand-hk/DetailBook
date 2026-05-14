@@ -44,26 +44,39 @@ export default function OnboardingPage() {
   const [paymentError, setPaymentError] = useState("");
   const checkoutOpenedAt = useRef<number | null>(null);
 
-  // Fire CompleteRegistration once when the user lands here straight
-  // from /signup. sessionStorage flag is set by the signup form (URL
-  // query-param version would have forced a history.replaceState which
-  // fbevents.js was double-counting as a PageView).
-  useEffect(() => {
+  // Pixel-event mapping (matches Meta optimisation goals):
+  //   Lead                  — fires once after Business Details (top of
+  //                           funnel: we have the prospect's email but
+  //                           no card yet).
+  //   CompleteRegistration  — fires once after Paddle Checkout completes
+  //                           (the conversion event Meta optimises for —
+  //                           card on file, trial actually started).
+  // We deliberately do NOT fire CompleteRegistration on /onboarding
+  // mount anymore; that was misleading Meta into optimising for users
+  // who never reached the card step.
+  const firedLeadRef = useRef(false);
+  const firedRegistrationRef = useRef(false);
+  const fireLeadOnce = () => {
+    if (firedLeadRef.current) return;
     if (typeof window === "undefined" || typeof window.fbq !== "function") return;
-    let justSignedUp = false;
-    try {
-      justSignedUp = sessionStorage.getItem("dB_justSignedUp") === "1";
-      if (justSignedUp) sessionStorage.removeItem("dB_justSignedUp");
-    } catch { /* private mode */ }
-    if (!justSignedUp) return;
-
-    window.fbq("track", "CompleteRegistration", {
-      content_name: "DetailBook Trial Signup",
-      status: true,
+    firedLeadRef.current = true;
+    window.fbq("track", "Lead", {
+      content_name: "DetailBook Business Details",
       value: 0,
       currency: "USD",
     });
-  }, []);
+  };
+  const fireCompleteRegistrationOnce = () => {
+    if (firedRegistrationRef.current) return;
+    if (typeof window === "undefined" || typeof window.fbq !== "function") return;
+    firedRegistrationRef.current = true;
+    window.fbq("track", "CompleteRegistration", {
+      content_name: "DetailBook Trial Signup",
+      status: true,
+      value: 29,
+      currency: "USD",
+    });
+  };
 
   // Step 0 — business details. serviceType drives which fields show.
   const [bizForm, setBizForm] = useState({
@@ -185,6 +198,10 @@ export default function OnboardingPage() {
     }
 
     setSaving(false);
+    // Top-of-funnel signal. Pixel-event semantics: we have a qualified
+    // lead (email + business details). The conversion event is still
+    // CompleteRegistration, fired below after Paddle Checkout settles.
+    fireLeadOnce();
     setStep(1);
   };
 
@@ -203,6 +220,10 @@ export default function OnboardingPage() {
         token,
         eventCallback(event) {
           if (event.name === "checkout.completed") {
+            // Conversion event for Meta — fires exactly once, the moment
+            // Paddle confirms the card was captured. Before this point
+            // we only had a Lead; from here the user is in trial.
+            fireCompleteRegistrationOnce();
             // Mark waiting so the UI shows "saving card…" until the
             // webhook lands and we can re-sync the user.
             setWaitingForCard(true);
