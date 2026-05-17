@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
+import { sanitizeVehiclePricing } from "@/lib/vehicle-pricing";
 
 // Validates the addons payload from the owner. We accept an array of
 // {id?, name, price} objects, drop anything malformed, and regenerate
@@ -80,6 +81,7 @@ export async function POST(request: NextRequest) {
     }
 
     const cleanedAddons = sanitizeAddons(body.addons);
+    const cleanedVehiclePricing = sanitizeVehiclePricing(body.vehiclePricing);
 
     const pkg = await prisma.package.create({
       data: {
@@ -90,6 +92,7 @@ export async function POST(request: NextRequest) {
         deposit: deposit != null ? parseFloat(deposit) : null,
         active: active !== undefined ? active : true,
         addons: cleanedAddons === undefined ? undefined : (cleanedAddons as any),
+        vehiclePricing: cleanedVehiclePricing === undefined ? undefined : (cleanedVehiclePricing as any),
         userId: session.id,
       },
     });

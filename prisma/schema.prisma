@@ -351,6 +351,15 @@ model Package {
   // Shape: [{ id: string, name: string, price: number, duration?: number }]
   addons Json?
 
+  // Optional per-vehicle-type surcharge. Sedan is treated as the base
+  // (price + 0). Larger vehicles pay an additive surcharge on top of
+  // `price` (e.g. SUV +$20, Truck +$30). Empty/null means the package
+  // is a flat price for any vehicle. The list also acts as a filter on
+  // the public booking page: when non-empty, the package only shows for
+  // the vehicle types listed here.
+  // Shape: [{ type: "sedan"|"coupe"|"suv"|"truck"|"van", surcharge: number }]
+  vehiclePricing Json?
+
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
@@ -389,6 +398,12 @@ model Booking {
   vehicleModel    String
   vehicleYear     String
   vehicleColor    String
+  // Optional vehicle-size category the customer picked at booking time.
+  // Drives per-vehicle-type surcharges on the booking page (see
+  // Package.vehiclePricing). Values match the enum used there:
+  // "sedan" | "coupe" | "suv" | "truck" | "van". Empty for legacy
+  // bookings made before the vehicle-pricing feature shipped.
+  vehicleType     String @default("")
   serviceId       String
   serviceName     String
   servicePrice    Float

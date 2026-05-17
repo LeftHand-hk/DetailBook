@@ -154,40 +154,68 @@ export async function POST(request: NextRequest) {
     const vModel = vehicle?.model || body.vehicleModel || "";
     const vYear = vehicle?.year || body.vehicleYear || "";
     const vColor = vehicle?.color || body.vehicleColor || "";
+    const vType = typeof body.vehicleType === "string" ? body.vehicleType.trim().toLowerCase() : "";
+
+    // Look up the live package once so we can derive the authoritative
+    // base price + vehicle surcharge server-side. We already needed the
+    // package to validate add-ons; folding both into a single read keeps
+    // the booking write to one DB round-trip on the hot path.
+    let pkgRow: { price: number; addons: unknown; vehiclePricing: unknown; userId: string } | null = null;
+    if (serviceId) {
+      pkgRow = await prisma.package.findUnique({
+        where: { id: serviceId },
+        select: { price: true, addons: true, vehiclePricing: true, userId: true },
+      });
+      if (pkgRow && pkgRow.userId !== userId) pkgRow = null; // owner mismatch — ignore
+    }
 
     // Sanitise selected addons against the package's actual addon list so
     // a customer can't inject a free-form item or trick us with a price.
-    // We look up the live package and only keep entries the customer
-    // genuinely chose, snapshotting the current name/price.
+    // We only keep entries the customer genuinely chose, snapshotting
+    // the current name/price.
     let storedSelectedAddons:
       | { id: string; name: string; price: number }[]
       | null = null;
     let computedAddonsTotal = 0;
-    if (Array.isArray(body.selectedAddons) && body.selectedAddons.length > 0 && serviceId) {
-      const pkg = await prisma.package.findUnique({
-        where: { id: serviceId },
-        select: { addons: true, userId: true },
-      });
-      if (pkg && pkg.userId === userId && Array.isArray(pkg.addons)) {
-        const offered = pkg.addons as unknown as Array<{
-          id?: string; name?: string; price?: number;
-        }>;
-        const requestedIds = new Set(
-          (body.selectedAddons as unknown[])
-            .map((a) => (a && typeof a === "object" ? (a as any).id : null))
-            .filter((v): v is string => typeof v === "string"),
-        );
-        const matched = offered.filter((a) => a && a.id && requestedIds.has(a.id));
-        if (matched.length > 0) {
-          storedSelectedAddons = matched.map((a) => ({
-            id: String(a.id),
-            name: String(a.name || ""),
-            price: Number(a.price) || 0,
-          }));
-          computedAddonsTotal = storedSelectedAddons.reduce((s, a) => s + (a.price || 0), 0);
-          computedAddonsTotal = Math.round(computedAddonsTotal * 100) / 100;
-        }
+    if (pkgRow && Array.isArray(body.selectedAddons) && body.selectedAddons.length > 0 && Array.isArray(pkgRow.addons)) {
+      const offered = pkgRow.addons as unknown as Array<{
+        id?: string; name?: string; price?: number;
+      }>;
+      const requestedIds = new Set(
+        (body.selectedAddons as unknown[])
+          .map((a) => (a && typeof a === "object" ? (a as any).id : null))
+          .filter((v): v is string => typeof v === "string"),
+      );
+      const matched = offered.filter((a) => a && a.id && requestedIds.has(a.id));
+      if (matched.length > 0) {
+        storedSelectedAddons = matched.map((a) => ({
+          id: String(a.id),
+          name: String(a.name || ""),
+          price: Number(a.price) || 0,
+        }));
+        computedAddonsTotal = storedSelectedAddons.reduce((s, a) => s + (a.price || 0), 0);
+        computedAddonsTotal = Math.round(computedAddonsTotal * 100) / 100;
       }
+    }
+
+    // Authoritative service price: package.price + per-vehicle surcharge.
+    // Falls back to the client-provided servicePrice if we couldn't look
+    // up the package (legacy clients, stale serviceId). When the package
+    // has vehiclePricing configured, reject bookings whose vehicleType
+    // isn't on the list — the customer would otherwise be quoted a
+    // surcharge of $0 by accident.
+    let finalServicePrice = parseFloat(servicePrice) || 0;
+    if (pkgRow) {
+      const { surchargeForVehicleType, packageSupportsVehicleType } = await import("@/lib/vehicle-pricing");
+      const hasTierPricing = Array.isArray(pkgRow.vehiclePricing) && pkgRow.vehiclePricing.length > 0;
+      if (hasTierPricing && !packageSupportsVehicleType(pkgRow.vehiclePricing, vType)) {
+        return NextResponse.json(
+          { error: "This service isn't offered for the selected vehicle type. Please pick a different package." },
+          { status: 400 },
+        );
+      }
+      finalServicePrice = pkgRow.price + surchargeForVehicleType(pkgRow.vehiclePricing, vType);
+      finalServicePrice = Math.round(finalServicePrice * 100) / 100;
     }
 
     // paymentProof is either a "stripe:<payment_intent_id>" / "square:<payment_id>"
@@ -242,9 +270,10 @@ export async function POST(request: NextRequest) {
         vehicleModel: vModel,
         vehicleYear: vYear,
         vehicleColor: vColor,
+        vehicleType: vType,
         serviceId: serviceId || "",
         serviceName,
-        servicePrice: parseFloat(servicePrice) || 0,
+        servicePrice: finalServicePrice,
         date,
         time,
         depositPaid: depositPaid != null ? parseFloat(String(depositPaid)) : 0,

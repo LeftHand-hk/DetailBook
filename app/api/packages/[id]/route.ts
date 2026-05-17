@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
+import { sanitizeVehiclePricing } from "@/lib/vehicle-pricing";
 
 // Mirrors the validator in app/api/packages/route.ts — kept local so the
 // two files don't grow a circular dependency through a shared helper.
@@ -57,6 +58,8 @@ export async function PUT(
     if (active !== undefined) data.active = active;
     const cleanedAddons = sanitizeAddons(body.addons);
     if (cleanedAddons !== undefined) data.addons = cleanedAddons;
+    const cleanedVehiclePricing = sanitizeVehiclePricing(body.vehiclePricing);
+    if (cleanedVehiclePricing !== undefined) data.vehiclePricing = cleanedVehiclePricing;
 
     const updated = await prisma.package.update({
       where: { id },

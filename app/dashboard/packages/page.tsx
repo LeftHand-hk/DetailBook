@@ -7,6 +7,7 @@ import type { Package, PackageAddon, User } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
 import SetupHint from "@/components/SetupHint";
 import EmptyState, { EmptyIcons } from "@/components/EmptyState";
+import { VEHICLE_TYPES, type VehicleTypeId } from "@/lib/vehicle-pricing";
 
 const QUICK_TEMPLATES = [
   { name: "Basic Wash", description: "Exterior wash, tire shine, and quick interior wipe-down.", price: "45", duration: "30", deposit: "" },
@@ -25,6 +26,14 @@ interface AddonDraft {
   price: string;
 }
 
+// Vehicle pricing rows mirror the addon pattern: surcharge stays as a
+// string in form state so the input can be naturally empty, and is
+// parsed right before submit.
+interface VehicleSurchargeDraft {
+  type: VehicleTypeId;
+  surcharge: string;
+}
+
 interface PackageFormData {
   name: string;
   description: string;
@@ -32,6 +41,11 @@ interface PackageFormData {
   duration: string;
   deposit: string;
   addons: AddonDraft[];
+  // When `vehiclePricingEnabled` is false, the package is flat-priced
+  // and available to all vehicle types — vehiclePricing is ignored on
+  // save. When true, only listed vehicle types can book the package.
+  vehiclePricingEnabled: boolean;
+  vehiclePricing: VehicleSurchargeDraft[];
 }
 
 const EMPTY_FORM: PackageFormData = {
@@ -41,10 +55,19 @@ const EMPTY_FORM: PackageFormData = {
   duration: "",
   deposit: "",
   addons: [],
+  vehiclePricingEnabled: false,
+  vehiclePricing: [],
 };
 
 function newAddonDraft(): AddonDraft {
   return { id: `a_${Math.random().toString(36).slice(2, 10)}`, name: "", price: "" };
+}
+
+// Default "Different prices per vehicle" list: every vehicle type
+// included, all surcharges blank. Owner can edit surcharges or remove
+// rows that don't apply to this package.
+function defaultVehiclePricingRows(): VehicleSurchargeDraft[] {
+  return VEHICLE_TYPES.map((v) => ({ type: v.id, surcharge: "" }));
 }
 
 export default function PackagesPage() {
@@ -100,11 +123,13 @@ export default function PackagesPage() {
 
   const openWithTemplate = (t: typeof QUICK_TEMPLATES[number]) => {
     setEditing(null);
-    setForm({ ...t, addons: [] });
+    setForm({ ...t, addons: [], vehiclePricingEnabled: false, vehiclePricing: [] });
     setShowModal(true);
   };
 
   const openEdit = (pkg: Package) => {
+    const existingPricing = ((pkg as any).vehiclePricing as Array<{ type: VehicleTypeId; surcharge: number }> | null | undefined) || [];
+    const hasPricing = existingPricing.length > 0;
     setEditing(pkg);
     setForm({
       name: pkg.name,
@@ -117,8 +142,43 @@ export default function PackagesPage() {
         name: a.name,
         price: String(a.price),
       })),
+      vehiclePricingEnabled: hasPricing,
+      vehiclePricing: hasPricing
+        ? existingPricing.map((p) => ({ type: p.type, surcharge: p.surcharge ? String(p.surcharge) : "" }))
+        : [],
     });
     setShowModal(true);
+  };
+
+  const toggleVehiclePricing = () => {
+    setForm((f) => ({
+      ...f,
+      vehiclePricingEnabled: !f.vehiclePricingEnabled,
+      vehiclePricing: !f.vehiclePricingEnabled && f.vehiclePricing.length === 0
+        ? defaultVehiclePricingRows()
+        : f.vehiclePricing,
+    }));
+  };
+  const updateVehicleSurcharge = (type: VehicleTypeId, surcharge: string) => {
+    setForm((f) => ({
+      ...f,
+      vehiclePricing: f.vehiclePricing.map((row) =>
+        row.type === type ? { ...row, surcharge } : row,
+      ),
+    }));
+  };
+  const removeVehicleType = (type: VehicleTypeId) => {
+    setForm((f) => ({
+      ...f,
+      vehiclePricing: f.vehiclePricing.filter((row) => row.type !== type),
+    }));
+  };
+  const addVehicleType = (type: VehicleTypeId) => {
+    setForm((f) =>
+      f.vehiclePricing.some((row) => row.type === type)
+        ? f
+        : { ...f, vehiclePricing: [...f.vehiclePricing, { type, surcharge: "" }] },
+    );
   };
 
   const updateAddon = (id: string, patch: Partial<AddonDraft>) => {
@@ -151,6 +211,17 @@ export default function PackagesPage() {
         return { id: a.id, name, price };
       })
       .filter((a): a is PackageAddon => a !== null);
+    // Vehicle pricing: only serialise when the owner explicitly enabled
+    // it. Empty surcharge inputs are treated as $0 (= included at base
+    // price). Rows the owner removed don't get serialised, so the
+    // package will be unbookable for those vehicle types.
+    const cleanVehiclePricing = form.vehiclePricingEnabled
+      ? form.vehiclePricing.map((row) => ({
+          type: row.type,
+          surcharge: Math.max(0, parseFloat(row.surcharge) || 0),
+        }))
+      : [];
+
     const payload = {
       name: form.name,
       description: form.description,
@@ -158,6 +229,7 @@ export default function PackagesPage() {
       duration: parseInt(form.duration),
       deposit: depositVal ?? 0,
       addons: cleanAddons,
+      vehiclePricing: cleanVehiclePricing,
     };
 
     try {
@@ -380,6 +452,12 @@ export default function PackagesPage() {
                           {pkg.addons.length} add-on{pkg.addons.length === 1 ? "" : "s"}
                         </span>
                       )}
+                      {Array.isArray((pkg as any).vehiclePricing) && (pkg as any).vehiclePricing.length > 0 && (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full" title="This package has per-vehicle-type pricing">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 13l2-2m0 0l7-7 7 7M5 11v8a2 2 0 002 2h2m6 0h2a2 2 0 002-2v-8m-9 0h4" /></svg>
+                          {(pkg as any).vehiclePricing.length} vehicle type{(pkg as any).vehiclePricing.length === 1 ? "" : "s"}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -521,6 +599,99 @@ export default function PackagesPage() {
                   />
                   <p className="text-xs text-gray-400 mt-1.5">Amount required upfront to secure the booking. Leave empty or 0 for no deposit.</p>
                 </div>
+              </div>
+
+              {/* Vehicle-type pricing (optional). Detailers often charge
+                  more for bigger vehicles — this lets the owner add a
+                  flat surcharge per type on top of the base price.
+                  When disabled, the package is available for every
+                  vehicle at the flat base price. */}
+              <div className="border-t border-gray-100 pt-4">
+                <div className="flex items-start justify-between gap-3 mb-1">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-800">Vehicle-type pricing</label>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Charge extra for bigger vehicles. Sedan is your base — add a surcharge for larger types (e.g. SUV +$20, Truck +$30).
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={form.vehiclePricingEnabled}
+                      onChange={toggleVehiclePricing}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-checked:bg-blue-600 rounded-full peer-focus:ring-2 peer-focus:ring-blue-200 transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-transform peer-checked:after:translate-x-5" />
+                  </label>
+                </div>
+
+                {form.vehiclePricingEnabled && (
+                  <div className="mt-3 bg-blue-50/40 border border-blue-100 rounded-xl p-3 space-y-2">
+                    {form.vehiclePricing.length === 0 ? (
+                      <p className="text-xs text-gray-500 text-center py-2">
+                        No vehicle types selected. Add types below to make this package bookable.
+                      </p>
+                    ) : (
+                      form.vehiclePricing.map((row) => {
+                        const meta = VEHICLE_TYPES.find((v) => v.id === row.type);
+                        if (!meta) return null;
+                        return (
+                          <div key={row.type} className="grid grid-cols-[1fr_120px_auto] gap-2 items-center">
+                            <div className="flex items-center gap-2 text-sm text-gray-800">
+                              <span className="text-lg">{meta.emoji}</span>
+                              <span className="font-medium">{meta.label}</span>
+                            </div>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">+$</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={row.surcharge}
+                                onChange={(e) => updateVehicleSurcharge(row.type, e.target.value)}
+                                placeholder="0"
+                                className="w-full pl-8 pr-2 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 bg-white"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeVehicleType(row.type)}
+                              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Don't offer this package for this vehicle type"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+
+                    {/* Quick re-add buttons for vehicle types that were removed. */}
+                    {(() => {
+                      const present = new Set(form.vehiclePricing.map((r) => r.type));
+                      const missing = VEHICLE_TYPES.filter((v) => !present.has(v.id));
+                      if (missing.length === 0) return null;
+                      return (
+                        <div className="flex flex-wrap gap-1.5 pt-2 border-t border-blue-100">
+                          <span className="text-xs text-gray-500 self-center mr-1">Add:</span>
+                          {missing.map((v) => (
+                            <button
+                              key={v.id}
+                              type="button"
+                              onClick={() => addVehicleType(v.id)}
+                              className="text-xs px-2 py-1 rounded-md bg-white border border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 transition-colors inline-flex items-center gap-1"
+                            >
+                              <span>{v.emoji}</span>
+                              {v.label}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
 
               {/* Add-ons (optional). Shown to customers as ticked extras on

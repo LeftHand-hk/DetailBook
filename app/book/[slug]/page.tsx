@@ -8,6 +8,7 @@ import StripeDepositModal from "@/components/StripeDepositModal";
 import SquareDepositModal from "@/components/SquareDepositModal";
 import PublicPhotoGallery, { type PublicPhoto } from "@/components/PublicPhotoGallery";
 import PublicReviews, { type PublicReview } from "@/components/PublicReviews";
+import { VEHICLE_TYPES, type VehicleTypeId, surchargeForVehicleType, packageSupportsVehicleType } from "@/lib/vehicle-pricing";
 
 const TIMES = [
   "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM",
@@ -121,6 +122,13 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   const [bookedSlots, setBookedSlots] = useState<{ date: string; time: string; staffId: string | null }[]>([]);
   const [photos, setPhotos] = useState<PublicPhoto[]>([]);
   const [reviews, setReviews] = useState<PublicReview[]>([]);
+  // Customer-chosen vehicle size. Only shown when at least one of the
+  // owner's packages has per-vehicle pricing configured; otherwise the
+  // selector hides entirely and the booking flow is unchanged from the
+  // flat-priced model. Captured in the booking payload alongside
+  // make/model/year/color so the dashboard can show the size at a
+  // glance.
+  const [selectedVehicleType, setSelectedVehicleType] = useState<VehicleTypeId | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
   const [stripeDepositPaid, setStripeDepositPaid] = useState(false);
   const [smsConsent, setSmsConsent] = useState(false);
@@ -292,6 +300,14 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     setSelectedAddonIds([]);
   }, [selectedPackage?.id]);
 
+  // Vehicle-type surcharge on the *selected* package. The booking page
+  // only enables the selector when at least one package has tier pricing;
+  // for flat-priced packages this evaluates to 0.
+  const vehicleSurcharge = surchargeForVehicleType(
+    (selectedPackage as any)?.vehiclePricing,
+    selectedVehicleType,
+  );
+
   // Add-on derived values. We always recompute from the live package +
   // the ticked ids so changing the selection updates the summary instantly.
   // Add-ons only affect price — appointment duration stays at the
@@ -301,7 +317,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   );
   const chosenAddons: PackageAddon[] = availableAddons.filter((a) => selectedAddonIds.includes(a.id));
   const addonsTotal = chosenAddons.reduce((s, a) => s + (a.price || 0), 0);
-  const totalPrice = (selectedPackage?.price || 0) + addonsTotal;
+  const totalPrice = (selectedPackage?.price || 0) + vehicleSurcharge + addonsTotal;
   const toggleAddon = (id: string) => {
     setSelectedAddonIds((cur) => cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
   };
@@ -350,8 +366,12 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       customerEmail: form.customerEmail,
       customerPhone: form.customerPhone,
       vehicle: { make: form.make, model: form.model, year: form.year, color: form.color },
+      vehicleType: selectedVehicleType || "",
       serviceId: selectedPackage!.id,
       serviceName: selectedPackage!.name,
+      // Send the base package price — the server recomputes the final
+      // amount from the live package + vehicleType so a tampered client
+      // can't dodge a surcharge.
       servicePrice: selectedPackage!.price,
       // Send only ids — the API re-resolves and snapshots the price from
       // the live package so a tampered client can't pay $0 for an add-on.
@@ -631,7 +651,28 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   const isDemoMode = viewerIsOwner && packages.length === 0;
   // The list every layout iterates over. Real packages in the happy
   // path; demo packages when in Demo Mode.
-  const displayPackages = isDemoMode ? DEMO_SERVICES : packages;
+  const allDisplayPackages = isDemoMode ? DEMO_SERVICES : packages;
+
+  // Show the vehicle-size picker only when at least one package has
+  // per-vehicle pricing configured. For flat-priced businesses the
+  // booking flow stays exactly as it was — no extra step, no picker.
+  const hasVehiclePricing = allDisplayPackages.some(
+    (p) => Array.isArray((p as any).vehiclePricing) && (p as any).vehiclePricing.length > 0,
+  );
+  // Filter the package list by the customer's vehicle pick. Packages
+  // without vehiclePricing accept any vehicle (passthrough); packages
+  // with the list only show when the type is included. With no type
+  // chosen yet, show everything so the customer can browse.
+  const displayPackages = selectedVehicleType
+    ? allDisplayPackages.filter((p) => packageSupportsVehicleType((p as any).vehiclePricing, selectedVehicleType))
+    : allDisplayPackages;
+
+  // Per-package effective price for the *currently selected vehicle
+  // type*. Falls back to the base price when there is no surcharge or
+  // when no vehicle is picked yet.
+  const priceForPackage = (pkg: Package): number => {
+    return pkg.price + surchargeForVehicleType((pkg as any).vehiclePricing, selectedVehicleType);
+  };
 
   // Clicking a service card normally selects + advances. In Demo Mode
   // we short-circuit — the demo packages aren't bookable, so we point
@@ -1208,6 +1249,48 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
             <h2 className="text-2xl font-extrabold text-gray-900 mb-1">Choose a Service</h2>
             <p className="text-gray-500 text-sm mb-6">Select the service you&apos;d like to book.</p>
 
+            {/* Vehicle-size picker. Shown only when at least one package
+                offers tier pricing — otherwise the booking flow is
+                identical to the flat-priced version. Selecting a type
+                filters incompatible packages out of the list below and
+                applies the per-type surcharge to displayed prices. */}
+            {hasVehiclePricing && !isDemoMode && (
+              <div className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-5 shadow-sm">
+                <p className="text-sm font-semibold text-gray-800 mb-3">What type of vehicle?</p>
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                  {VEHICLE_TYPES.map((v) => {
+                    const active = selectedVehicleType === v.id;
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => setSelectedVehicleType(v.id)}
+                        className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-center transition-all ${
+                          active
+                            ? "border-blue-500 bg-blue-50 shadow-sm"
+                            : "border-gray-100 bg-gray-50 hover:border-blue-300"
+                        }`}
+                      >
+                        <span className="text-xl sm:text-2xl">{v.emoji}</span>
+                        <span className={`text-[11px] sm:text-xs font-bold leading-tight ${active ? "text-blue-700" : "text-gray-700"}`}>
+                          {v.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedVehicleType && (
+                  <p className="text-xs text-gray-500 mt-3">
+                    Prices below include any surcharge for{" "}
+                    <span className="font-semibold text-gray-700">
+                      {VEHICLE_TYPES.find((v) => v.id === selectedVehicleType)?.label}
+                    </span>
+                    .
+                  </p>
+                )}
+              </div>
+            )}
+
             {packages.length === 0 && !viewerIsOwner ? (
               /* Public visitor hits an unfinished page — give them a
                  way to reach the business directly instead of the old
@@ -1253,14 +1336,17 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                       <p className="text-xs text-gray-500 mb-3 leading-relaxed line-clamp-2">{pkg.description}</p>
                       <div className="flex items-end justify-between gap-2">
                         <div>
-                          <p className="text-2xl font-extrabold text-gray-900 group-hover:text-blue-600 transition-colors duration-300">${pkg.price}</p>
-                          <div className="flex items-center gap-2 mt-1">
+                          <p className="text-2xl font-extrabold text-gray-900 group-hover:text-blue-600 transition-colors duration-300">${priceForPackage(pkg)}</p>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <span className="flex items-center gap-1 text-[10px] text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">
                               <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                               {formatDuration(pkg.duration)}
                             </span>
                             {pkg.deposit && pkg.deposit > 0 && (
                               <span className="text-[10px] text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-full">${pkg.deposit} dep.</span>
+                            )}
+                            {selectedVehicleType && priceForPackage(pkg) > pkg.price && (
+                              <span className="text-[10px] text-amber-700 font-semibold bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">+${priceForPackage(pkg) - pkg.price}</span>
                             )}
                           </div>
                         </div>
@@ -1293,16 +1379,19 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-1">
                           <h3 className="font-bold text-gray-900 text-base group-hover:text-blue-600 transition-colors">{pkg.name}</h3>
-                          <p className="text-2xl font-extrabold text-gray-900 flex-shrink-0 group-hover:text-blue-600 transition-colors">${pkg.price}</p>
+                          <p className="text-2xl font-extrabold text-gray-900 flex-shrink-0 group-hover:text-blue-600 transition-colors">${priceForPackage(pkg)}</p>
                         </div>
                         <p className="text-sm text-gray-500 mb-2 leading-relaxed">{pkg.description}</p>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
                           <span className="flex items-center gap-1 text-xs text-gray-400 bg-gray-50 px-2.5 py-1 rounded-full">
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             {formatDuration(pkg.duration)}
                           </span>
                           {pkg.deposit && pkg.deposit > 0 && (
                             <span className="text-xs text-blue-600 font-semibold bg-blue-50 px-2.5 py-1 rounded-full">${pkg.deposit} deposit</span>
+                          )}
+                          {selectedVehicleType && priceForPackage(pkg) > pkg.price && (
+                            <span className="text-xs text-amber-700 font-semibold bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">+${priceForPackage(pkg) - pkg.price}</span>
                           )}
                         </div>
                       </div>
@@ -1341,7 +1430,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-lg font-extrabold text-gray-900 group-hover:text-blue-600 transition-colors">${pkg.price}</span>
+                      <span className="text-lg font-extrabold text-gray-900 group-hover:text-blue-600 transition-colors">${priceForPackage(pkg)}</span>
                       <svg className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                     </div>
                   </button>
@@ -1370,11 +1459,14 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                       <p className="text-blue-100 text-sm mb-4 leading-relaxed">{pkg.description}</p>
                       <div className="flex items-end justify-between">
                         <div>
-                          <p className="text-3xl font-extrabold text-white">${pkg.price}</p>
-                          <div className="flex items-center gap-2 mt-1">
+                          <p className="text-3xl font-extrabold text-white">${priceForPackage(pkg)}</p>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <span className="text-xs text-blue-200 bg-white/10 px-2.5 py-0.5 rounded-full">{formatDuration(pkg.duration)}</span>
                             {pkg.deposit && pkg.deposit > 0 && (
                               <span className="text-xs text-blue-200 bg-white/10 px-2.5 py-0.5 rounded-full">${pkg.deposit} deposit</span>
+                            )}
+                            {selectedVehicleType && priceForPackage(pkg) > pkg.price && (
+                              <span className="text-xs text-white font-semibold bg-amber-500/40 border border-amber-300/50 px-2.5 py-0.5 rounded-full">+${priceForPackage(pkg) - pkg.price}</span>
                             )}
                           </div>
                         </div>
@@ -1400,7 +1492,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                         <h3 className="font-bold text-gray-900 text-sm mb-0.5 group-hover:text-blue-600 transition-colors">{pkg.name}</h3>
                         <p className="text-xs text-gray-500 mb-2 line-clamp-1">{pkg.description}</p>
                         <div className="flex items-center justify-between">
-                          <p className="text-xl font-extrabold text-gray-900 group-hover:text-blue-600 transition-colors">${pkg.price}</p>
+                          <p className="text-xl font-extrabold text-gray-900 group-hover:text-blue-600 transition-colors">${priceForPackage(pkg)}</p>
                           <span className="text-[10px] text-gray-400">{formatDuration(pkg.duration)}</span>
                         </div>
                       </button>
@@ -1432,7 +1524,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                       </div>
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0">
-                      <span className="text-2xl font-extrabold text-gray-900 group-hover:text-blue-600 transition-colors">${pkg.price}</span>
+                      <span className="text-2xl font-extrabold text-gray-900 group-hover:text-blue-600 transition-colors">${priceForPackage(pkg)}</span>
                       <svg className="w-5 h-5 text-gray-300 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                     </div>
                   </button>
@@ -1565,8 +1657,12 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
               </div>
               <div className="text-right">
                 <p className="text-white font-extrabold text-xl">${totalPrice}</p>
-                {addonsTotal > 0 && (
-                  <p className="text-blue-200 text-[11px] leading-tight">${selectedPackage?.price} + ${addonsTotal}</p>
+                {(addonsTotal > 0 || vehicleSurcharge > 0) && (
+                  <p className="text-blue-200 text-[11px] leading-tight">
+                    ${selectedPackage?.price}
+                    {vehicleSurcharge > 0 && ` + $${vehicleSurcharge}`}
+                    {addonsTotal > 0 && ` + $${addonsTotal}`}
+                  </p>
                 )}
                 <button onClick={() => setStep(0)} className="text-blue-300 text-xs hover:text-white transition-colors">Change</button>
               </div>
@@ -2027,6 +2123,12 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                     <span className="text-white/60">{selectedPackage?.name}</span>
                     <span className="font-semibold">${selectedPackage?.price}</span>
                   </div>
+                  {vehicleSurcharge > 0 && selectedVehicleType && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-white/50 pl-3">+ {VEHICLE_TYPES.find((v) => v.id === selectedVehicleType)?.label} surcharge</span>
+                      <span className="font-semibold text-white/80">${vehicleSurcharge}</span>
+                    </div>
+                  )}
                   {chosenAddons.map((addon) => (
                     <div key={addon.id} className="flex justify-between text-sm">
                       <span className="text-white/50 pl-3">+ {addon.name}</span>

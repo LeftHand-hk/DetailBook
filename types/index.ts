@@ -119,6 +119,11 @@ export interface PackageAddon {
   price: number;
 }
 
+export interface PackageVehiclePricing {
+  type: "sedan" | "coupe" | "suv" | "truck" | "van";
+  surcharge: number;
+}
+
 export interface Package {
   id: string;
   name: string;
@@ -128,6 +133,10 @@ export interface Package {
   active: boolean;
   deposit?: number;
   addons?: PackageAddon[];
+  // When non-empty, the package only shows for the listed vehicle types
+  // and applies the matching surcharge on top of `price`. When empty or
+  // null, the package is flat-priced and available to any vehicle.
+  vehiclePricing?: PackageVehiclePricing[] | null;
 }
 
 export interface Booking {
@@ -135,6 +144,10 @@ export interface Booking {
   customerName: string;
   customerEmail: string;
   customerPhone: string;
+  // Optional vehicle-size category captured at booking time when the
+  // owner has per-vehicle pricing on at least one package. Empty for
+  // legacy or flat-priced bookings.
+  vehicleType?: string;
   vehicle: {
     make: string;
     model: string;

@@ -79,6 +79,7 @@ export default function BookingsPage() {
           year: b.vehicleYear || "",
           color: b.vehicleColor || "",
         },
+        vehicleType: b.vehicleType || "",
       }));
       const sorted = mapped.sort((a, b) =>
         new Date((b as any).createdAt).getTime() - new Date((a as any).createdAt).getTime()
