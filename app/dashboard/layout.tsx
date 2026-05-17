@@ -378,7 +378,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   );
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    // `h-screen` resolves to 100vh, which on iOS Safari is taller than
+    // the visible viewport (it counts the address bar's space). The
+    // result was the bottom of the dashboard hiding under the bar and
+    // the mobile top-bar getting pushed above the visible area when
+    // Safari animated its chrome. `100dvh` is the dynamic viewport
+    // height — it shrinks when the address bar shows and grows when it
+    // hides, keeping the whole dashboard inside the visible area at
+    // all times. Supported in iOS Safari 15.4+ (March 2022); we keep
+    // h-screen as a fallback for anything older.
+    <div className="flex h-screen bg-gray-50 overflow-hidden" style={{ height: "100dvh" }}>
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex flex-col w-[260px] bg-[#0B1120] flex-shrink-0 border-r border-white/[0.04]">
         <Sidebar />
@@ -525,8 +534,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             also renders the slide-out side panel as a fixed overlay. */}
         <SetupExperience />
 
-        {/* Page Content */}
-        <main ref={mainRef} className="flex-1 overflow-y-auto bg-gray-50/80">
+        {/* Page Content. iOS safe-area padding so content at the very
+            bottom isn't hidden behind the home indicator on devices
+            with a gesture bar. */}
+        <main
+          ref={mainRef}
+          className="flex-1 overflow-y-auto bg-gray-50/80"
+          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        >
           {children}
         </main>
       </div>
