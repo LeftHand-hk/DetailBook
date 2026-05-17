@@ -176,14 +176,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Reset the main scroll area to top on every route change. The dashboard
-  // uses a nested scroll container (not the window), so Next.js' default
-  // scroll restoration doesn't reach it. Without this, navigating from
-  // /onboarding back to /dashboard can land mid-page.
+  // Reset the main scroll area to top on every *real* route change.
+  // We compare against the last pathname we acted on because a few
+  // pages (booking-page editor, dashboard home) re-render with the
+  // same pathname when query params or in-page state change — without
+  // the ref guard the scroll snapped back to the top mid-scroll, which
+  // was the "scroll keeps resetting / can't reach the bottom" bug. We
+  // also no longer call window.scrollTo: the dashboard scrolls through
+  // the nested <main>, and a window scroll-to-zero on top of that was
+  // jerking mobile users back when they tried to scroll down.
   const mainRef = useRef<HTMLElement | null>(null);
+  const lastScrolledPathRef = useRef<string | null>(null);
   useEffect(() => {
+    if (lastScrolledPathRef.current === pathname) return;
+    lastScrolledPathRef.current = pathname;
     if (mainRef.current) mainRef.current.scrollTop = 0;
-    if (typeof window !== "undefined") window.scrollTo(0, 0);
   }, [pathname]);
 
   const handleLogout = () => {
