@@ -49,9 +49,24 @@ function SavedBadge() {
   );
 }
 
+// Top-level navigation for the booking-page editor. Originally an 11-
+// section vertical scroll, now split into 5 tabs so each related group
+// fits on a single screen and the page stops feeling like a wall of
+// settings. Tab labels are deliberately short — the icon + label combo
+// has to fit on a phone without wrapping.
+type EditorTab = "profile" | "branding" | "services" | "media" | "messages";
+const EDITOR_TABS: { id: EditorTab; label: string; icon: React.ReactNode }[] = [
+  { id: "profile",  label: "Profile",  icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg> },
+  { id: "branding", label: "Branding", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg> },
+  { id: "services", label: "Layout",   icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg> },
+  { id: "media",    label: "Media",    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> },
+  { id: "messages", label: "Messages", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg> },
+];
+
 export default function BookingPagePage() {
   const [user, setUserState] = useState<User | null>(null);
   const [saved, setSaved] = useState(false);
+  const [activeTab, setActiveTab] = useState<EditorTab>("profile");
 
   // Booking page state
   const [slug, setSlug] = useState("");
@@ -235,6 +250,33 @@ export default function BookingPagePage() {
         </a>
       </div>
 
+      {/* ── Tab Navigation — sticks under the dashboard sub-bar on scroll
+            so the user always knows which section they're on. Mobile
+            wraps to two rows automatically. ── */}
+      <div className="sticky top-0 z-10 -mx-6 px-6 bg-gray-50/95 backdrop-blur-sm border-b border-gray-200">
+        <div className="flex gap-1 overflow-x-auto scrollbar-thin py-2 -mb-px">
+          {EDITOR_TABS.map((tab) => {
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all border ${
+                  active
+                    ? "bg-white border-blue-500 text-blue-700 shadow-sm"
+                    : "bg-transparent border-transparent text-gray-500 hover:text-gray-800 hover:bg-white/80"
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {activeTab === "profile" && (<>
       {/* ── Card: Business Profile ── */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
@@ -382,8 +424,10 @@ export default function BookingPagePage() {
           <p className="text-xs text-gray-400 mt-2">Only lowercase letters, numbers, and hyphens. Other characters will be converted.</p>
         </div>
       </div>
+      </>)}
 
-      {/* ── Card: Hero Banner ── */}
+      {activeTab === "branding" && (
+      /* ── Card: Hero Banner ── */
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
           <h2 className="text-white font-bold text-base">Hero Banner</h2>
@@ -450,7 +494,10 @@ export default function BookingPagePage() {
           </div>
         </div>
       </div>
+      )}
 
+      {activeTab === "media" && (
+      <>
       {/* ── Card: Photo Gallery (between Hero Banner and Service Layout) ── */}
       <PhotoGalleryEditor
         layout={galleryLayout}
@@ -472,6 +519,11 @@ export default function BookingPagePage() {
         onShowAvatarsChange={setReviewsShowAvatars}
         onShowDatesChange={setReviewsShowDates}
       />
+      </>
+      )}
+
+      {activeTab === "services" && (
+      <>
 
       {/* ── Card: Service Layout ── */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -623,8 +675,11 @@ export default function BookingPagePage() {
           </div>
         </div>
       </div>
+      </>
+      )}
 
-      {/* ── Card 2: Appearance ── */}
+      {activeTab === "branding" && (
+      /* ── Card 2: Appearance ── */
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
           <h2 className="text-white font-bold text-base">Appearance</h2>
@@ -734,7 +789,10 @@ export default function BookingPagePage() {
           </div>
         </div>
       </div>
+      )}
 
+      {activeTab === "services" && (
+      <>
       {/* ── Card 3: Content Visibility ── */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
@@ -755,8 +813,11 @@ export default function BookingPagePage() {
           ))}
         </div>
       </div>
+      </>
+      )}
 
-      {/* ── Card: Social & Contact Links ── */}
+      {activeTab === "profile" && (
+      /* ── Card: Social & Contact Links ── */
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
           <h2 className="text-white font-bold text-base">Social & Contact Links</h2>
@@ -789,8 +850,10 @@ export default function BookingPagePage() {
           <p className="text-xs text-gray-400">These links appear on your public booking page header.</p>
         </div>
       </div>
+      )}
 
-      {/* ── Card 4: Booking Rules ── */}
+      {activeTab === "services" && (
+      /* ── Card 4: Booking Rules ── */
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
           <h2 className="text-white font-bold text-base">Booking Rules</h2>
@@ -813,8 +876,10 @@ export default function BookingPagePage() {
           </div>
         </div>
       </div>
+      )}
 
-      {/* ── Card 5: Messages ── */}
+      {activeTab === "messages" && (
+      /* ── Card 5: Messages ── */
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
           <h2 className="text-white font-bold text-base">Messages</h2>
@@ -857,6 +922,7 @@ export default function BookingPagePage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Spacer for sticky bar */}
       <div className="h-16" />
