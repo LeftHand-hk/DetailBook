@@ -43,9 +43,26 @@ export async function POST() {
   try {
     const user = await prisma.user.findUnique({
       where: { id: session.id },
-      select: { id: true, email: true, plan: true },
+      select: { id: true, email: true, plan: true, subscriptionStatus: true },
     });
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+    // Sticky cancel guard. /api/subscription/sync is a recovery path —
+    // it exists for users whose Paddle webhook never arrived. The
+    // billing page calls it whenever status !== "active", which after a
+    // cancel includes status === "canceled". Without this guard, the
+    // sync re-fetches Paddle (which keeps a trialing sub visible for
+    // the full trial window even after the user requests cancellation)
+    // and overwrites "canceled" back to "active" — bug reported as
+    // "I cancel and it bounces back to Starter Active". A second
+    // cancel works because by then Paddle has actually flipped to
+    // "canceled" status and the sync no longer finds a matching sub.
+    if ((user.subscriptionStatus || "").toLowerCase() === "canceled") {
+      return NextResponse.json(
+        { error: "Subscription is canceled.", reason: "canceled" },
+        { status: 409 },
+      );
+    }
 
     const base = paddleApiBase();
     const headers = { Authorization: `Bearer ${apiKey}` };

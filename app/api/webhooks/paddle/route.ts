@@ -248,18 +248,34 @@ export async function POST(req: NextRequest) {
 
         const user = await prisma.user.findFirst({ where: { paddleSubscriptionId: subId } });
         if (user) {
-          const updateData: Record<string, string> = { subscriptionStatus: status };
-          if (plan) updateData.plan = plan;
-          await prisma.user.update({ where: { id: user.id }, data: updateData });
-          console.log(
-            "[Paddle webhook] subscription.updated applied",
-            JSON.stringify({
-              userId: user.id,
-              status,
-              plan: plan || "(unchanged)",
-              source: scheduledItems.length > 0 ? "scheduled_change" : "items",
-            })
-          );
+          // Sticky cancel: when the owner clicks Cancel, Paddle keeps
+          // the subscription visible as "trialing" or "active" until
+          // the end of the trial / billing period and fires several
+          // subscription.updated events along the way. If we let those
+          // overwrite our local "canceled" status, the dashboard would
+          // resurrect the user — exactly what the "cancel then refresh
+          // shows Active again" bug looked like. Skip the update once
+          // we've recorded a cancel.
+          const localStatus = (user.subscriptionStatus || "").toLowerCase();
+          if (localStatus === "canceled") {
+            console.log(
+              "[Paddle webhook] subscription.updated ignored — user already canceled",
+              JSON.stringify({ userId: user.id, paddleStatus: status })
+            );
+          } else {
+            const updateData: Record<string, string> = { subscriptionStatus: status };
+            if (plan) updateData.plan = plan;
+            await prisma.user.update({ where: { id: user.id }, data: updateData });
+            console.log(
+              "[Paddle webhook] subscription.updated applied",
+              JSON.stringify({
+                userId: user.id,
+                status,
+                plan: plan || "(unchanged)",
+                source: scheduledItems.length > 0 ? "scheduled_change" : "items",
+              })
+            );
+          }
         }
         break;
       }
