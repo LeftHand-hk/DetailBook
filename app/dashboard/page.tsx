@@ -17,7 +17,7 @@ const statusColors: Record<string, string> = {
 // Minimal shape of one step from /api/onboarding/status — we ignore
 // title/description/etc. that the API also returns and just read
 // `id` + `done` for the dashboard's Setup Progress Card.
-type SetupStepId = "business_info" | "working_hours" | "services" | "deposits" | "share_link";
+type SetupStepId = "business_info" | "working_hours" | "services" | "customize_page" | "share_link";
 interface SetupStep { id: SetupStepId; done: boolean }
 
 export default function DashboardPage() {
@@ -459,18 +459,16 @@ export default function DashboardPage() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Setup Progress Card — shown ONLY to users with zero bookings. Replaces
-// the placeholder "—" stats row with a 4-step checklist that gives the
+// the placeholder "—" stats row with a 5-step checklist that gives the
 // user a tangible "next thing to do" until their booking link starts
-// pulling traffic.
-
-// The 4 dashboard-facing steps. Maps to subset of the steps from
-// /api/onboarding/status (which has 5 — we hide "deposits" because the
-// brief asked for these four specifically).
+// pulling traffic. The list mirrors /api/onboarding/status one-for-one
+// so completion percentages match the banner the layout shows above.
 const CARD_STEP_DEFS: { id: SetupStepId; label: string; href: string; emoji: string }[] = [
-  { id: "business_info", label: "Business profile created", href: "/dashboard/settings",       emoji: "🏢" },
-  { id: "services",      label: "Add your first service package", href: "/dashboard/packages?setup=services", emoji: "🧴" },
-  { id: "working_hours", label: "Set your working hours",   href: "/dashboard/settings",       emoji: "⏰" },
-  { id: "share_link",    label: "Share your booking link",  href: "",                          emoji: "🔗" },
+  { id: "business_info",  label: "Business profile created",       href: "/dashboard/settings",                  emoji: "🏢" },
+  { id: "services",       label: "Add your first service package", href: "/dashboard/packages?setup=services",   emoji: "🧴" },
+  { id: "working_hours",  label: "Set your working hours",         href: "/dashboard/settings",                  emoji: "⏰" },
+  { id: "customize_page", label: "Customize your booking page",    href: "/dashboard/booking-page",              emoji: "🎨" },
+  { id: "share_link",     label: "Share your booking link",        href: "",                                     emoji: "🔗" },
 ];
 
 function SetupProgressCard({

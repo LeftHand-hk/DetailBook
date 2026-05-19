@@ -6,6 +6,7 @@ type StepId =
   | "business_info"
   | "working_hours"
   | "services"
+  | "customize_page"
   | "share_link";
 
 type ProgressJson = Partial<Record<StepId, boolean>>;
@@ -14,14 +15,14 @@ type ProgressJson = Partial<Record<StepId, boolean>>;
 // first package" step is the one users actually need to see value
 // from the product, so we put it second (right after the auto-
 // completed business profile). Working hours is administrative and
-// can wait. Deposits used to live here as an optional step but was
-// the loudest source of friction (payment config before a single
-// customer existed) — it's been moved to Settings → Payments and
-// surfaced contextually after the user's first booking instead.
+// can wait. After working hours we nudge to customize the booking
+// page (logo, banner, copy) so the link they share looks polished
+// before they share it.
 const STEP_ORDER: StepId[] = [
   "business_info",
   "services",
   "working_hours",
+  "customize_page",
   "share_link",
 ];
 
@@ -36,8 +37,9 @@ export async function GET() {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  // Onboarding only needs a few flags + package count. Skip the base64
-  // image columns (logo/coverImage/bannerImage) entirely.
+  // Onboarding needs a few flags + package count + the customize signals
+  // (logo, bannerImage, bookingPageTitle). We deliberately fetch the
+  // base64 image columns only as booleans to keep the payload small.
   const user = await prisma.user.findUnique({
     where: { id: session.id },
     select: {
@@ -45,6 +47,10 @@ export async function GET() {
       onboardingCompletedAt: true,
       onboardingDismissed: true,
       businessHours: true,
+      // Customize-page signals.
+      logo: true,
+      bannerImage: true,
+      bookingPageTitle: true,
       _count: { select: { packages: true } },
     },
   });
@@ -55,6 +61,15 @@ export async function GET() {
   const hasBusinessHours =
     user.businessHours !== null && user.businessHours !== undefined;
 
+  // "Customize booking page" is satisfied as soon as the owner has
+  // changed at least one of the visual fields away from default:
+  // a logo or banner upload, or a custom page title. Any of these
+  // is a strong signal they've engaged with the booking-page editor.
+  const hasLogo = typeof user.logo === "string" && user.logo.length > 0;
+  const hasBanner = typeof user.bannerImage === "string" && user.bannerImage.length > 0;
+  const hasCustomTitle = typeof user.bookingPageTitle === "string" && user.bookingPageTitle.trim().length > 0;
+  const hasCustomized = hasLogo || hasBanner || hasCustomTitle;
+
   // Sticky completion: once observed done, persist so transient UI states
   // (clearing a field during autosave, etc.) don't flip a step back.
   const stepDone = {
@@ -63,6 +78,7 @@ export async function GET() {
     business_info: true,
     working_hours: Boolean(progress.working_hours) || hasBusinessHours,
     services: Boolean(progress.services) || user._count.packages > 0,
+    customize_page: Boolean(progress.customize_page) || hasCustomized,
     share_link: Boolean(progress.share_link),
   };
 
@@ -70,6 +86,7 @@ export async function GET() {
   const newlyDone: Partial<Record<StepId, boolean>> = {};
   if (!progress.working_hours && stepDone.working_hours) newlyDone.working_hours = true;
   if (!progress.services && stepDone.services) newlyDone.services = true;
+  if (!progress.customize_page && stepDone.customize_page) newlyDone.customize_page = true;
   if (Object.keys(newlyDone).length) {
     await prisma.user.update({
       where: { id: session.id },
@@ -101,6 +118,14 @@ export async function GET() {
       estimate: "1 min",
       optional: false,
       done: stepDone.working_hours,
+    },
+    {
+      id: "customize_page" as const,
+      title: "Customize your booking page",
+      description: "Add your logo, a hero photo, and a short intro so the page you share looks like your business.",
+      estimate: "2 min",
+      optional: false,
+      done: stepDone.customize_page,
     },
     {
       id: "share_link" as const,

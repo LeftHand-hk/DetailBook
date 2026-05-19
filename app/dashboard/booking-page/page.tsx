@@ -208,6 +208,14 @@ export default function BookingPagePage() {
       setHasChanges(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
+      // The "Customize your booking page" setup step auto-completes the
+      // moment the owner uploads a logo or banner, or sets a custom page
+      // title. Pinging the setup banner + dashboard progress card here
+      // makes that flip happen the instant they save instead of after
+      // the next focus/refresh.
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("detailbook:setup-changed"));
+      }
     }, 600);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps

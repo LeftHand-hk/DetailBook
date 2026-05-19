@@ -190,6 +190,12 @@ export default function SettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ businessHours: hours }),
       });
+      // Tell the setup banner + inline progress card to re-fetch so the
+      // "Set your working hours" row flips to ✅ immediately instead of
+      // waiting for the next window focus / route change.
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("detailbook:setup-changed"));
+      }
     } catch {}
   };
 
