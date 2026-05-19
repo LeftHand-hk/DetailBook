@@ -261,14 +261,6 @@ async function apiCall<T>(
   try {
     const res = await fetch(url, {
       credentials: "include",
-      // Force a fresh fetch. Without this, /api/user GETs during the
-      // rapid onboarding/Paddle sync sequence were being served from
-      // the browser/CDN cache — so the dashboard layout's "needs
-      // onboarding?" check ran against stale data without
-      // paddleCustomerId set and bounced the user back to
-      // /onboarding. Reported symptom: "it only works if I log out
-      // and log back in" (logout clears state, login forces fresh).
-      cache: "no-store",
       headers: { "Content-Type": "application/json", ...((options.headers as Record<string, string>) ?? {}) },
       ...options,
     });

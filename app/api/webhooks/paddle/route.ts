@@ -248,32 +248,18 @@ export async function POST(req: NextRequest) {
 
         const user = await prisma.user.findFirst({ where: { paddleSubscriptionId: subId } });
         if (user) {
-          // Sticky cancel: if the user has already canceled (either via
-          // our cancel endpoint or an earlier Paddle event), do NOT let
-          // an "updated" event flip them back to trialing/active.
-          // Paddle keeps the sub visible as "trialing" for the full
-          // trial window after a scheduled cancel, and we don't want to
-          // resurrect a user who explicitly canceled.
-          const localStatus = (user.subscriptionStatus || "").toLowerCase();
-          if (localStatus === "canceled") {
-            console.log(
-              "[Paddle webhook] subscription.updated ignored — user is canceled",
-              JSON.stringify({ userId: user.id, paddleStatus: status })
-            );
-          } else {
-            const updateData: Record<string, string> = { subscriptionStatus: status };
-            if (plan) updateData.plan = plan;
-            await prisma.user.update({ where: { id: user.id }, data: updateData });
-            console.log(
-              "[Paddle webhook] subscription.updated applied",
-              JSON.stringify({
-                userId: user.id,
-                status,
-                plan: plan || "(unchanged)",
-                source: scheduledItems.length > 0 ? "scheduled_change" : "items",
-              })
-            );
-          }
+          const updateData: Record<string, string> = { subscriptionStatus: status };
+          if (plan) updateData.plan = plan;
+          await prisma.user.update({ where: { id: user.id }, data: updateData });
+          console.log(
+            "[Paddle webhook] subscription.updated applied",
+            JSON.stringify({
+              userId: user.id,
+              status,
+              plan: plan || "(unchanged)",
+              source: scheduledItems.length > 0 ? "scheduled_change" : "items",
+            })
+          );
         }
         break;
       }
@@ -283,23 +269,10 @@ export async function POST(req: NextRequest) {
         const subId = data.id;
         const user = await prisma.user.findFirst({ where: { paddleSubscriptionId: subId } });
         if (user) {
-          // Cancel-during-trial: keep the dashboard live until the
-          // trial ends. We only suspend when the in-app trial has
-          // actually expired. Otherwise the user cancels and the page
-          // would immediately lock them out — not what the brief
-          // wanted ("trial keeps running, no charge").
-          const trialMs = (user as any).trialEndsAt ? Date.parse((user as any).trialEndsAt) : NaN;
-          const stillInTrial = !Number.isNaN(trialMs) && trialMs > Date.now();
           await prisma.user.update({
             where: { id: user.id },
-            data: stillInTrial
-              ? { subscriptionStatus: "canceled" }
-              : { subscriptionStatus: "canceled", suspended: true },
+            data: { subscriptionStatus: "canceled", suspended: true },
           });
-          console.log(
-            "[Paddle webhook] subscription.canceled applied",
-            JSON.stringify({ userId: user.id, stillInTrial })
-          );
         }
         break;
       }
