@@ -43,15 +43,7 @@ export async function POST() {
   try {
     const user = await prisma.user.findUnique({
       where: { id: session.id },
-      // trialEndsAt + suspended pulled in so we can mirror the webhook's
-      // "let the in-app trial run alongside Paddle's trial" decision
-      // (see webhooks/paddle/route.ts). Without this the recovery sync
-      // would force subscriptionStatus="active" + clear trialEndsAt for
-      // a brand-new card-on-signup user, which made the dashboard show
-      // "Active" instead of "Trial · 7d left" and would also charge
-      // the card immediately (we used to call /activate from the
-      // webhook when no trial was detected).
-      select: { id: true, email: true, plan: true, trialEndsAt: true, suspended: true },
+      select: { id: true, email: true, plan: true },
     });
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
@@ -109,38 +101,19 @@ export async function POST() {
       );
     }
 
-    // 3. Mirror the webhook's "respect the trial" decision so the
-    //    recovery path produces the same final user state as the live
-    //    Paddle event. New card-on-signup users have Paddle status
-    //    "trialing" AND an in-app trial still running — those stay in
-    //    `trialing` with trialEndsAt intact, so the dashboard shows
-    //    "Trial · 7d left" and the cancel-during-trial flow works.
-    //    Reactivations / post-trial subscribers come back from Paddle
-    //    with status "active" and get fully activated.
+    // 3. Activate locally. This mirrors the webhook handler exactly.
     const plan = planFromItems(activeSub.items);
-    const paddleStatus = String(activeSub.status || "").toLowerCase();
-    const inAppTrialMs = user.trialEndsAt ? Date.parse(user.trialEndsAt) : NaN;
-    const inAppTrialActive = !Number.isNaN(inAppTrialMs) && inAppTrialMs > Date.now();
-    const letPaddleTrialRun = paddleStatus === "trialing" && inAppTrialActive && !user.suspended;
-
-    const updateData: Record<string, string | boolean> = {
+    const updateData: Record<string, string> = {
       paddleSubscriptionId: activeSub.id,
       paddleCustomerId: matchedCustomer.id,
-      suspended: false,
+      subscriptionStatus: "active",
+      trialEndsAt: "",
     };
     if (plan) updateData.plan = plan;
 
-    if (letPaddleTrialRun) {
-      updateData.subscriptionStatus = "trialing";
-      // Keep trialEndsAt as-is — already aligned to day 8.
-    } else {
-      updateData.subscriptionStatus = "active";
-      updateData.trialEndsAt = "";
-    }
-
     await prisma.user.update({
       where: { id: user.id },
-      data: updateData,
+      data: { ...updateData, suspended: false },
     });
 
     return NextResponse.json({
@@ -148,8 +121,6 @@ export async function POST() {
       plan: plan || user.plan,
       subscriptionId: activeSub.id,
       customerId: matchedCustomer.id,
-      paddleStatus,
-      mode: letPaddleTrialRun ? "trialing" : "active",
     });
   } catch (err) {
     console.error("[sync] error:", err);

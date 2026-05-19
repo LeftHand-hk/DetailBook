@@ -37,13 +37,9 @@ export async function GET() {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  // Onboarding needs a few flags + package count. The customize_page
-  // step is auto-detected from `bookingPageTitle` (cheap) plus the
-  // sticky progress flag — the booking-page editor explicitly PATCHes
-  // markStep="customize_page" on every autosave, so ANY change in that
-  // editor ticks the step done. We deliberately do NOT select `logo`
-  // or `bannerImage` here: those are MB-sized base64 columns and were
-  // making this status request slow on every dashboard load.
+  // Onboarding needs a few flags + package count + the customize signals
+  // (logo, bannerImage, bookingPageTitle). We deliberately fetch the
+  // base64 image columns only as booleans to keep the payload small.
   const user = await prisma.user.findUnique({
     where: { id: session.id },
     select: {
@@ -51,6 +47,9 @@ export async function GET() {
       onboardingCompletedAt: true,
       onboardingDismissed: true,
       businessHours: true,
+      // Customize-page signals.
+      logo: true,
+      bannerImage: true,
       bookingPageTitle: true,
       _count: { select: { packages: true } },
     },
@@ -62,11 +61,14 @@ export async function GET() {
   const hasBusinessHours =
     user.businessHours !== null && user.businessHours !== undefined;
 
-  // Auto-detect customize_page when the page title is a non-default
-  // value. Other visual changes (logo, banner, accent color, etc.) are
-  // tracked via the explicit markStep PATCH from the editor.
+  // "Customize booking page" is satisfied as soon as the owner has
+  // changed at least one of the visual fields away from default:
+  // a logo or banner upload, or a custom page title. Any of these
+  // is a strong signal they've engaged with the booking-page editor.
+  const hasLogo = typeof user.logo === "string" && user.logo.length > 0;
+  const hasBanner = typeof user.bannerImage === "string" && user.bannerImage.length > 0;
   const hasCustomTitle = typeof user.bookingPageTitle === "string" && user.bookingPageTitle.trim().length > 0;
-  const hasCustomized = hasCustomTitle;
+  const hasCustomized = hasLogo || hasBanner || hasCustomTitle;
 
   // Sticky completion: once observed done, persist so transient UI states
   // (clearing a field during autosave, etc.) don't flip a step back.
