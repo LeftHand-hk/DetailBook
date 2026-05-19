@@ -208,11 +208,17 @@ export default function BookingPagePage() {
       setHasChanges(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-      // The "Customize your booking page" setup step auto-completes the
-      // moment the owner uploads a logo or banner, or sets a custom page
-      // title. Pinging the setup banner + dashboard progress card here
-      // makes that flip happen the instant they save instead of after
-      // the next focus/refresh.
+      // Explicitly mark the "Customize your booking page" setup step as
+      // done — any save in this editor counts (logo, banner, accent
+      // color, title, social links, etc.). Fire-and-forget; the API is
+      // sticky so re-marking is a no-op. The setup-changed event below
+      // then triggers the banner + inline progress card to re-fetch
+      // and flip the row to ✅ immediately.
+      fetch("/api/onboarding/status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ markStep: "customize_page" }),
+      }).catch(() => { /* sticky; reconciles on next focus */ });
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("detailbook:setup-changed"));
       }
