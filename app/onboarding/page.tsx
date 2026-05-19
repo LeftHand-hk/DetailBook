@@ -120,10 +120,21 @@ export default function OnboardingPage() {
       // via form submits and the Paddle checkout callback. Without the
       // guard a fresh sync that lands while the user is mid-checkout
       // would yank them back to step 0.
+      //
+      // "Business details done" is detected via `phone` (or address /
+      // serviceAreas), not `serviceType`: the Prisma schema gives
+      // serviceType a default of "mobile" so it's already set on a
+      // fresh signup and would falsely skip step 0. Register leaves
+      // phone empty (""), and step 0's PUT /api/user always saves a
+      // phone, so a non-empty phone is the reliable signal.
       if (!stepResolved.current) {
         stepResolved.current = true;
         const hasPaddle = Boolean((u as any).paddleCustomerId);
-        const hasBusinessDetails = Boolean((u as any).serviceType);
+        const phone = ((u as any).phone || "").trim();
+        const address = ((u as any).address || "").trim();
+        const serviceAreas = (u as any).serviceAreas;
+        const firstServiceArea = Array.isArray(serviceAreas) && serviceAreas[0] ? String(serviceAreas[0]).trim() : "";
+        const hasBusinessDetails = Boolean(phone) || Boolean(address) || Boolean(firstServiceArea);
         if (hasPaddle) {
           router.replace("/dashboard");
           return;
