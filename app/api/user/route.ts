@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 
+// User state changes constantly during signup/onboarding (Paddle webhook
+// + recovery sync flip trialEndsAt, paddleCustomerId, subscriptionStatus
+// in seconds). Marking the route dynamic ensures Next.js never reuses a
+// rendered response between requests, and the no-store headers below
+// keep the browser and any CDN layer (Netlify Edge) from serving stale
+// JSON. Without this the dashboard could read a pre-Paddle snapshot of
+// the user and bounce them to /onboarding right after Skip.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET() {
   try {
     const session = await getSessionUser();
@@ -32,7 +42,9 @@ export async function GET() {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ user });
+    const res = NextResponse.json({ user });
+    res.headers.set("Cache-Control", "private, no-store, max-age=0");
+    return res;
   } catch (error) {
     console.error("Get user error:", error);
     return NextResponse.json(

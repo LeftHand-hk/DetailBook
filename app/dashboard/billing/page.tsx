@@ -49,12 +49,21 @@ export default function BillingPage() {
       if (res.ok) {
         const data = await res.json();
         setUser(data.user);
-        if (data.user && data.user.subscriptionStatus !== "active") {
-          // Background sync — silent. Re-fetch user if it activated.
+        // Recovery sync exists for users whose Paddle webhook never
+        // arrived after a successful checkout. We only run it when the
+        // status hasn't been resolved yet (null / empty). For any
+        // explicit status — trialing, canceled, past_due — the user's
+        // state is already known and re-querying Paddle would clobber
+        // it (Paddle keeps a trialing sub visible for the full trial
+        // even after the user clicks cancel, so a stray sync would
+        // bring the user back from "canceled" to "trialing").
+        const status = (data.user?.subscriptionStatus || "").toLowerCase();
+        const needsRecovery = !status;
+        if (data.user && needsRecovery) {
           fetch("/api/subscription/sync", { method: "POST" })
             .then((r) => (r.ok ? fetch("/api/user", { cache: "no-store" }) : null))
             .then((r) => r && r.ok ? r.json() : null)
-            .then((d) => { if (d?.user?.subscriptionStatus === "active") setUser(d.user); })
+            .then((d) => { if (d?.user) setUser(d.user); })
             .catch(() => { /* silent */ });
         }
       }

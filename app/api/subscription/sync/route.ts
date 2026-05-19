@@ -45,15 +45,27 @@ export async function POST() {
       where: { id: session.id },
       // trialEndsAt + suspended pulled in so we can mirror the webhook's
       // "let the in-app trial run alongside Paddle's trial" decision
-      // (see webhooks/paddle/route.ts). Without this the recovery sync
-      // would force subscriptionStatus="active" + clear trialEndsAt for
-      // a brand-new card-on-signup user, which made the dashboard show
-      // "Active" instead of "Trial · 7d left" and would also charge
-      // the card immediately (we used to call /activate from the
-      // webhook when no trial was detected).
-      select: { id: true, email: true, plan: true, trialEndsAt: true, suspended: true },
+      // (see webhooks/paddle/route.ts). subscriptionStatus pulled in so
+      // we can refuse to re-activate a user who has already canceled.
+      select: {
+        id: true, email: true, plan: true,
+        trialEndsAt: true, suspended: true, subscriptionStatus: true,
+      },
     });
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+    // Sticky cancel: once the user has clicked Cancel, do not let a
+    // recovery sync resurrect them. Paddle keeps a trialing sub visible
+    // for the full trial period after the user requests cancellation,
+    // so a sync called by the billing page or onboarding poll would
+    // otherwise overwrite "canceled" with "trialing" the next time
+    // anyone loaded the page.
+    if ((user.subscriptionStatus || "").toLowerCase() === "canceled") {
+      return NextResponse.json(
+        { error: "Subscription is canceled — skipping sync.", reason: "canceled" },
+        { status: 409 },
+      );
+    }
 
     const base = paddleApiBase();
     const headers = { Authorization: `Bearer ${apiKey}` };
