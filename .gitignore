@@ -37,3 +37,10 @@ yarn-error.log*
 next-env.d.ts
 
 /lib/generated/prisma
+
+# Local-only booking page v2 preview. The route was reverted on remote
+# (see commit reverting 2fae0c2) but the file is kept locally for the
+# owner to iterate on before deciding to re-ship it. Brackets in the
+# slug folder name are escaped so .gitignore treats them as literal
+# characters, not glob character classes.
+/app/book/\[slug\]/v2/
