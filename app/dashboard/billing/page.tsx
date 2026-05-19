@@ -193,14 +193,8 @@ export default function BillingPage() {
     });
   }, []);
 
-  // Card is on file whenever Paddle has a linked subscription — trial
-  // or active. We fetch on either status so users who just added their
-  // card during the 7-day trial signup see their card displayed,
-  // instead of the "No payment method yet" empty state.
   useEffect(() => {
-    if (user?.subscriptionStatus === "active" || user?.subscriptionStatus === "trialing") {
-      fetchCard({ retry: true });
-    }
+    if (user?.subscriptionStatus === "active") fetchCard({ retry: true });
   }, [user?.subscriptionStatus]);
 
   // After Paddle Checkout closes successfully, activation happens
@@ -355,12 +349,6 @@ export default function BillingPage() {
 
   const isPro = user?.plan === "pro";
   const isSubscribed = user?.subscriptionStatus === "active";
-  // "Has a card on file" is true for both active subscribers AND
-  // trialing users (they captured their card during signup). UI that
-  // shows the saved card or the "Update card" button should gate on
-  // this, NOT on isSubscribed, otherwise trial users see "No payment
-  // method yet" right after they just added their card.
-  const hasCardOnFile = isSubscribed || user?.subscriptionStatus === "trialing";
   const trialDaysLeft = (() => {
     if (!user?.trialEndsAt) return null;
     const diff = new Date(user.trialEndsAt).getTime() - Date.now();
@@ -533,7 +521,7 @@ export default function BillingPage() {
             <h2 className="text-lg font-bold text-gray-900">Payment method</h2>
             <p className="text-sm text-gray-500">Card on file for your monthly subscription.</p>
           </div>
-          {hasCardOnFile && card && (
+          {isSubscribed && card && (
             <button
               onClick={handleUpdateCard}
               disabled={updatingCard}
@@ -544,7 +532,7 @@ export default function BillingPage() {
           )}
         </div>
 
-        {!hasCardOnFile ? (
+        {!isSubscribed ? (
           <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-8 text-center">
             <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 flex items-center justify-center">
               <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -661,11 +649,7 @@ export default function BillingPage() {
         <div className="grid sm:grid-cols-2 gap-4">
           {plans.map((plan) => {
             const isCurrent = user?.plan === plan.id;
-            // A trialing user with a card on file IS subscribed (just
-            // not yet billed) — they shouldn't see "Subscribe to X"
-            // CTAs for their current plan, they should see "Current
-            // plan" the same way active subscribers do.
-            const isActive = isCurrent && hasCardOnFile;
+            const isActive = isCurrent && isSubscribed;
             const isPopular = plan.popular;
             return (
               <div
@@ -722,8 +706,10 @@ export default function BillingPage() {
                   >
                     {changingPlan === plan.id
                       ? "Preparing checkout…"
-                      : hasCardOnFile
-                        ? `Switch to ${plan.name}`
+                      : isSubscribed
+                        ? user?.plan === "pro" && plan.id === "starter"
+                          ? `Switch to ${plan.name}`
+                          : `Switch to ${plan.name}`
                         : `Subscribe to ${plan.name}`}
                   </button>
                 )}
