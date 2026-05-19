@@ -43,6 +43,11 @@ export default function OnboardingPage() {
   const [waitingForCard, setWaitingForCard] = useState(false);
   const [paymentError, setPaymentError] = useState("");
   const checkoutOpenedAt = useRef<number | null>(null);
+  // Mirrors the `paddle` state into a ref so the Paddle event callback
+  // (which closes over old state on mount) can always reach the latest
+  // instance — used to auto-close Paddle's lingering "Transaction
+  // completed" success screen.
+  const paddleRef = useRef<Paddle | null>(null);
 
   // Pixel-event mapping (matches Meta optimisation goals):
   //   Lead                  — fires once after Business Details (top of
@@ -235,6 +240,14 @@ export default function OnboardingPage() {
             // Paddle confirms the card was captured. Before this point
             // we only had a Lead; from here the user is in trial.
             fireCompleteRegistrationOnce();
+            // Paddle's overlay shows a built-in "Transaction completed"
+            // success screen that lingers until the user closes it. Let
+            // the user see the confirmation for ~2 seconds, then close
+            // it ourselves so the onboarding flow keeps moving without
+            // a manual tap.
+            setTimeout(() => {
+              try { paddleRef.current?.Checkout.close(); } catch { /* ignore */ }
+            }, 2000);
             // Mark waiting so the UI shows "saving card…" until the
             // webhook lands and we can re-sync the user.
             setWaitingForCard(true);
@@ -281,7 +294,10 @@ export default function OnboardingPage() {
         },
       }).then((instance) => {
         if (cancelled) return;
-        if (instance) setPaddle(instance);
+        if (instance) {
+          paddleRef.current = instance;
+          setPaddle(instance);
+        }
         setPaddleLoading(false);
       }).catch((err) => {
         console.error("[Paddle] initializePaddle threw:", err);
