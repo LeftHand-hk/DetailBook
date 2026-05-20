@@ -17,6 +17,39 @@ type FullUser = Record<string, unknown> & {
   _count?: { packages?: number; bookings?: number; staff?: number };
 };
 
+// Whitelist of editable field names — must stay in sync with
+// EDITABLE_FIELDS in /api/admin/users/[id]/route.ts. Anything not
+// listed here renders as read-only (e.g. id, createdAt, paddleCustomerId).
+const EDITABLE_FIELDS = new Set<string>([
+  "email", "name", "businessName", "phone",
+  "slug", "address", "city", "serviceType", "timezone", "bio",
+  "yearsInBusiness", "instagram", "facebook", "website",
+  "serviceAreas", "businessHours",
+  "bookingPageTitle", "bookingPageSubtitle", "bookingPageTheme",
+  "accentColor", "serviceLayout", "bannerOverlayOpacity",
+  "showRating", "showSocialLinks", "showServiceAreas",
+  "showBusinessHours", "showTrustBadges",
+  "thankYouMessage", "termsText", "customMessage", "advanceBookingDays",
+  "plan", "trialEndsAt", "subscriptionStatus", "suspended",
+]);
+
+const BOOLEAN_FIELDS = new Set<string>([
+  "showRating", "showSocialLinks", "showServiceAreas",
+  "showBusinessHours", "showTrustBadges", "suspended",
+]);
+
+const NUMBER_FIELDS = new Set<string>([
+  "yearsInBusiness", "advanceBookingDays", "bannerOverlayOpacity",
+]);
+
+const TEXTAREA_FIELDS = new Set<string>([
+  "bio", "thankYouMessage", "termsText", "customMessage",
+]);
+
+const JSON_FIELDS = new Set<string>([
+  "businessHours",
+]);
+
 // Group every User column into a labelled section so the admin can scan
 // what each customer filled in. Keys not listed here fall into "Other"
 // at the bottom — keeps the page resilient when new schema fields land.
@@ -246,6 +279,252 @@ function FieldRow({ label, value }: { label: string; value: unknown }) {
   );
 }
 
+// One editable input per row. The shape (text / textarea / number /
+// checkbox / textarea-JSON) is picked from the field name so the
+// admin gets a sensible control without us hand-building a form.
+function EditableRow({
+  fieldKey,
+  value,
+  onChange,
+}: {
+  fieldKey: string;
+  value: unknown;
+  onChange: (next: unknown) => void;
+}) {
+  // Booleans render as a toggle so the admin can flip flags quickly.
+  if (BOOLEAN_FIELDS.has(fieldKey)) {
+    const checked = Boolean(value);
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-2 sm:gap-4 py-3 border-b border-gray-100 last:border-0 items-center">
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{fieldKey}</div>
+        <label className="inline-flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={(e) => onChange(e.target.checked)}
+            className="w-4 h-4 accent-gray-900"
+          />
+          <span className="text-sm text-gray-700">{checked ? "Yes" : "No"}</span>
+        </label>
+      </div>
+    );
+  }
+
+  if (NUMBER_FIELDS.has(fieldKey)) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-2 sm:gap-4 py-3 border-b border-gray-100 last:border-0">
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{fieldKey}</div>
+        <input
+          type="number"
+          value={value == null ? "" : String(value)}
+          onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
+          className="w-full max-w-[200px] px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+        />
+      </div>
+    );
+  }
+
+  // serviceAreas — comma-separated text → array on save.
+  if (fieldKey === "serviceAreas") {
+    const text = Array.isArray(value) ? value.join(", ") : String(value || "");
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-2 sm:gap-4 py-3 border-b border-gray-100 last:border-0">
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{fieldKey}</div>
+        <div>
+          <input
+            type="text"
+            value={text}
+            onChange={(e) => onChange(e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
+            placeholder="Austin, Round Rock, Cedar Park"
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+          />
+          <p className="text-[11px] text-gray-400 mt-1">Comma-separated.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // businessHours and any other JSON field — give the admin a JSON
+  // textarea. Invalid JSON keeps the previous value (set on blur).
+  if (JSON_FIELDS.has(fieldKey)) {
+    const stringified = (() => {
+      try { return JSON.stringify(value ?? {}, null, 2); } catch { return ""; }
+    })();
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-2 sm:gap-4 py-3 border-b border-gray-100 last:border-0">
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{fieldKey}</div>
+        <div>
+          <textarea
+            defaultValue={stringified}
+            onBlur={(e) => {
+              try { onChange(JSON.parse(e.target.value)); }
+              catch { /* leave previous value, indicate error */ }
+            }}
+            rows={Math.min(12, Math.max(4, stringified.split("\n").length))}
+            className="w-full px-3 py-2 text-xs font-mono border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+          />
+          <p className="text-[11px] text-gray-400 mt-1">Save on blur. Invalid JSON is ignored.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (TEXTAREA_FIELDS.has(fieldKey)) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-2 sm:gap-4 py-3 border-b border-gray-100 last:border-0">
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{fieldKey}</div>
+        <textarea
+          value={typeof value === "string" ? value : ""}
+          onChange={(e) => onChange(e.target.value)}
+          rows={3}
+          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+        />
+      </div>
+    );
+  }
+
+  // Default: single-line text input. Slug field gets a help line so
+  // the admin knows what they're editing changes the public URL.
+  const isSlug = fieldKey === "slug";
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-2 sm:gap-4 py-3 border-b border-gray-100 last:border-0">
+      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{fieldKey}</div>
+      <div>
+        <input
+          type="text"
+          value={typeof value === "string" ? value : value == null ? "" : String(value)}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+        />
+        {isSlug && (
+          <p className="text-[11px] text-gray-400 mt-1">
+            Public booking-page URL — appears at <code className="font-mono">/book/{`{slug}`}</code>. Lowercase letters, digits, and hyphens only.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SectionCard({
+  title,
+  rows,
+  userId,
+  onSaved,
+}: {
+  title: string;
+  rows: { key: string; value: unknown }[];
+  userId: string;
+  onSaved: (updated: FullUser) => void;
+}) {
+  const editableRows = rows.filter((r) => EDITABLE_FIELDS.has(r.key));
+  const readOnlyRows = rows.filter((r) => !EDITABLE_FIELDS.has(r.key));
+  const canEdit = editableRows.length > 0;
+
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Record<string, unknown>>({});
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const startEdit = () => {
+    const seed: Record<string, unknown> = {};
+    for (const r of editableRows) seed[r.key] = r.value;
+    setDraft(seed);
+    setEditing(true);
+    setError("");
+  };
+
+  const cancel = () => {
+    setEditing(false);
+    setDraft({});
+    setError("");
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || `HTTP ${res.status}`);
+        return;
+      }
+      onSaved(data as FullUser);
+      setEditing(false);
+      setDraft({});
+    } catch (err: any) {
+      setError(err?.message || "Network error.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">{title}</h3>
+        {canEdit && !editing && (
+          <button
+            onClick={startEdit}
+            className="text-xs font-bold text-blue-600 hover:text-blue-700 px-3 py-1 rounded-lg border border-blue-200 hover:bg-blue-50 transition-colors"
+          >
+            Edit
+          </button>
+        )}
+        {editing && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={cancel}
+              disabled={saving}
+              className="text-xs font-semibold text-gray-600 hover:text-gray-900 px-3 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="text-xs font-bold text-white bg-gray-900 hover:bg-gray-800 disabled:opacity-50 px-3 py-1 rounded-lg transition-colors"
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-gray-50/50 border border-gray-100 rounded-xl px-4">
+        {editing
+          ? editableRows.map((r) => (
+              <EditableRow
+                key={r.key}
+                fieldKey={r.key}
+                value={r.key in draft ? draft[r.key] : r.value}
+                onChange={(next) => setDraft((d) => ({ ...d, [r.key]: next }))}
+              />
+            ))
+          : rows.map((r) => <FieldRow key={r.key} label={r.key} value={r.value} />)}
+
+        {/* When editing, surface read-only rows separately so the admin
+            still sees the full record (e.g. createdAt next to email). */}
+        {editing && readOnlyRows.length > 0 && (
+          <div className="pt-2 mt-2 border-t border-dashed border-gray-200">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 py-1">Read-only</p>
+            {readOnlyRows.map((r) => <FieldRow key={r.key} label={r.key} value={r.value} />)}
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <p className="text-xs text-red-600 mt-2 font-medium">{error}</p>
+      )}
+    </div>
+  );
+}
+
 export default function AdminDataPage() {
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [loadingList, setLoadingList] = useState(true);
@@ -427,16 +706,13 @@ export default function AdminDataPage() {
                 <WelcomeEmailsCard user={detail} onAction={reloadDetail} />
 
                 {detailSections.map((sec) => (
-                  <div key={sec.title}>
-                    <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-                      {sec.title}
-                    </h3>
-                    <div className="bg-gray-50/50 border border-gray-100 rounded-xl px-4">
-                      {sec.rows.map((row) => (
-                        <FieldRow key={row.key} label={row.key} value={row.value} />
-                      ))}
-                    </div>
-                  </div>
+                  <SectionCard
+                    key={sec.title}
+                    title={sec.title}
+                    rows={sec.rows}
+                    userId={detail.id as string}
+                    onSaved={(updated) => setDetail(updated)}
+                  />
                 ))}
               </div>
             )}
