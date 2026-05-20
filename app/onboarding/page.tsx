@@ -59,12 +59,32 @@ export default function OnboardingPage() {
   // We deliberately do NOT fire CompleteRegistration on /onboarding
   // mount anymore; that was misleading Meta into optimising for users
   // who never reached the card step.
+  //
+  // Both flags are persisted in sessionStorage as well as in a ref so
+  // they survive a top-level redirect (e.g. PayPal / Apple Pay flows
+  // bounce the browser out to the payment provider and back to a
+  // fresh /onboarding mount — without sessionStorage we would either
+  // re-fire on the second mount or never fire at all). useRef is the
+  // fast in-memory guard; sessionStorage is the survives-a-redirect
+  // guard.
   const firedLeadRef = useRef(false);
   const firedRegistrationRef = useRef(false);
+  const LEAD_KEY = "dB_fired_lead";
+  const REGISTRATION_KEY = "dB_fired_complete_registration";
+  const hasFired = (key: string): boolean => {
+    if (typeof window === "undefined") return false;
+    try { return sessionStorage.getItem(key) === "1"; } catch { return false; }
+  };
+  const markFired = (key: string): void => {
+    if (typeof window === "undefined") return;
+    try { sessionStorage.setItem(key, "1"); } catch { /* private mode */ }
+  };
   const fireLeadOnce = () => {
     if (firedLeadRef.current) return;
+    if (hasFired(LEAD_KEY)) { firedLeadRef.current = true; return; }
     if (typeof window === "undefined" || typeof window.fbq !== "function") return;
     firedLeadRef.current = true;
+    markFired(LEAD_KEY);
     window.fbq("track", "Lead", {
       content_name: "DetailBook Business Details",
       value: 0,
@@ -73,8 +93,10 @@ export default function OnboardingPage() {
   };
   const fireCompleteRegistrationOnce = () => {
     if (firedRegistrationRef.current) return;
+    if (hasFired(REGISTRATION_KEY)) { firedRegistrationRef.current = true; return; }
     if (typeof window === "undefined" || typeof window.fbq !== "function") return;
     firedRegistrationRef.current = true;
+    markFired(REGISTRATION_KEY);
     window.fbq("track", "CompleteRegistration", {
       content_name: "DetailBook Trial Signup",
       status: true,
@@ -141,6 +163,14 @@ export default function OnboardingPage() {
         const firstServiceArea = Array.isArray(serviceAreas) && serviceAreas[0] ? String(serviceAreas[0]).trim() : "";
         const hasBusinessDetails = Boolean(phone) || Boolean(address) || Boolean(firstServiceArea);
         if (hasPaddle) {
+          // Detection-on-return path for PayPal / Apple Pay / any other
+          // Paddle payment method that uses a top-level redirect. The
+          // user comes back to a fresh /onboarding mount with the
+          // webhook-set paddleCustomerId already in their record, so
+          // Paddle's checkout.completed event never fires in this tab.
+          // sessionStorage de-dupes across the card path where
+          // checkout.completed already fired moments earlier.
+          fireCompleteRegistrationOnce();
           router.replace("/dashboard");
           return;
         }
