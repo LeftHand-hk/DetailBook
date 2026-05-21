@@ -240,7 +240,15 @@ export default function AdminSmsPage() {
                       <p className="text-sm whitespace-pre-wrap break-words">{m.body}</p>
                       <p className={`text-[10px] mt-1 ${out ? "text-white/50" : "text-gray-400"}`}>
                         {fmtTime(m.createdAt)}
-                        {out && m.status === "failed" && <span className="text-red-300 font-semibold"> · failed</span>}
+                        {out && m.status && (() => {
+                          const s = m.status.toLowerCase();
+                          const bad = s.includes("fail") || s.includes("undeliver") || s.includes("err");
+                          return (
+                            <span className={bad ? "text-red-300 font-semibold" : "text-white/50"}>
+                              {" · "}{m.status}
+                            </span>
+                          );
+                        })()}
                       </p>
                     </div>
                   </div>

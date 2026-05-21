@@ -42,6 +42,18 @@ export async function sendSms(to: string, body: string): Promise<{ success: bool
   if (messagingServiceSid) params.MessagingServiceSid = messagingServiceSid;
   else if (from) params.From = from;
 
+  // Ask Twilio to POST delivery-status updates back to us. The initial
+  // API response only tells us Twilio ACCEPTED the message (status
+  // "queued"/"accepted") — actual delivery success/failure (e.g. a
+  // geo-permission block or an unverified trial number) arrives
+  // asynchronously here. Without this, a message that Twilio later
+  // fails to deliver looks "sent" forever in our UI. Requires a public
+  // app URL; skipped silently in local dev where there's no callback host.
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+  if (appUrl.startsWith("http")) {
+    params.StatusCallback = `${appUrl.replace(/\/$/, "")}/api/twilio/status`;
+  }
+
   try {
     const res = await fetch(
       `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
