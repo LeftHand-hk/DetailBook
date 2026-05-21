@@ -1,10 +1,17 @@
-// Normalise a phone number to E.164. Assumes US (+1) when no country
-// code is present, matching the rest of the app's US-only assumption.
+// Normalise a phone number to E.164. We only assume the US country
+// code (+1) for the clear US/Canada shapes — a 10-digit number, or an
+// 11-digit number starting with 1. Anything else is treated as a full
+// international number the caller typed without the leading "+", so we
+// just prefix it. This stops a Kosovo number like 38348394457 from
+// being mangled into +138348394457.
 export function normalizePhone(raw: string): string {
   const trimmed = (raw || "").trim();
   if (trimmed.startsWith("+")) return trimmed;
   const digits = trimmed.replace(/\D/g, "");
-  return digits ? `+1${digits}` : "";
+  if (!digits) return "";
+  if (digits.length === 10) return `+1${digits}`;            // US/Canada, no country code
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`; // US/Canada with 1
+  return `+${digits}`;                                        // assume full intl number
 }
 
 export function isTwilioConfigured(): boolean {
@@ -26,8 +33,8 @@ export async function sendSms(to: string, body: string): Promise<{ success: bool
     return { success: false, error: "Twilio not configured" };
   }
 
-  // Normalize phone number: must start with +
-  const normalized = to.startsWith("+") ? to : `+1${to.replace(/\D/g, "")}`;
+  // Normalize phone number to E.164 (shared helper handles US vs intl).
+  const normalized = normalizePhone(to);
 
   // Prefer MessagingServiceSid (handles routing, compliance, sender pool).
   // Fall back to From number if no service is configured.
