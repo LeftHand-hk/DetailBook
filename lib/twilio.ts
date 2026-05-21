@@ -1,3 +1,20 @@
+// Normalise a phone number to E.164. Assumes US (+1) when no country
+// code is present, matching the rest of the app's US-only assumption.
+export function normalizePhone(raw: string): string {
+  const trimmed = (raw || "").trim();
+  if (trimmed.startsWith("+")) return trimmed;
+  const digits = trimmed.replace(/\D/g, "");
+  return digits ? `+1${digits}` : "";
+}
+
+export function isTwilioConfigured(): boolean {
+  return Boolean(
+    process.env.TWILIO_ACCOUNT_SID &&
+    process.env.TWILIO_AUTH_TOKEN &&
+    (process.env.TWILIO_MESSAGING_SERVICE_SID || process.env.TWILIO_PHONE_NUMBER)
+  );
+}
+
 export async function sendSms(to: string, body: string): Promise<{ success: boolean; error?: string; sid?: string }> {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;

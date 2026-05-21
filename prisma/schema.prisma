@@ -452,6 +452,37 @@ model PasswordReset {
   @@index([email])
 }
 
+// Admin SMS inbox. Every inbound (customer → us) and outbound
+// (us → customer, sent from the admin dashboard) text is stored here
+// so the admin can hold a conversation from /admin/sms. Conversations
+// are grouped by `contact` — the external phone number, always the
+// other party regardless of direction — so a thread reads top to
+// bottom no matter who spoke.
+model SmsMessage {
+  id          String   @id @default(cuid())
+  // "inbound"  = customer texted our Twilio number
+  // "outbound" = admin sent from the dashboard
+  direction   String
+  // The external party's number in E.164 (+1…). For inbound this is
+  // the From; for outbound it's the To. Always the "other side".
+  contact     String
+  // Raw From/To as Twilio reported them, kept for auditing.
+  fromNumber  String
+  toNumber    String
+  body        String   @db.Text
+  // Twilio message SID once accepted (outbound) or received (inbound).
+  twilioSid   String?
+  // Delivery/receipt status from Twilio (queued, sent, delivered,
+  // received, failed, undelivered…).
+  status      String   @default("")
+  // Inbound messages start unread so the inbox can badge new texts.
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([contact])
+  @@index([createdAt])
+}
+
 model PlatformSettings {
   id                   String  @id @default("default")
   platformName         String  @default("DetailBook")

@@ -58,6 +58,15 @@ const navItems: NavItem[] = [
     ),
   },
   {
+    label: "SMS Inbox",
+    href: "/admin/sms",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+      </svg>
+    ),
+  },
+  {
     label: "Feedback",
     href: "/admin/feedback",
     icon: (
