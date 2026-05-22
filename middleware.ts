@@ -3,8 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Dashboard routes — require user token
-  if (pathname.startsWith("/dashboard")) {
+  // Dashboard routes + the standalone booking-page editor — require
+  // the user token. The editor lives outside /dashboard so it can
+  // render full-screen without the dashboard layout, but it's still
+  // owner-only.
+  if (pathname.startsWith("/dashboard") || pathname.startsWith("/booking-page-editor")) {
     const token = request.cookies.get("detailbook_token")?.value;
     if (!token) {
       return NextResponse.redirect(new URL("/login", request.url));
@@ -31,5 +34,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/staff/:path*", "/admin/:path*"],
+  matcher: ["/dashboard/:path*", "/booking-page-editor/:path*", "/staff/:path*", "/admin/:path*"],
 };

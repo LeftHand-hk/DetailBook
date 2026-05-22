@@ -127,6 +127,7 @@ export default function BookingV2Landing({
   onSaved,
   onManageGallery,
   onManageReviews,
+  onBack,
 }: {
   profile: V2Profile;
   packages: V2Package[];
@@ -137,6 +138,7 @@ export default function BookingV2Landing({
   onSaved?: (fields: Record<string, unknown>) => void;
   onManageGallery?: () => void;
   onManageReviews?: () => void;
+  onBack?: () => void;
 }) {
   const [scrolled, setScrolled] = useState(false);
   const [draft, setDraft] = useState<Partial<Record<EditableKey, string>>>({});
@@ -227,8 +229,17 @@ export default function BookingV2Landing({
       {editable && (
         <div className="sticky top-0 z-50 bg-stone-900 text-white">
           <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center gap-3 flex-wrap">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-white/90 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                Dashboard
+              </button>
+            )}
             <span className="text-sm font-bold">Edit your page</span>
-            <span className="text-xs text-white/50 hidden sm:inline">Click any text or photo below to change it.</span>
+            <span className="text-xs text-white/50 hidden md:inline">Click any text or photo below to change it.</span>
 
             {/* Page color picker */}
             <div className="flex items-center gap-1.5 ml-auto">
