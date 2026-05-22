@@ -70,6 +70,7 @@ export async function PUT(request: NextRequest) {
       "hasSeenCustomizePrompt",
       "galleryLayout", "galleryShowTitle", "galleryTitle",
       "reviewsLayout", "reviewsShowStars", "reviewsShowAvatars", "reviewsShowDates",
+      "pageContent",
     ];
 
     const updateData: Record<string, unknown> = {};

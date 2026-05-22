@@ -94,6 +94,7 @@ export async function GET(
       accentColor: user.accentColor,
       bookingPageTitle: user.bookingPageTitle,
       bookingPageSubtitle: user.bookingPageSubtitle,
+      pageContent: (user as any).pageContent ?? null,
       showRating: user.showRating,
       showSocialLinks: user.showSocialLinks,
       showServiceAreas: user.showServiceAreas,

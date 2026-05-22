@@ -121,6 +121,7 @@ export default function BookingPageEditorStandalone() {
           bookingPageSubtitle: u.bookingPageSubtitle,
           accentColor: u.accentColor,
           galleryTitle,
+          pageContent: u.pageContent ?? null,
         }}
         packages={packages}
         reviews={reviews}

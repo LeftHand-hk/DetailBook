@@ -129,6 +129,13 @@ model User {
   reviewsShowAvatars Boolean @default(true)
   reviewsShowDates   Boolean @default(true)
 
+  // Free-form text overrides for the v2 booking page — section
+  // headings, eyebrow labels, CTA copy, etc. that don't have their
+  // own column. Keyed by a stable slot id (e.g. "servicesHeading",
+  // "ctaHeading"); the page renders pageContent[key] ?? a built-in
+  // default, so an empty/absent key always shows sensible default copy.
+  pageContent        Json?
+
   // Welcome email sequence (4 emails: Day 0, Day 2, Day 5, Day 13). Each
   // *At column is the timestamp of decision (sent OR explicitly skipped).
   // For Day 2 in particular, `welcomeEmailDay2Skipped` distinguishes

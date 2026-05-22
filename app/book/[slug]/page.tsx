@@ -746,6 +746,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
           bookingPageSubtitle: u.bookingPageSubtitle,
           accentColor: u.accentColor,
           galleryTitle: u.galleryTitle,
+          pageContent: u.pageContent ?? null,
         }}
         packages={allDisplayPackages as any}
         reviews={reviews as any}
