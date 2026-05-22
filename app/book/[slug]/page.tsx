@@ -9,6 +9,7 @@ import SquareDepositModal from "@/components/SquareDepositModal";
 import PublicPhotoGallery, { type PublicPhoto } from "@/components/PublicPhotoGallery";
 import PublicReviews, { type PublicReview } from "@/components/PublicReviews";
 import { VEHICLE_TYPES, type VehicleTypeId, surchargeForVehicleType, packageSupportsVehicleType } from "@/lib/vehicle-pricing";
+import BookingV2Landing from "@/components/BookingV2Landing";
 
 const TIMES = [
   "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM",
@@ -94,6 +95,10 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState(0);
+  // v2: the editorial landing shows first; "Book Now" drops the visitor
+  // into the existing step-based booking flow. Default true so every
+  // visitor lands on the marketing page; flipped to false on Book Now.
+  const [showLanding, setShowLanding] = useState(true);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   // True when the logged-in viewer is the owner of this booking page.
   // We use slug equality from the local storage cache — same machine
@@ -710,6 +715,48 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
           <p className="text-white/60">The booking page for &quot;{slug}&quot; doesn&apos;t exist.</p>
         </div>
       </div>
+    );
+  }
+
+  // ── v2 editorial landing ────────────────────────────
+  // Shown first (default). "Book Now" drops into the existing
+  // step-based flow below. Hidden once the visitor enters the flow
+  // (showLanding=false) or lands mid-flow via a payment return
+  // (step !== 0).
+  if (showLanding && step === 0) {
+    const u = user as any;
+    return (
+      <BookingV2Landing
+        profile={{
+          businessName: user.businessName || "",
+          bio: u.bio,
+          city: u.city,
+          address: u.address,
+          phone: u.phone,
+          instagram: u.instagram,
+          facebook: u.facebook,
+          website: u.website,
+          yearsInBusiness: u.yearsInBusiness,
+          rating: u.rating,
+          reviewCount: u.reviewCount,
+          serviceAreas: u.serviceAreas,
+          logo: u.logo,
+          bannerImage: u.bannerImage,
+          bookingPageTitle: u.bookingPageTitle,
+          bookingPageSubtitle: u.bookingPageSubtitle,
+          accentColor: u.accentColor,
+          galleryTitle: u.galleryTitle,
+        }}
+        packages={allDisplayPackages as any}
+        reviews={reviews as any}
+        photos={photos as any}
+        viewerIsOwner={viewerIsOwner}
+        onBookNow={() => { setShowLanding(false); window.scrollTo({ top: 0 }); }}
+        onProfileSaved={(updated) => setUser((prev) => (prev ? { ...prev, ...updated } as any : prev))}
+        onManagePackages={() => { window.location.href = "/dashboard/packages"; }}
+        onManageGallery={() => { window.location.href = "/dashboard/booking-page"; }}
+        onManageReviews={() => { window.location.href = "/dashboard/reviews"; }}
+      />
     );
   }
 
