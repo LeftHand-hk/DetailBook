@@ -729,9 +729,11 @@ export default function BookingPagePage() {
             </div>
           </div>
 
-          {/* Accent Color */}
+          {/* Accent Color — the brand colour used across the whole
+              public booking page (buttons, links, section labels). */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-3">Accent Color</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Page color</label>
+            <p className="text-xs text-gray-400 mb-3">Your brand color — used for buttons, links, and highlights across your booking page.</p>
             <div className="flex items-center gap-3 flex-wrap">
               {PRESET_COLORS.map((color) => (
                 <button

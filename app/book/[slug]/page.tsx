@@ -750,12 +750,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
         packages={allDisplayPackages as any}
         reviews={reviews as any}
         photos={photos as any}
-        viewerIsOwner={viewerIsOwner}
         onBookNow={() => { setShowLanding(false); window.scrollTo({ top: 0 }); }}
-        onProfileSaved={(updated) => setUser((prev) => (prev ? { ...prev, ...updated } as any : prev))}
-        onManagePackages={() => { window.location.href = "/dashboard/packages"; }}
-        onManageGallery={() => { window.location.href = "/dashboard/booking-page"; }}
-        onManageReviews={() => { window.location.href = "/dashboard/reviews"; }}
       />
     );
   }
