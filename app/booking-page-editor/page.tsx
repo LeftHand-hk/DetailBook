@@ -51,7 +51,9 @@ export default function BookingPageEditorStandalone() {
   const loadPhotos = useCallback(() => {
     fetch("/api/photos", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : []))
-      .then((data) => { if (Array.isArray(data)) setPhotos(data.map((p: any) => ({ id: p.id, imageUrl: p.imageUrl, title: p.title }))); })
+      // BusinessPhoto rows use photoUrl/caption; the v2 gallery expects
+      // imageUrl/title — map field names so photos actually render.
+      .then((data) => { if (Array.isArray(data)) setPhotos(data.map((p: any) => ({ id: p.id, imageUrl: p.photoUrl, title: p.caption }))); })
       .catch(() => {});
   }, []);
 
@@ -62,12 +64,21 @@ export default function BookingPageEditorStandalone() {
     const cached = getUser();
     if (cached) { setUserState(cached); hydrateOpts(cached); setReady(true); }
 
-    // Background refresh — don't block the editor on it.
-    syncFromServer().then(() => {
-      const fresh = getUser();
-      if (fresh) { setUserState(fresh); hydrateOpts(fresh); }
-      setReady(true);
-    }).catch(() => setReady(true));
+    // The editor needs the full user INCLUDING the banner/cover base64
+    // images (the cached/synced user omits them). Fetch ?full=1 so the
+    // banner + About image show and can be edited.
+    fetch("/api/user?full=1", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.user) {
+          const { packages: _p, bookings: _b, ...fields } = data.user;
+          const fresh = fields as User;
+          setUserState(fresh);
+          hydrateOpts(fresh);
+        }
+        setReady(true);
+      })
+      .catch(() => setReady(true));
 
     fetch("/api/packages", { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).then((p) => { if (Array.isArray(p)) setPackages(p.filter((x: any) => x.active)); }).catch(() => {});
     fetch("/api/reviews", { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).then((rv) => { if (Array.isArray(rv)) setReviews(rv.map((r: any) => ({ id: r.id, customerName: r.customerName, rating: r.rating, reviewText: r.reviewText, reviewDate: r.reviewDate }))); }).catch(() => {});
@@ -117,6 +128,7 @@ export default function BookingPageEditorStandalone() {
           serviceAreas: u.serviceAreas,
           logo: u.logo,
           bannerImage: u.bannerImage,
+          coverImage: u.coverImage,
           bookingPageTitle: u.bookingPageTitle,
           bookingPageSubtitle: u.bookingPageSubtitle,
           accentColor: u.accentColor,

@@ -22,6 +22,7 @@ export type V2Profile = {
   instagram?: string | null; facebook?: string | null; website?: string | null;
   yearsInBusiness?: number | null; rating?: number | null; reviewCount?: number | null;
   serviceAreas?: string[] | null; logo?: string | null; bannerImage?: string | null;
+  coverImage?: string | null;
   bookingPageTitle?: string | null; bookingPageSubtitle?: string | null;
   accentColor?: string | null; galleryTitle?: string | null;
   pageContent?: Record<string, string> | null;
@@ -55,6 +56,8 @@ const CONTENT_DEFAULTS: Record<string, string> = {
   bookEyebrow: "Book online",
   bookNote: "Online booking 24/7 — no calls, no DMs, no waiting.",
   followEyebrow: "Follow",
+  aboutImageLabel: "Recent work",
+  aboutImageCaption: "Showroom finish, every time.",
 };
 
 const PRESET_COLORS = ["#0F172A", "#2563EB", "#6366F1", "#8B5CF6", "#10B981", "#F59E0B", "#EF4444", "#EC4899", "#0EA5E9", "#14B8A6"];
@@ -115,6 +118,7 @@ export default function BookingV2Landing({
   const [savedFlash, setSavedFlash] = useState(false);
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const aboutImgInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 80);
@@ -145,7 +149,7 @@ export default function BookingV2Landing({
       return bio ? (bio.length > 140 ? bio.slice(0, 140) + "…" : bio) : "Professional auto detailing — book online in under a minute.";
     }
     if (key === "heroEyebrow") return textValue("city") || profile.serviceAreas?.[0] || "Auto Detailing";
-    if (key === "aboutTagline") return profile.yearsInBusiness ? `${profile.yearsInBusiness}+ years of obsession with finish.` : "obsessive attention to every panel.";
+    if (key === "aboutTagline") return years ? `${years}+ years of obsession with finish.` : "obsessive attention to every panel.";
     if (key === "bio") return "From a daily-driver refresh to a multi-stage paint correction, every car gets the same hand-finished attention. Book online and we'll handle the rest.";
     return CONTENT_DEFAULTS[key] ?? "";
   };
@@ -162,6 +166,10 @@ export default function BookingV2Landing({
     setSaving(true); setSaveError("");
     try {
       const payload: Record<string, unknown> = { ...colDraft };
+      // yearsInBusiness is an Int column — coerce the draft string.
+      if (typeof payload.yearsInBusiness === "string") {
+        payload.yearsInBusiness = parseInt(payload.yearsInBusiness, 10) || 0;
+      }
       if (Object.keys(contentDraft).length) payload.pageContent = { ...pc, ...contentDraft };
       const res = await fetch("/api/user", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (!res.ok) {
@@ -176,10 +184,11 @@ export default function BookingV2Landing({
     } finally { setSaving(false); }
   };
 
-  const pickImage = async (key: "bannerImage" | "logo", file: File | undefined) => {
+  const pickImage = async (key: "bannerImage" | "logo" | "coverImage", file: File | undefined) => {
     if (!file) return;
     try {
-      const dataUrl = await compressImage(file, key === "logo" ? 400 : 1600);
+      const maxW = key === "logo" ? 400 : key === "coverImage" ? 1000 : 1600;
+      const dataUrl = await compressImage(file, maxW);
       setColDraft((d) => ({ ...d, [key]: dataUrl }));
     } catch (err: any) {
       setSaveError(err?.message || "Could not load image.");
@@ -191,7 +200,15 @@ export default function BookingV2Landing({
   const businessName = resolve("businessName") || profile.businessName;
   const bannerImage = colDraft["bannerImage"] || profile.bannerImage || "";
   const logo = colDraft["logo"] || profile.logo || "";
+  // About-section image: coverImage, then first gallery photo, then
+  // banner — never empty.
+  const aboutImage = colDraft["coverImage"] || profile.coverImage || photos[0]?.imageUrl || bannerImage || "";
   const hasAvg = (profile.rating || 0) > 0 && (profile.reviewCount || 0) > 0;
+  // Years in business — editable number. Draft (string) wins while
+  // editing; coerced to a number on save.
+  const years = colDraft["yearsInBusiness"] !== undefined
+    ? (parseInt(colDraft["yearsInBusiness"], 10) || 0)
+    : (profile.yearsInBusiness || 0);
 
   // Inline editable text → input/textarea in editor, plain text in display.
   const Field = ({ k, tag: Tag = "span", className = "", editClassName = "", multiline = false, rows = 2 }: {
@@ -354,26 +371,57 @@ export default function BookingV2Landing({
             {editable
               ? <Field k="bio" multiline rows={5} />
               : <p className="text-stone-600 text-lg leading-relaxed max-w-xl">{resolve("bio")}</p>}
+
+            {/* Years-in-business editor (number). Drives the stat + the
+                about tagline default. */}
+            {editable && (
+              <div className="mt-6 flex items-center gap-2">
+                <label className="text-xs font-semibold uppercase tracking-widest text-stone-500">Years in business</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={colDraft["yearsInBusiness"] !== undefined ? colDraft["yearsInBusiness"] : (profile.yearsInBusiness ?? "")}
+                  onChange={(e) => setColDraft((d) => ({ ...d, yearsInBusiness: e.target.value }))}
+                  className="w-20 bg-white border-2 border-dashed border-blue-300 rounded px-2 py-1 text-sm text-stone-900"
+                />
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-6 max-w-md text-sm mt-8">
-              {profile.yearsInBusiness ? <Stat labelKey="statYearsLabel" value={`${profile.yearsInBusiness}+`} resolve={resolve} editable={editable} textValue={textValue} setText={setText} /> : null}
-              {profile.reviewCount ? <Stat labelKey="statReviewsLabel" value={`${profile.reviewCount}`} resolve={resolve} editable={editable} textValue={textValue} setText={setText} /> : null}
+              {(years > 0 || editable) ? <Stat labelKey="statYearsLabel" value={`${years || 0}+`} resolve={resolve} editable={editable} textValue={textValue} setText={setText} /> : null}
+              {(profile.reviewCount || editable) ? <Stat labelKey="statReviewsLabel" value={`${profile.reviewCount || 0}`} resolve={resolve} editable={editable} textValue={textValue} setText={setText} /> : null}
               {profile.serviceAreas && profile.serviceAreas.length > 0 ? <Stat labelKey="statAreaLabel" value={profile.serviceAreas[0]} resolve={resolve} editable={editable} textValue={textValue} setText={setText} /> : null}
               {packages.length > 0 ? <Stat labelKey="statServicesLabel" value={`${packages.length}`} resolve={resolve} editable={editable} textValue={textValue} setText={setText} /> : null}
             </div>
           </div>
           <div className="relative aspect-[4/5] w-full rounded-2xl overflow-hidden bg-stone-200 shadow-2xl">
-            {photos[0]?.imageUrl ? (
+            {aboutImage ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={photos[0].imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
-            ) : bannerImage ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={bannerImage} alt="" className="absolute inset-0 w-full h-full object-cover opacity-80" />
+              <img src={aboutImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
             ) : (
-              <div className="absolute inset-0 bg-gradient-to-br from-stone-700 to-stone-900 flex items-center justify-center text-white/40 text-sm">No photos yet</div>
+              <div className="absolute inset-0 bg-gradient-to-br from-stone-700 to-stone-900 flex items-center justify-center text-white/40 text-sm">No photo yet</div>
+            )}
+            {editable && (
+              <>
+                <button onClick={() => aboutImgInputRef.current?.click()} className="absolute top-3 right-3 z-10 inline-flex items-center gap-2 bg-white/90 text-stone-900 text-xs font-bold px-3 py-1.5 rounded-full shadow hover:bg-white">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                  Replace photo
+                </button>
+                <input ref={aboutImgInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => pickImage("coverImage", e.target.files?.[0])} />
+              </>
             )}
             <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black/80 to-transparent">
-              <p className="text-white/70 text-[10px] uppercase tracking-widest font-semibold">Recent work</p>
-              <p className="text-white text-lg font-bold mt-1">{photos[0]?.title || "Showroom finish, every time."}</p>
+              {editable ? (
+                <div className="space-y-1.5">
+                  <input value={textValue("aboutImageLabel")} placeholder={resolve("aboutImageLabel")} onChange={(e) => setText("aboutImageLabel", e.target.value)} className="bg-white/95 border-2 border-dashed border-blue-300 rounded px-2 py-1 text-[10px] uppercase tracking-widest text-stone-900 w-40" />
+                  <input value={textValue("aboutImageCaption")} placeholder={resolve("aboutImageCaption")} onChange={(e) => setText("aboutImageCaption", e.target.value)} className="bg-white/95 border-2 border-dashed border-blue-300 rounded px-2 py-1 text-sm font-bold text-stone-900 w-full" />
+                </div>
+              ) : (
+                <>
+                  <p className="text-white/70 text-[10px] uppercase tracking-widest font-semibold">{resolve("aboutImageLabel")}</p>
+                  <p className="text-white text-lg font-bold mt-1">{resolve("aboutImageCaption")}</p>
+                </>
+              )}
             </div>
           </div>
         </div>

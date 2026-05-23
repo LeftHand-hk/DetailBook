@@ -742,6 +742,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
           serviceAreas: u.serviceAreas,
           logo: u.logo,
           bannerImage: u.bannerImage,
+          coverImage: u.coverImage,
           bookingPageTitle: u.bookingPageTitle,
           bookingPageSubtitle: u.bookingPageSubtitle,
           accentColor: u.accentColor,
@@ -750,7 +751,9 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
         }}
         packages={allDisplayPackages as any}
         reviews={reviews as any}
-        photos={photos as any}
+        // BusinessPhoto rows use photoUrl/caption; the v2 gallery
+        // expects imageUrl/title — map so photos render.
+        photos={photos.map((p: any) => ({ id: p.id, imageUrl: p.photoUrl || p.imageUrl, title: p.caption || p.title })) as any}
         onBookNow={() => { setShowLanding(false); window.scrollTo({ top: 0 }); }}
       />
     );

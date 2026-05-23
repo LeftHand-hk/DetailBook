@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await getSessionUser();
     if (!session) {
@@ -12,16 +12,17 @@ export async function GET() {
       );
     }
 
-    // Omit base64 image blobs — coverImage and bannerImage are only used
-    // on the public booking page, not on the dashboard. The logo IS used
-    // in the dashboard header so we keep it.
+    // By default we omit the base64 image blobs (coverImage,
+    // bannerImage) — the dashboard reads /api/user constantly and
+    // doesn't need them, so shipping MBs of base64 every time is
+    // wasteful. The booking-page editor DOES need them (to show + edit
+    // the banner and the About-section image), so it requests ?full=1.
+    const full = request.nextUrl.searchParams.get("full") === "1";
     const user = await prisma.user.findUnique({
       where: { id: session.id },
-      omit: {
-        password: true,
-        coverImage: true,
-        bannerImage: true,
-      },
+      omit: full
+        ? { password: true }
+        : { password: true, coverImage: true, bannerImage: true },
       include: {
         packages: true,
         bookings: true,

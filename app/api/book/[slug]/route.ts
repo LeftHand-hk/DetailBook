@@ -17,9 +17,6 @@ export async function GET(
     // blocked on photo download.
     const user = await prisma.user.findUnique({
       where: { slug },
-      // coverImage is a base64 column the booking page never uses;
-      // omitting it keeps a big string out of the DB read + response.
-      omit: { coverImage: true },
       include: {
         packages: {
           where: { active: true },
@@ -73,9 +70,8 @@ export async function GET(
       bio: user.bio,
       address: user.address,
       logo: user.logo,
-      // coverImage intentionally omitted — the booking page (v1 flow +
-      // v2 landing) never reads it, and as a base64 column it only
-      // bloated the payload and slowed first paint.
+      // coverImage is the v2 About-section image (compressed on upload).
+      coverImage: user.coverImage,
       instagram: user.instagram,
       facebook: user.facebook,
       website: user.website,
