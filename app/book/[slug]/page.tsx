@@ -755,6 +755,20 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
         // expects imageUrl/title — map so photos render.
         photos={photos.map((p: any) => ({ id: p.id, imageUrl: p.photoUrl || p.imageUrl, title: p.caption || p.title })) as any}
         onBookNow={() => { setShowLanding(false); window.scrollTo({ top: 0 }); }}
+        onSelectPackage={(pkg: any) => {
+          // Customer clicked a specific service card. Preselect it and
+          // skip the redundant "choose a service" step.
+          const real = allDisplayPackages.find((p) => p.id === pkg.id);
+          setShowLanding(false);
+          window.scrollTo({ top: 0 });
+          if (!real) return;
+          setSelectedPackage(real);
+          // Tiered packages need the vehicle-type picker (step 0 only),
+          // so the surcharge is applied. Flat-priced packages jump
+          // straight to date/time.
+          const hasTiers = Array.isArray((real as any).vehiclePricing) && (real as any).vehiclePricing.length > 0;
+          setStep(hasTiers ? 0 : 1);
+        }}
       />
     );
   }

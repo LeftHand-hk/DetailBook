@@ -99,7 +99,7 @@ function compressImage(file: File, maxWidth = 1600, quality = 0.82): Promise<str
 
 export default function BookingV2Landing({
   profile, packages, reviews, photos, onBookNow,
-  editable = false, onSaved, onManageGallery, onManageReviews, onBack,
+  editable = false, onSaved, onManageGallery, onManageReviews, onBack, onSelectPackage,
 }: {
   profile: V2Profile;
   packages: V2Package[]; reviews: V2Review[]; photos: V2Photo[];
@@ -109,6 +109,10 @@ export default function BookingV2Landing({
   onManageGallery?: () => void;
   onManageReviews?: () => void;
   onBack?: () => void;
+  // Customer clicked a specific service card — jump straight into the
+  // booking flow with that package preselected (skip re-choosing it).
+  // Falls back to onBookNow when not provided.
+  onSelectPackage?: (pkg: V2Package) => void;
 }) {
   const [scrolled, setScrolled] = useState(false);
   const [colDraft, setColDraft] = useState<Record<string, string>>({});
@@ -440,8 +444,16 @@ export default function BookingV2Landing({
             <div className="bg-stone-50 border border-stone-200 rounded-2xl p-10 text-center text-stone-500">No services listed yet.{editable ? " Add them on the Packages page." : ""}</div>
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {packages.map((pkg) => (
-                <div key={pkg.id} className="group bg-white border border-stone-200 rounded-2xl p-7 flex flex-col text-left">
+              {packages.map((pkg) => {
+                // In the live page the whole card books THIS package
+                // directly (no re-selection). In the editor it's inert.
+                const bookThis = () => { if (editable) return; (onSelectPackage ? onSelectPackage(pkg) : onBookNow()); };
+                return (
+                <div
+                  key={pkg.id}
+                  onClick={bookThis}
+                  className={`group bg-white border border-stone-200 rounded-2xl p-7 flex flex-col text-left transition-all ${editable ? "" : "cursor-pointer hover:border-stone-900 hover:-translate-y-0.5 hover:shadow-xl shadow-stone-200/60"}`}
+                >
                   <div className="flex items-start justify-between mb-5">
                     <div className="w-12 h-12 bg-stone-100 rounded-2xl flex items-center justify-center text-2xl">{PACKAGE_ICONS[pkg.name] ?? "🚗"}</div>
                     <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">{formatDuration(pkg.duration)}</span>
@@ -453,10 +465,11 @@ export default function BookingV2Landing({
                       <p className="text-3xl font-black tracking-tight">${pkg.price}</p>
                       {pkg.deposit && pkg.deposit > 0 && <p className="text-[11px] text-stone-400 mt-0.5">${pkg.deposit} deposit</p>}
                     </div>
-                    {!editable && <button onClick={onBookNow} className="text-xs font-bold uppercase tracking-widest text-stone-500 hover:text-stone-900 transition-colors">Book →</button>}
+                    {!editable && <span className="text-xs font-bold uppercase tracking-widest text-stone-500 group-hover:text-stone-900 transition-colors">Book →</span>}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
           {editable && <p className="text-center text-xs text-stone-400 mt-6">Services are managed on the Packages page — they appear here automatically.</p>}
