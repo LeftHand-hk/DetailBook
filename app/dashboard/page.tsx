@@ -490,6 +490,18 @@ function SetupProgressCard({
   copied: boolean;
   router: ReturnType<typeof useRouter>;
 }) {
+  // Prefetch the destination of every guide step as soon as the card
+  // mounts. The rows are <button>s (not <Link>s, because some open the
+  // copy-link action and done rows are disabled), so Next wouldn't
+  // prefetch them automatically — clicking then waited on the route
+  // chunk before the page appeared. Warming them up makes the click
+  // feel instant.
+  useEffect(() => {
+    for (const def of CARD_STEP_DEFS) {
+      if (def.href) router.prefetch(def.href);
+    }
+  }, [router]);
+
   // While the onboarding status request is in flight we render a thin
   // skeleton instead of pretending everything is incomplete.
   if (!steps) {

@@ -51,6 +51,13 @@ export async function GET() {
       logo: true,
       bannerImage: true,
       bookingPageTitle: true,
+      // V2 / "modern" signals — cheap text/JSON columns (no base64):
+      //   bookingPageLayout — flips to "modern" when they switch v1→v2
+      //   pageContent       — any inline edit in the modern editor lands here
+      //   bio               — a short intro typed in either editor
+      bookingPageLayout: true,
+      pageContent: true,
+      bio: true,
       _count: { select: { packages: true } },
     },
   });
@@ -62,13 +69,22 @@ export async function GET() {
     user.businessHours !== null && user.businessHours !== undefined;
 
   // "Customize booking page" is satisfied as soon as the owner has
-  // changed at least one of the visual fields away from default:
-  // a logo or banner upload, or a custom page title. Any of these
-  // is a strong signal they've engaged with the booking-page editor.
+  // changed at least one visual field away from default: a logo or
+  // banner upload, a custom page title, an intro/bio, switching the
+  // design to "modern" (v2), or any inline edit saved into pageContent.
+  // Any of these is a strong signal they've engaged with the editor.
   const hasLogo = typeof user.logo === "string" && user.logo.length > 0;
   const hasBanner = typeof user.bannerImage === "string" && user.bannerImage.length > 0;
   const hasCustomTitle = typeof user.bookingPageTitle === "string" && user.bookingPageTitle.trim().length > 0;
-  const hasCustomized = hasLogo || hasBanner || hasCustomTitle;
+  const hasBio = typeof user.bio === "string" && user.bio.trim().length > 0;
+  // bookingPageLayout defaults to "classic", so only a switch to "modern"
+  // counts as an explicit customization.
+  const switchedToModern = (user as any).bookingPageLayout === "modern";
+  // Any non-empty pageContent object means they saved at least one inline
+  // edit in the modern editor.
+  const pc = (user as any).pageContent;
+  const hasPageContent = pc && typeof pc === "object" && Object.keys(pc).length > 0;
+  const hasCustomized = hasLogo || hasBanner || hasCustomTitle || hasBio || switchedToModern || hasPageContent;
 
   // Sticky completion: once observed done, persist so transient UI states
   // (clearing a field during autosave, etc.) don't flip a step back.
