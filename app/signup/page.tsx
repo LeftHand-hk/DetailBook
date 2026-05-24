@@ -81,8 +81,9 @@ export default function SignupPage() {
         return;
       }
       login();
-      await syncFromServer();
-      setLoading(false);
+      // Navigate immediately; warm the cache in the background instead
+      // of blocking on a full sync.
+      syncFromServer().catch(() => {});
       // Pixel events are deliberately NOT fired here — the conversion
       // event (CompleteRegistration) lives in /onboarding's Paddle
       // checkout.completed callback, and the top-of-funnel Lead fires

@@ -58,8 +58,12 @@ export default function LoginPage() {
         return;
       }
       login();
-      await syncFromServer();
-      setLoading(false);
+      // Navigate immediately — don't block the login button on a full
+      // data sync (/api/user pulls the whole user + bookings + packages
+      // and was making login feel frozen for seconds). The dashboard
+      // layout runs its own sync on mount; we just warm the cache here
+      // in the background.
+      syncFromServer().catch(() => {});
       router.push("/dashboard");
     } catch {
       setError("Something went wrong. Please try again.");
@@ -82,8 +86,7 @@ export default function LoginPage() {
         return;
       }
       login();
-      await syncFromServer();
-      setLoading(false);
+      syncFromServer().catch(() => {});
       router.push("/dashboard");
     } catch {
       setError("Something went wrong. Please try again.");

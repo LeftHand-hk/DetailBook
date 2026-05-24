@@ -6,7 +6,6 @@ import { useState, useEffect, useRef } from "react";
 import { isLoggedIn, logout, getUser, initializeDemo, syncFromServer } from "@/lib/storage";
 import type { User } from "@/types";
 import { LogoIcon, LogoWordmark } from "@/components/Logo";
-import NotificationBell from "@/components/NotificationBell";
 import SetupExperience from "@/components/SetupExperience";
 
 interface NavItem {
@@ -424,17 +423,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <NotificationBell />
             {isPro && (
               <span className="text-[10px] font-bold bg-gray-700 text-white px-2.5 py-1 rounded-full uppercase tracking-wider">Pro</span>
             )}
-          </div>
-        </div>
-
-        {/* Desktop floating notification box — fixed in the top-right corner */}
-        <div className="hidden lg:block fixed top-4 right-6 z-30">
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-md p-1">
-            <NotificationBell />
           </div>
         </div>
 
