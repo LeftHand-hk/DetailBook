@@ -191,8 +191,12 @@ export default function BookingV2Landing({
   const pickImage = async (key: "bannerImage" | "logo" | "coverImage", file: File | undefined) => {
     if (!file) return;
     try {
-      const maxW = key === "logo" ? 400 : key === "coverImage" ? 1000 : 1600;
-      const dataUrl = await compressImage(file, maxW);
+      // Smaller banners save much faster. Phone photos at 1600px@0.82
+      // produced ~1 MB+ of base64, which took ~10s to upload + persist.
+      // 1366px@0.8 is still crisp for a full-bleed hero but ~35% lighter.
+      const maxW = key === "logo" ? 400 : key === "coverImage" ? 1000 : 1366;
+      const quality = key === "bannerImage" ? 0.8 : 0.82;
+      const dataUrl = await compressImage(file, maxW, quality);
       setColDraft((d) => ({ ...d, [key]: dataUrl }));
     } catch (err: any) {
       setSaveError(err?.message || "Could not load image.");
@@ -308,7 +312,7 @@ export default function BookingV2Landing({
       )}
 
       {/* ── HERO ────────────────────────────────────────────────────── */}
-      <section className="relative w-full h-screen min-h-[640px] flex items-end overflow-hidden">
+      <section className="relative w-full h-[58vh] min-h-[440px] sm:h-screen sm:min-h-[640px] flex items-end overflow-hidden">
         {bannerImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={bannerImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
@@ -338,7 +342,7 @@ export default function BookingV2Landing({
           </button>
         )}
 
-        <div className="relative z-10 w-full max-w-6xl mx-auto px-5 sm:px-8 pb-28 sm:pb-24">
+        <div className="relative z-10 w-full max-w-6xl mx-auto px-5 sm:px-8 pb-10 sm:pb-24">
           {editable ? (
             <div className="max-w-2xl space-y-3">
               <Field k="heroEyebrow" editClassName="max-w-xs text-sm uppercase tracking-widest" />
@@ -404,7 +408,6 @@ export default function BookingV2Landing({
 
             <div className="grid grid-cols-2 gap-6 max-w-md text-sm mt-8">
               {(years > 0 || editable) ? <Stat labelKey="statYearsLabel" value={`${years || 0}+`} resolve={resolve} editable={editable} textValue={textValue} setText={setText} /> : null}
-              {(profile.reviewCount || editable) ? <Stat labelKey="statReviewsLabel" value={`${profile.reviewCount || 0}`} resolve={resolve} editable={editable} textValue={textValue} setText={setText} /> : null}
               {profile.serviceAreas && profile.serviceAreas.length > 0 ? <Stat labelKey="statAreaLabel" value={profile.serviceAreas[0]} resolve={resolve} editable={editable} textValue={textValue} setText={setText} /> : null}
               {packages.length > 0 ? <Stat labelKey="statServicesLabel" value={`${packages.length}`} resolve={resolve} editable={editable} textValue={textValue} setText={setText} /> : null}
             </div>
@@ -559,8 +562,8 @@ export default function BookingV2Landing({
       </section>
 
       {/* ── CONTACT / FOOTER ────────────────────────────────────────── */}
-      <footer id="contact" className="bg-stone-100 border-t border-stone-200 px-5 sm:px-8 py-14">
-        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-10">
+      <footer id="contact" className="bg-stone-100 border-t border-stone-200 px-5 sm:px-8 py-10 sm:py-14">
+        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-7 md:gap-10">
           <div>
             <Eyebrow k="contactEyebrow" />
             <p className="text-stone-900 font-bold text-lg mb-3">{businessName}</p>
@@ -577,14 +580,14 @@ export default function BookingV2Landing({
               </>
             )}
           </div>
-          <div>
+          <div className="border-t border-stone-200 pt-7 md:border-t-0 md:pt-0">
             <Eyebrow k="bookEyebrow" />
-            <button onClick={onBookNow} className="inline-flex items-center gap-2 text-white font-semibold text-sm px-5 py-2.5 rounded-full hover:opacity-90 transition-opacity" style={{ backgroundColor: accent }}>Open booking →</button>
+            <button onClick={onBookNow} className="inline-flex items-center justify-center gap-2 w-full sm:w-auto text-white font-semibold text-sm px-5 py-3 sm:py-2.5 rounded-full hover:opacity-90 transition-opacity" style={{ backgroundColor: accent }}>Open booking →</button>
             {editable
               ? <div className="mt-3 max-w-xs"><Field k="bookNote" multiline rows={2} editClassName="text-xs" /></div>
               : <p className="text-stone-500 text-xs mt-3 leading-relaxed">{resolve("bookNote")}</p>}
           </div>
-          <div>
+          <div className="border-t border-stone-200 pt-7 md:border-t-0 md:pt-0">
             <Eyebrow k="followEyebrow" />
             {editable ? (
               <div className="space-y-2 max-w-xs">
