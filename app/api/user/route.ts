@@ -93,11 +93,14 @@ export async function PUT(request: NextRequest) {
     const user = await prisma.user.update({
       where: { id: session.id },
       data: updateData,
+      // Don't echo the heavy base64 image columns back in the response.
+      // A tiny text edit in the booking-page editor was downloading
+      // ~1-2MB of logo/banner/cover on every save, which is why saving
+      // felt slow. The client already has whatever it just sent.
+      omit: { password: true, logo: true, coverImage: true, bannerImage: true },
     });
 
-    const { password: _, ...userWithoutPassword } = user;
-
-    return NextResponse.json({ user: userWithoutPassword });
+    return NextResponse.json({ user });
   } catch (error) {
     console.error("Update user error:", error);
     return NextResponse.json(
