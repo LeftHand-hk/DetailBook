@@ -86,11 +86,6 @@ const settingsNav: NavItem[] = [
     href: "/dashboard/support",
     icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
   },
-  {
-    label: "Feedback",
-    href: "/dashboard/feedback",
-    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 8h10M7 12h6m-6 4h8m1 4l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-1l-2 4z" /></svg>,
-  },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -101,6 +96,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [checked, setChecked] = useState(false);
   const [upgradeDismissed, setUpgradeDismissed] = useState(false);
   const [impersonating, setImpersonating] = useState(false);
+  // Dashboard dark mode. Persisted in localStorage; applied as a
+  // `db-dark` class on the dashboard root, which a scoped block in
+  // globals.css restyles (so we don't need dark: variants on every
+  // element). Seeded from storage in the initializer to avoid a
+  // light→dark flash on load.
+  const [dark, setDark] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try { return localStorage.getItem("db_dark") === "1"; } catch { return false; }
+  });
+  const toggleDark = () => {
+    setDark((d) => {
+      const next = !d;
+      try { localStorage.setItem("db_dark", next ? "1" : "0"); } catch { /* private mode */ }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -364,6 +375,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           View Booking Page
         </Link>
         <button
+          onClick={toggleDark}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all"
+        >
+          {dark ? (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+          )}
+          <span className="flex-1 text-left">{dark ? "Light mode" : "Dark mode"}</span>
+          <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${dark ? "bg-blue-500" : "bg-white/15"}`}>
+            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${dark ? "translate-x-4.5" : "translate-x-1"}`} style={{ transform: dark ? "translateX(18px)" : "translateX(3px)" }} />
+          </span>
+        </button>
+        <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-500 hover:text-red-400 hover:bg-red-500/[0.06] transition-all"
         >
@@ -386,7 +415,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     // hides, keeping the whole dashboard inside the visible area at
     // all times. Supported in iOS Safari 15.4+ (March 2022); we keep
     // h-screen as a fallback for anything older.
-    <div className="flex h-screen bg-gray-50 overflow-hidden" style={{ height: "100dvh" }}>
+    <div className={`flex h-screen bg-gray-50 overflow-hidden ${dark ? "db-dark" : ""}`} style={{ height: "100dvh" }}>
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex flex-col w-[260px] bg-[#0B1120] flex-shrink-0 border-r border-white/[0.04]">
         <Sidebar />

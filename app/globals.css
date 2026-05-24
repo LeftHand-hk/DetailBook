@@ -182,3 +182,70 @@ body {
 ::-webkit-scrollbar-track { background: #f1f5f9; }
 ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+/* ─────────────────────────────────────────────────────────────────
+   Dashboard dark mode.
+
+   Scoped to `.db-dark` (the dashboard root). The dashboard is built in
+   light-mode Tailwind utilities; rather than add dark: variants to
+   hundreds of elements, we restyle the neutral gray/white surfaces
+   here. Accent colors (blue/green/red/amber backgrounds + their text)
+   are deliberately left untouched so badges and buttons keep their
+   meaning. The dark sidebar uses slate / white-alpha utilities, which
+   we don't target, so it stays exactly as designed.
+   ───────────────────────────────────────────────────────────────── */
+.db-dark { background-color: #0b1120; color: #e2e8f0; }
+
+/* Surfaces — cards, panels, page backgrounds */
+.db-dark .bg-white { background-color: #1e293b !important; }
+.db-dark .bg-gray-50,
+.db-dark .bg-gray-50\/80,
+.db-dark .bg-gray-50\/50,
+.db-dark .bg-gray-50\/40,
+.db-dark .bg-gray-100 { background-color: #0f172a !important; }
+.db-dark .bg-gray-100\/50,
+.db-dark .bg-gray-200 { background-color: #1e293b !important; }
+
+/* Text */
+.db-dark .text-gray-900 { color: #f8fafc !important; }
+.db-dark .text-gray-800 { color: #e2e8f0 !important; }
+.db-dark .text-gray-700 { color: #cbd5e1 !important; }
+.db-dark .text-gray-600,
+.db-dark .text-gray-500 { color: #94a3b8 !important; }
+.db-dark .text-gray-400,
+.db-dark .text-gray-300 { color: #64748b !important; }
+
+/* Borders + dividers */
+.db-dark .border-gray-100,
+.db-dark .border-gray-200,
+.db-dark .border-gray-300,
+.db-dark .border-gray-50 { border-color: #334155 !important; }
+.db-dark .divide-gray-50 > :not([hidden]) ~ :not([hidden]),
+.db-dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: #334155 !important; }
+
+/* Form fields */
+.db-dark input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+.db-dark textarea,
+.db-dark select {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+.db-dark input::placeholder,
+.db-dark textarea::placeholder { color: #64748b !important; }
+
+/* Hover states on neutral surfaces */
+.db-dark .hover\:bg-gray-50:hover,
+.db-dark .hover\:bg-gray-100:hover { background-color: #334155 !important; }
+
+/* Soften the light-mode shadows on a dark canvas */
+.db-dark .shadow-sm,
+.db-dark .shadow,
+.db-dark .shadow-md,
+.db-dark .shadow-lg,
+.db-dark .shadow-xl,
+.db-dark .shadow-2xl { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3) !important; }
+
+/* Scrollbar track on dark */
+.db-dark ::-webkit-scrollbar-track { background: #0f172a; }
+.db-dark ::-webkit-scrollbar-thumb { background: #475569; }
