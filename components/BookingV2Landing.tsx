@@ -62,6 +62,12 @@ const CONTENT_DEFAULTS: Record<string, string> = {
 
 const PRESET_COLORS = ["#0F172A", "#2563EB", "#6366F1", "#8B5CF6", "#10B981", "#F59E0B", "#EF4444", "#EC4899", "#0EA5E9", "#14B8A6"];
 
+// Default hero photos shown when a business hasn't uploaded its own banner.
+// Portrait for mobile, landscape for desktop. Served from /public (CDN
+// cached). Owners can still replace them via "Replace banner photo".
+const DEFAULT_BANNER_DESKTOP = "/default-banner-desktop.jpg";
+const DEFAULT_BANNER_MOBILE = "/default-banner-mobile.jpg";
+
 const PACKAGE_ICONS: Record<string, string> = {
   "Basic Wash": "💧", "Full Detail": "✨", "Ceramic Coating": "🛡️", "Paint Correction": "🎨", "Interior Detail": "🚗",
 };
@@ -337,17 +343,24 @@ export default function BookingV2Landing({
             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${bannerLoaded ? "opacity-100" : "opacity-0"}`}
           />
         ) : (
-          // No banner uploaded → a premium auto-detailing themed backdrop.
-          <div className="absolute inset-0 overflow-hidden">
-            {/* studio spotlight — the sheen of freshly polished paint */}
-            <div className="absolute inset-0" style={{ background: "radial-gradient(115% 80% at 72% 0%, rgba(255,255,255,0.15), transparent 55%)" }} />
-            {/* on-brand color glow from the lower corner */}
-            <div className="absolute inset-0 opacity-25" style={{ background: `radial-gradient(85% 65% at 12% 105%, ${accent}, transparent 62%)` }} />
-            {/* glossy diagonal highlight streak */}
-            <div className="absolute -left-1/4 top-0 h-full w-1/2 rotate-[14deg] bg-gradient-to-r from-transparent via-white/[0.05] to-transparent" />
-            {/* faint detailing motif */}
-            <span className="absolute -bottom-6 right-2 sm:right-12 text-[11rem] sm:text-[17rem] leading-none select-none opacity-[0.06] grayscale">🚗</span>
-          </div>
+          // No custom banner → default detailing photos. <picture> lets the
+          // browser download ONLY the portrait (mobile) or landscape
+          // (desktop) version, not both.
+          // eslint-disable-next-line @next/next/no-img-element
+          <picture>
+            <source media="(max-width: 639px)" srcSet={DEFAULT_BANNER_MOBILE} />
+            <source media="(min-width: 640px)" srcSet={DEFAULT_BANNER_DESKTOP} />
+            <img
+              src={DEFAULT_BANNER_DESKTOP}
+              alt=""
+              // @ts-expect-error fetchPriority is a valid DOM attr
+              fetchpriority="high"
+              decoding="async"
+              ref={(el) => { if (el && el.complete && el.naturalWidth > 0) setBannerLoaded(true); }}
+              onLoad={() => setBannerLoaded(true)}
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${bannerLoaded ? "opacity-100" : "opacity-0"}`}
+            />
+          </picture>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/65 to-black/55" />
 
