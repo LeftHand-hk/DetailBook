@@ -115,6 +115,10 @@ export default function BookingV2Landing({
   onSelectPackage?: (pkg: V2Package) => void;
 }) {
   const [scrolled, setScrolled] = useState(false);
+  // Fade the banner in once it's fully decoded so a baseline JPEG doesn't
+  // visibly paint top-to-bottom ("piece by piece"). The dark backdrop shows
+  // until then. Reset when the banner source changes (e.g. editor upload).
+  const [bannerLoaded, setBannerLoaded] = useState(false);
   const [colDraft, setColDraft] = useState<Record<string, string>>({});
   const [contentDraft, setContentDraft] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -218,6 +222,9 @@ export default function BookingV2Landing({
     ? (parseInt(colDraft["yearsInBusiness"], 10) || 0)
     : (profile.yearsInBusiness || 0);
 
+  // Re-arm the banner fade whenever the source changes.
+  useEffect(() => { setBannerLoaded(false); }, [bannerImage]);
+
   // Inline editable text → input/textarea in editor, plain text in display.
   const Field = ({ k, tag: Tag = "span", className = "", editClassName = "", multiline = false, rows = 2 }: {
     k: string; tag?: any; className?: string; editClassName?: string; multiline?: boolean; rows?: number;
@@ -313,13 +320,25 @@ export default function BookingV2Landing({
 
       {/* ── HERO ────────────────────────────────────────────────────── */}
       <section className="relative w-full h-[58vh] min-h-[440px] sm:h-screen sm:min-h-[640px] flex items-end overflow-hidden">
+        {/* Dark base is always present so there's no flash and the photo
+            can fade in over it (no visible top-down JPEG paint). */}
+        <div className="absolute inset-0 bg-gradient-to-br from-stone-900 via-stone-800 to-stone-950" />
         {bannerImage ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={bannerImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          <img
+            src={bannerImage}
+            alt=""
+            // @ts-expect-error fetchPriority is a valid DOM attr
+            fetchpriority="high"
+            decoding="async"
+            // Covers cached images, where onLoad may not fire after mount.
+            ref={(el) => { if (el && el.complete && el.naturalWidth > 0) setBannerLoaded(true); }}
+            onLoad={() => setBannerLoaded(true)}
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${bannerLoaded ? "opacity-100" : "opacity-0"}`}
+          />
         ) : (
-          // No banner uploaded → a premium auto-detailing themed backdrop
-          // instead of a flat color, so the hero never looks empty.
-          <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-stone-900 via-stone-800 to-stone-950">
+          // No banner uploaded → a premium auto-detailing themed backdrop.
+          <div className="absolute inset-0 overflow-hidden">
             {/* studio spotlight — the sheen of freshly polished paint */}
             <div className="absolute inset-0" style={{ background: "radial-gradient(115% 80% at 72% 0%, rgba(255,255,255,0.15), transparent 55%)" }} />
             {/* on-brand color glow from the lower corner */}
@@ -330,7 +349,7 @@ export default function BookingV2Landing({
             <span className="absolute -bottom-6 right-2 sm:right-12 text-[11rem] sm:text-[17rem] leading-none select-none opacity-[0.06] grayscale">🚗</span>
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/55 to-black/45" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/65 to-black/55" />
 
         {/* Editor: nav sits inside the hero (below the toolbar). */}
         {editable && <div className="absolute top-0 left-0 right-0 z-30">{navInner}</div>}
