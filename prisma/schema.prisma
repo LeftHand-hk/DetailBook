@@ -136,6 +136,13 @@ model User {
   // default, so an empty/absent key always shows sensible default copy.
   pageContent        Json?
 
+  // Which public booking-page design to render: "classic" (the
+  // original card-based flow) or "modern" (the v2 editorial layout).
+  // Defaults to "classic" so NO existing or new business is switched
+  // to v2 without explicitly choosing it from the dashboard design
+  // picker — protects active clients from a surprise redesign.
+  bookingPageLayout  String  @default("classic")
+
   // Welcome email sequence (4 emails: Day 0, Day 2, Day 5, Day 13). Each
   // *At column is the timestamp of decision (sent OR explicitly skipped).
   // For Day 2 in particular, `welcomeEmailDay2Skipped` distinguishes

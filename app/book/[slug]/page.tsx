@@ -733,11 +733,12 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   }
 
   // ── v2 editorial landing ────────────────────────────
-  // Shown first (default). "Book Now" drops into the existing
-  // step-based flow below. Hidden once the visitor enters the flow
-  // (showLanding=false) or lands mid-flow via a payment return
-  // (step !== 0).
-  if (showLanding && step === 0) {
+  // Only for businesses that chose the "modern" design. Everyone else
+  // (default "classic") falls straight through to the original
+  // step-based booking flow below, so active clients keep their
+  // existing page untouched. "Book Now" drops into the flow; the
+  // landing is also skipped once mid-flow via a payment return.
+  if (showLanding && step === 0 && (user as any)?.bookingPageLayout === "modern") {
     const u = user as any;
     return (
       <BookingV2Landing

@@ -96,6 +96,7 @@ export async function GET(
       bookingPageTitle: user.bookingPageTitle,
       bookingPageSubtitle: user.bookingPageSubtitle,
       pageContent: (user as any).pageContent ?? null,
+      bookingPageLayout: (user as any).bookingPageLayout ?? "classic",
       showRating: user.showRating,
       showSocialLinks: user.showSocialLinks,
       showServiceAreas: user.showServiceAreas,
