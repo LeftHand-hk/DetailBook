@@ -1,12 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { cookieSecure } from "@/lib/auth";
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
     const response = NextResponse.json({ message: "Logged out successfully" });
 
     response.cookies.set("detailbook_token", "", {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: cookieSecure(request),
       sameSite: "lax",
       path: "/",
       maxAge: 0,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { verifyPassword, signToken, signStaffToken } from "@/lib/auth";
+import { verifyPassword, signToken, signStaffToken, cookieSecure } from "@/lib/auth";
 import { isValidEmail } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
 
       response.cookies.set("detailbook_token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: cookieSecure(request),
         sameSite: "lax",
         path: "/",
         maxAge: 60 * 60 * 24 * 30,
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
 
       response.cookies.set("detailbook_staff_token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: cookieSecure(request),
         sameSite: "lax",
         path: "/",
         maxAge: 60 * 60 * 24 * 30,
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
 
       response.cookies.set("detailbook_admin_token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: cookieSecure(request),
         sameSite: "lax",
         path: "/",
         maxAge: 60 * 60 * 24 * 30,

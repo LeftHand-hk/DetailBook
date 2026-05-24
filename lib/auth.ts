@@ -1,6 +1,29 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
+import type { NextRequest } from "next/server";
+
+/**
+ * Whether the auth cookie should carry the `Secure` flag.
+ *
+ * We can't key this off NODE_ENV: `next start` forces NODE_ENV=production,
+ * which would mark the cookie Secure even when the app is served over plain
+ * HTTP on a LAN IP (e.g. http://192.168.x.x:3000 for phone testing).
+ * Browsers silently DROP Secure cookies on non-HTTPS origins (localhost is
+ * the only HTTP exception), so the session cookie never gets stored and the
+ * user looks "not logged in" (e.g. "Account not loaded" at the card step).
+ *
+ * Instead we read the actual request protocol. Behind Netlify / any proxy
+ * the original scheme is in `x-forwarded-proto`; we fall back to the request
+ * URL's own protocol. Result: HTTPS (production) → Secure; HTTP (LAN/local)
+ * → not Secure. This is strictly more correct than the NODE_ENV check.
+ */
+export function cookieSecure(request: NextRequest): boolean {
+  const proto =
+    request.headers.get("x-forwarded-proto")?.split(",")[0].trim() ||
+    request.nextUrl.protocol.replace(":", "");
+  return proto === "https";
+}
 
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 16) {
   throw new Error("JWT_SECRET environment variable must be set (at least 16 characters)");

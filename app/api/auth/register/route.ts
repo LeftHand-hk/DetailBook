@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { hashPassword, signToken } from "@/lib/auth";
+import { hashPassword, signToken, cookieSecure } from "@/lib/auth";
 import { isValidEmail, validatePassword } from "@/lib/validation";
 import { getClientIp, getClientCountry } from "@/lib/geo";
 import { sendWelcomeEmail } from "@/lib/welcome-emails";
@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
 
     response.cookies.set("detailbook_token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: cookieSecure(request),
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24 * 30,
