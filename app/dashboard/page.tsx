@@ -22,7 +22,13 @@ interface SetupStep { id: SetupStepId; done: boolean }
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  // Seed from the localStorage cache in the lazy initializer so the
+  // dashboard paints real data on first render instead of flashing
+  // empty state → data once the API responds.
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window === "undefined") return null;
+    try { return getUser(); } catch { return null; }
+  });
   const [bookings, setBookings] = useState<Booking[]>(() => {
     if (typeof window === "undefined") return [];
     try { return getBookings() || []; } catch { return []; }
