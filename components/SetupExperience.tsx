@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 type StepId =
   | "business_info"
@@ -31,7 +31,11 @@ type Status = {
 
 export default function SetupExperience() {
   const router = useRouter();
-  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+  // usePathname (not window.location) so server + client render the same
+  // value — reading window during render caused a hydration mismatch
+  // that could break event handlers across the dashboard (sidebar
+  // links stopped responding).
+  const pathname = usePathname();
   const [status, setStatus] = useState<Status | null>(null);
   const [showCompleteFlash, setShowCompleteFlash] = useState(false);
   const completionFlashedRef = useRef(false);
