@@ -66,6 +66,22 @@ export async function GET(
       select: { date: true, time: true, staffId: true },
     });
 
+    // Brand images are served as cacheable binary from /img/[type] rather
+    // than inlined as base64. We only need to know WHICH images exist so we
+    // can hand back a URL (or null). A tiny raw query checks existence
+    // without loading the multi-MB base64 columns into memory.
+    const flagRows = await prisma.$queryRaw<
+      Array<{ hasLogo: boolean; hasBanner: boolean; hasCover: boolean }>
+    >`SELECT (logo IS NOT NULL AND logo <> '') AS "hasLogo",
+             ("bannerImage" IS NOT NULL AND "bannerImage" <> '') AS "hasBanner",
+             ("coverImage" IS NOT NULL AND "coverImage" <> '') AS "hasCover"
+      FROM "User" WHERE id = ${user.id}`;
+    const flags = flagRows[0] ?? { hasLogo: false, hasBanner: false, hasCover: false };
+    // updatedAt-based cache buster: a new upload bumps updatedAt, changing
+    // the URL so caches refetch; otherwise the image is served from cache.
+    const ver = (user as any).updatedAt ? new Date((user as any).updatedAt).getTime() : 0;
+    const imgUrl = (type: string) => `/api/book/${slug}/img/${type}?v=${ver}`;
+
     // Return public profile data (exclude sensitive fields like password)
     const profile = {
       id: user.id,
@@ -76,8 +92,12 @@ export async function GET(
       slug: user.slug,
       bio: user.bio,
       address: user.address,
-      // logo / coverImage / bannerImage are NOT here — they load via
-      // /api/book/[slug]/images after first paint (see omit above).
+      // Brand images as cacheable binary URLs (null when not set) — see
+      // the /img/[type] route. The browser/CDN cache these instead of us
+      // re-shipping base64 on every load.
+      logo: flags.hasLogo ? imgUrl("logo") : null,
+      bannerImage: flags.hasBanner ? imgUrl("banner") : null,
+      coverImage: flags.hasCover ? imgUrl("cover") : null,
       instagram: user.instagram,
       facebook: user.facebook,
       website: user.website,

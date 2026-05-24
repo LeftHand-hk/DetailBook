@@ -330,7 +330,7 @@ export default function BookingV2Landing({
             <span className="absolute -bottom-6 right-2 sm:right-12 text-[11rem] sm:text-[17rem] leading-none select-none opacity-[0.06] grayscale">🚗</span>
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/30" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/55 to-black/45" />
 
         {/* Editor: nav sits inside the hero (below the toolbar). */}
         {editable && <div className="absolute top-0 left-0 right-0 z-30">{navInner}</div>}
@@ -428,19 +428,6 @@ export default function BookingV2Landing({
                 <input ref={aboutImgInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => pickImage("coverImage", e.target.files?.[0])} />
               </>
             )}
-            <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black/80 to-transparent">
-              {editable ? (
-                <div className="space-y-1.5">
-                  <input value={textValue("aboutImageLabel")} placeholder={resolve("aboutImageLabel")} onChange={(e) => setText("aboutImageLabel", e.target.value)} className="bg-white/95 border-2 border-dashed border-blue-300 rounded px-2 py-1 text-[10px] uppercase tracking-widest text-stone-900 w-40" />
-                  <input value={textValue("aboutImageCaption")} placeholder={resolve("aboutImageCaption")} onChange={(e) => setText("aboutImageCaption", e.target.value)} className="bg-white/95 border-2 border-dashed border-blue-300 rounded px-2 py-1 text-sm font-bold text-stone-900 w-full" />
-                </div>
-              ) : (
-                <>
-                  <p className="text-white/70 text-[10px] uppercase tracking-widest font-semibold">{resolve("aboutImageLabel")}</p>
-                  <p className="text-white text-lg font-bold mt-1">{resolve("aboutImageCaption")}</p>
-                </>
-              )}
-            </div>
           </div>
         </div>
       </section>

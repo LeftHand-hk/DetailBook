@@ -209,19 +209,10 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       .catch(() => { /* gallery just stays empty */ });
   }, [slug]);
 
-  // Brand images (logo, banner, cover) load separately from the main
-  // profile so first paint isn't blocked on ~370KB of base64. They
-  // merge into `user` when they arrive; the v2 hero shows its gradient
-  // fallback until then.
-  useEffect(() => {
-    fetch(`/api/book/${slug}/images`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((img) => {
-        if (!img) return;
-        setUser((prev) => (prev ? ({ ...prev, logo: img.logo, bannerImage: img.bannerImage, coverImage: img.coverImage } as any) : prev));
-      })
-      .catch(() => { /* hero keeps its gradient fallback */ });
-  }, [slug]);
+  // Brand images (logo, banner, cover) now arrive in the main payload as
+  // cacheable binary URLs (/api/book/[slug]/img/[type]) — no separate
+  // base64 fetch needed. The browser/CDN cache them, so they load fast
+  // and don't block first paint.
 
   // Handle Stripe deposit return
   const [pendingStripeReturn, setPendingStripeReturn] = useState<string | null>(null);
