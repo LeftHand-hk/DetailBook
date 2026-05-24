@@ -17,6 +17,13 @@ export async function GET(
     // blocked on photo download.
     const user = await prisma.user.findUnique({
       where: { slug },
+      // Omit the heavy base64 image columns from the main payload. They
+      // were dragging ~370KB over the DB→server link and the wire on
+      // every booking-page load, blocking first paint. The page now
+      // fetches them from /api/book/[slug]/images right after the first
+      // render (same pattern as photos), so the hero shows its gradient
+      // fallback instantly and the banner/logo/cover stream in.
+      omit: { logo: true, coverImage: true, bannerImage: true },
       include: {
         packages: {
           where: { active: true },
@@ -69,9 +76,8 @@ export async function GET(
       slug: user.slug,
       bio: user.bio,
       address: user.address,
-      logo: user.logo,
-      // coverImage is the v2 About-section image (compressed on upload).
-      coverImage: user.coverImage,
+      // logo / coverImage / bannerImage are NOT here — they load via
+      // /api/book/[slug]/images after first paint (see omit above).
       instagram: user.instagram,
       facebook: user.facebook,
       website: user.website,
@@ -83,7 +89,6 @@ export async function GET(
       emailReminders: user.emailReminders,
       customMessage: user.customMessage,
       advanceBookingDays: user.advanceBookingDays,
-      bannerImage: user.bannerImage,
       bannerOverlayOpacity: user.bannerOverlayOpacity,
       serviceLayout: user.serviceLayout,
       bookingPageTheme: user.bookingPageTheme,
