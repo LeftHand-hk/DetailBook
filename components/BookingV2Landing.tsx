@@ -313,7 +313,18 @@ export default function BookingV2Landing({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={bannerImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-stone-900 via-stone-800 to-stone-700" />
+          // No banner uploaded → a premium auto-detailing themed backdrop
+          // instead of a flat color, so the hero never looks empty.
+          <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-stone-900 via-stone-800 to-stone-950">
+            {/* studio spotlight — the sheen of freshly polished paint */}
+            <div className="absolute inset-0" style={{ background: "radial-gradient(115% 80% at 72% 0%, rgba(255,255,255,0.15), transparent 55%)" }} />
+            {/* on-brand color glow from the lower corner */}
+            <div className="absolute inset-0 opacity-25" style={{ background: `radial-gradient(85% 65% at 12% 105%, ${accent}, transparent 62%)` }} />
+            {/* glossy diagonal highlight streak */}
+            <div className="absolute -left-1/4 top-0 h-full w-1/2 rotate-[14deg] bg-gradient-to-r from-transparent via-white/[0.05] to-transparent" />
+            {/* faint detailing motif */}
+            <span className="absolute -bottom-6 right-2 sm:right-12 text-[11rem] sm:text-[17rem] leading-none select-none opacity-[0.06] grayscale">🚗</span>
+          </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/30" />
 
@@ -327,7 +338,7 @@ export default function BookingV2Landing({
           </button>
         )}
 
-        <div className="relative z-10 w-full max-w-6xl mx-auto px-5 sm:px-8 pb-16 sm:pb-24">
+        <div className="relative z-10 w-full max-w-6xl mx-auto px-5 sm:px-8 pb-28 sm:pb-24">
           {editable ? (
             <div className="max-w-2xl space-y-3">
               <Field k="heroEyebrow" editClassName="max-w-xs text-sm uppercase tracking-widest" />
@@ -443,7 +454,7 @@ export default function BookingV2Landing({
           {packages.length === 0 ? (
             <div className="bg-stone-50 border border-stone-200 rounded-2xl p-10 text-center text-stone-500">No services listed yet.{editable ? " Add them on the Packages page." : ""}</div>
           ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
               {packages.map((pkg) => {
                 // In the live page the whole card books THIS package
                 // directly (no re-selection). In the editor it's inert.
@@ -452,18 +463,18 @@ export default function BookingV2Landing({
                 <div
                   key={pkg.id}
                   onClick={bookThis}
-                  className={`group bg-white border border-stone-200 rounded-2xl p-7 flex flex-col text-left transition-all ${editable ? "" : "cursor-pointer hover:border-stone-900 hover:-translate-y-0.5 hover:shadow-xl shadow-stone-200/60"}`}
+                  className={`group bg-white border border-stone-200 rounded-2xl p-5 sm:p-7 flex flex-col text-left transition-all ${editable ? "" : "cursor-pointer hover:border-stone-900 hover:-translate-y-0.5 hover:shadow-xl shadow-stone-200/60"}`}
                 >
-                  <div className="flex items-start justify-between mb-5">
-                    <div className="w-12 h-12 bg-stone-100 rounded-2xl flex items-center justify-center text-2xl">{PACKAGE_ICONS[pkg.name] ?? "🚗"}</div>
+                  <div className="flex items-start justify-between mb-4 sm:mb-5">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-stone-100 rounded-2xl flex items-center justify-center text-xl sm:text-2xl">{PACKAGE_ICONS[pkg.name] ?? "🚗"}</div>
                     <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">{formatDuration(pkg.duration)}</span>
                   </div>
-                  <h3 className="text-xl font-extrabold leading-snug mb-2">{pkg.name}</h3>
-                  <p className="text-stone-500 text-sm leading-relaxed mb-6 flex-1 line-clamp-3">{pkg.description}</p>
-                  <div className="flex items-baseline justify-between border-t border-stone-100 pt-5">
+                  <h3 className="text-lg sm:text-xl font-extrabold leading-snug mb-2">{pkg.name}</h3>
+                  <p className="text-stone-500 text-sm leading-relaxed mb-4 sm:mb-6 flex-1 line-clamp-3">{pkg.description}</p>
+                  <div className="flex items-baseline justify-between border-t border-stone-100 pt-4 sm:pt-5">
                     <div>
-                      <p className="text-3xl font-black tracking-tight">${pkg.price}</p>
-                      {pkg.deposit && pkg.deposit > 0 && <p className="text-[11px] text-stone-400 mt-0.5">${pkg.deposit} deposit</p>}
+                      <p className="text-2xl sm:text-3xl font-black tracking-tight">${pkg.price}</p>
+                      {(pkg.deposit ?? 0) > 0 && <p className="text-[11px] text-stone-400 mt-0.5">${pkg.deposit} deposit</p>}
                     </div>
                     {!editable && <span className="text-xs font-bold uppercase tracking-widest text-stone-500 group-hover:text-stone-900 transition-colors">Book →</span>}
                   </div>

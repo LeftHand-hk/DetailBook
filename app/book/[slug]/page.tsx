@@ -1417,7 +1417,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                               <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                               {formatDuration(pkg.duration)}
                             </span>
-                            {pkg.deposit && pkg.deposit > 0 && (
+                            {(pkg.deposit ?? 0) > 0 && (
                               <span className="text-[10px] text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-full">${pkg.deposit} dep.</span>
                             )}
                             {selectedVehicleType && priceForPackage(pkg) > pkg.price && (
@@ -1462,7 +1462,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             {formatDuration(pkg.duration)}
                           </span>
-                          {pkg.deposit && pkg.deposit > 0 && (
+                          {(pkg.deposit ?? 0) > 0 && (
                             <span className="text-xs text-blue-600 font-semibold bg-blue-50 px-2.5 py-1 rounded-full">${pkg.deposit} deposit</span>
                           )}
                           {selectedVehicleType && priceForPackage(pkg) > pkg.price && (
@@ -1499,7 +1499,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                       <h3 className="font-semibold text-gray-900 text-sm group-hover:text-blue-600 transition-colors truncate">{pkg.name}</h3>
                       <div className="flex items-center gap-2 text-xs text-gray-400">
                         <span>{formatDuration(pkg.duration)}</span>
-                        {pkg.deposit && pkg.deposit > 0 && (
+                        {(pkg.deposit ?? 0) > 0 && (
                           <><span className="text-gray-300">·</span><span className="text-blue-500 font-medium">${pkg.deposit} dep.</span></>
                         )}
                       </div>
@@ -1537,7 +1537,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                           <p className="text-3xl font-extrabold text-white">${priceForPackage(pkg)}</p>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <span className="text-xs text-blue-200 bg-white/10 px-2.5 py-0.5 rounded-full">{formatDuration(pkg.duration)}</span>
-                            {pkg.deposit && pkg.deposit > 0 && (
+                            {(pkg.deposit ?? 0) > 0 && (
                               <span className="text-xs text-blue-200 bg-white/10 px-2.5 py-0.5 rounded-full">${pkg.deposit} deposit</span>
                             )}
                             {selectedVehicleType && priceForPackage(pkg) > pkg.price && (
@@ -1593,7 +1593,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                       <p className="text-sm text-gray-500 mt-0.5">{pkg.description}</p>
                       <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
                         <span>{formatDuration(pkg.duration)}</span>
-                        {pkg.deposit && pkg.deposit > 0 && (
+                        {(pkg.deposit ?? 0) > 0 && (
                           <><span className="text-gray-300">·</span><span>${pkg.deposit} deposit</span></>
                         )}
                       </div>
