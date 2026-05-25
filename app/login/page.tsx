@@ -193,7 +193,7 @@ export default function LoginPage() {
                 disabled={loading}
                 className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-bold py-2.5 rounded-xl transition-colors"
               >
-                {loading ? "Loading..." : "Log In as Demo User"}
+                {loading ? "Loading..." : "Login to demo dashboard"}
               </button>
             </div>
 

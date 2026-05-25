@@ -59,7 +59,6 @@ export default function LandingPage() {
     { q: "What happens if I exceed 5 packages on Starter?", a: "You'll be prompted to upgrade to Pro. All your existing packages stay active — you just can't add more until you upgrade." },
     { q: "Can I cancel anytime?", a: "Absolutely. No long-term contracts. Cancel any time from your Settings page. You keep access until the end of your billing period." },
     { q: "Does DetailBook work on mobile?", a: "Yes! Both your dashboard and your customer-facing booking page are fully optimized for mobile devices." },
-    { q: "Can I use my own domain for the booking page?", a: "On the Pro plan, you can connect a custom domain (e.g., book.yourbusiness.com). Starter gets a detailbookapp.com/book/your-name URL." },
   ];
 
   const navLinks = ["Features","Pricing","FAQ"];
@@ -266,7 +265,7 @@ export default function LandingPage() {
             </Link>
             <Link href="/book/mikes-mobile-detailing"
               className="glass border border-white/20 text-white font-bold text-lg px-10 py-4 rounded-2xl hover:bg-white/10 transition-all duration-300 hover:-translate-y-0.5">
-              See Live Demo →
+              See booking page live demo →
             </Link>
           </div>
 
@@ -648,7 +647,7 @@ export default function LandingPage() {
                 <span className="text-blue-200 ml-1">/month</span>
               </div>
               <ul className="space-y-3 mb-8 flex-1">
-                {["Everything in Starter","Unlimited service packages","SMS + Email reminders","Multiple staff & calendars","Google Calendar sync","Custom domain","Priority support","Analytics dashboard"].map((item) => (
+                {["Everything in Starter","Unlimited service packages","SMS + Email reminders","Multiple staff & calendars","Google Calendar sync","Priority support","Analytics dashboard"].map((item) => (
                   <li key={item} className="flex items-center gap-3 text-white text-sm">
                     <svg className="w-5 h-5 text-blue-200 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
@@ -766,7 +765,7 @@ export default function LandingPage() {
             </Link>
             <Link href="/book/mikes-mobile-detailing"
               className="inline-flex items-center justify-center glass border border-white/20 text-white font-bold text-lg px-10 py-4 rounded-2xl hover:bg-white/10 transition-all duration-300 hover:-translate-y-0.5">
-              See a Live Demo →
+              See booking page live demo →
             </Link>
           </div>
 
@@ -813,7 +812,7 @@ export default function LandingPage() {
                 { label:"Features",  href:"/#features" },
                 { label:"Pricing",   href:"/#pricing"  },
                 { label:"FAQ",       href:"/#faq"       },
-                { label:"Live Demo", href:"/book/mikes-mobile-detailing" },
+                { label:"Booking page demo", href:"/book/mikes-mobile-detailing" },
               ]},
               { title: "Company", links: [
                 { label:"About",   href:"/about"   },
