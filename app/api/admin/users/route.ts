@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAdminSession } from "@/lib/auth";
 import { isValidEmail } from "@/lib/validation";
+import { cancelPaddleSubscription } from "@/lib/paddle";
 
 export async function GET() {
   try {
@@ -170,23 +171,34 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Delete children explicitly first to avoid race between
-    // user→booking Cascade and staff→booking SetNull triggers.
-    // Order matters: bookings BEFORE staff (so staff's SetNull on
-    // booking.staffId doesn't fight the user-cascade on booking).
-    // Notifications must be explicit too — relying on cascade alone
-    // sometimes fails for users with many notifications.
-    // Interactive transaction (function form) is required because the
-    // array form of $transaction doesn't accept the timeout option.
+    // 1) Stop billing at Paddle first so a deleted account can never be
+    //    charged again. This is a network call, so it runs OUTSIDE the DB
+    //    transaction. We don't block deletion if it fails (the admin wants
+    //    the account gone) — we report the result so they can cancel
+    //    manually in Paddle if needed.
+    const paddle = await cancelPaddleSubscription((existing as any).paddleSubscriptionId);
+
+    // 2) Delete the account and EVERY related row. Children are removed
+    //    explicitly (rather than leaning only on FK cascade) so the wipe
+    //    is complete and deterministic regardless of cascade config:
+    //    bookings BEFORE staff (staff's SetNull on booking.staffId must
+    //    not fight the user-cascade), then the rest. PasswordReset keys on
+    //    email, not userId. SmsMessage is platform-level (no user link).
     const uid = userId;
+    const email = existing.email;
     await prisma.$transaction(
       async (tx) => {
         await tx.notification.deleteMany({ where: { userId: uid } });
         await tx.ticketMessage.deleteMany({ where: { ticket: { userId: uid } } });
         await tx.supportTicket.deleteMany({ where: { userId: uid } });
+        await tx.businessReview.deleteMany({ where: { userId: uid } });
+        await tx.businessPhoto.deleteMany({ where: { userId: uid } });
+        await tx.feedback.deleteMany({ where: { userId: uid } });
+        await tx.emailLog.deleteMany({ where: { userId: uid } });
         await tx.booking.deleteMany({ where: { userId: uid } });
         await tx.staff.deleteMany({ where: { userId: uid } });
         await tx.package.deleteMany({ where: { userId: uid } });
+        if (email) await tx.passwordReset.deleteMany({ where: { email } });
         await tx.user.delete({ where: { id: uid } });
       },
       {
@@ -196,7 +208,16 @@ export async function DELETE(request: NextRequest) {
       }
     );
 
-    return NextResponse.json({ success: true });
+    // Tell the admin what happened with Paddle so an active subscription
+    // that couldn't be auto-canceled doesn't slip through unnoticed.
+    const paddleWarning =
+      paddle.status === "failed"
+        ? `Account deleted, but Paddle did NOT confirm cancellation (${paddle.detail || "unknown error"}). Cancel it manually in Paddle.`
+        : paddle.status === "not_configured" && (existing as any).paddleSubscriptionId
+          ? "Account deleted, but PADDLE_API_KEY isn't set — cancel the subscription manually in Paddle."
+          : undefined;
+
+    return NextResponse.json({ success: true, paddle: paddle.status, paddleWarning });
   } catch (error) {
     // Surface Prisma's actual error code so we can diagnose flaky deletes.
     const code = (error as any)?.code;

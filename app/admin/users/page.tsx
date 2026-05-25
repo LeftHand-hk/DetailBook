@@ -287,6 +287,9 @@ export default function AdminUsersPage() {
       if (!res.ok) throw new Error(data.error || "Failed to delete");
       setUsers((prev) => prev.filter((u) => u.id !== deleteConfirm.id));
       setDeleteConfirm(null);
+      // The account is gone, but if Paddle couldn't auto-cancel, surface
+      // it so the admin can cancel the subscription manually.
+      if (data.paddleWarning) setError(data.paddleWarning);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete user");
     } finally {
@@ -683,8 +686,9 @@ export default function AdminUsersPage() {
               <strong>{deleteConfirm.businessName || deleteConfirm.name}</strong> ({deleteConfirm.email})?
             </p>
             <p className="text-sm text-red-600 mb-4">
-              This will permanently delete their account, packages ({deleteConfirm.packageCount}), bookings (
-              {deleteConfirm.bookingCount}), staff, and support tickets. This action cannot be undone.
+              This permanently deletes everything: their account, packages ({deleteConfirm.packageCount}), bookings (
+              {deleteConfirm.bookingCount}), staff, photos, reviews, support tickets, and feedback — and cancels their
+              Paddle subscription so billing stops. This action cannot be undone.
             </p>
             <div className="flex justify-end gap-2">
               <button
