@@ -189,7 +189,15 @@ export async function POST(req: NextRequest) {
 
         if (letPaddleTrialRun) {
           updateData.subscriptionStatus = "trialing";
-          // Keep trialEndsAt as the in-app one — already aligned to day 8.
+          // Align the in-app trial end with Paddle's ACTUAL first-charge
+          // date so the two can never drift. The Paddle trial length is set
+          // on the price and may differ from our default 7 days; if we kept
+          // our own date, the app would lock the user out (or expect a
+          // charge) on a different day than Paddle actually bills. Paddle's
+          // `next_billed_at` is exactly when it auto-charges the saved card
+          // and flips the subscription to active.
+          const paddleTrialEnd = data.next_billed_at || data.current_billing_period?.ends_at;
+          if (paddleTrialEnd) updateData.trialEndsAt = new Date(paddleTrialEnd).toISOString();
         } else {
           updateData.subscriptionStatus = "active";
           updateData.trialEndsAt = "";
@@ -265,6 +273,16 @@ export async function POST(req: NextRequest) {
           } else {
             const updateData: Record<string, string> = { subscriptionStatus: status };
             if (plan) updateData.plan = plan;
+            // Keep the in-app trial window aligned with Paddle through the
+            // whole lifecycle: once Paddle charges and the sub goes active,
+            // clear the trial; while still trialing, mirror Paddle's
+            // next-charge date (it can shift if the trial is extended).
+            if (status === "active") {
+              updateData.trialEndsAt = "";
+            } else if (status === "trialing") {
+              const end = data.next_billed_at || data.current_billing_period?.ends_at;
+              if (end) updateData.trialEndsAt = new Date(end).toISOString();
+            }
             await prisma.user.update({ where: { id: user.id }, data: updateData });
             console.log(
               "[Paddle webhook] subscription.updated applied",
