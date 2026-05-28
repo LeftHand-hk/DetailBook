@@ -385,7 +385,7 @@ export default function AdminUsersPage() {
                     <th className="text-left px-4 py-3 font-medium text-gray-500">Plan</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-500">Usage</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-500">Last login</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-500">Last active</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-500">Country</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-500">Created</th>
                     <th className="text-right px-4 py-3 font-medium text-gray-500">Actions</th>

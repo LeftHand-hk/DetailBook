@@ -59,6 +59,13 @@ export function verifyToken(
   }
 }
 
+// In-memory throttle so a hot serverless instance doesn't re-write
+// lastLoginAt on every authenticated request. Across cold starts this
+// resets and we do at most one extra update — the DB WHERE clause keeps
+// it atomic so concurrent requests can't double-write either.
+const recentActivityWrites = new Map<string, number>();
+const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000;
+
 export async function getSessionUser(): Promise<{
   id: string;
   email: string;
@@ -66,7 +73,30 @@ export async function getSessionUser(): Promise<{
   const cookieStore = await cookies();
   const token = cookieStore.get("detailbook_token")?.value;
   if (!token) return null;
-  return verifyToken(token);
+  const payload = verifyToken(token);
+  if (!payload) return null;
+
+  // "Last active" heartbeat. The lastLoginAt column doubles as the
+  // most-recent-activity timestamp the admin dashboard shows — a user who
+  // stays signed in via remember-me but keeps using the app needs to look
+  // active, not stuck on whenever they last hit the login form. Fire-and-
+  // forget; only writes if the row is >5min stale so writes are cheap.
+  const now = Date.now();
+  const last = recentActivityWrites.get(payload.id) || 0;
+  if (now - last > HEARTBEAT_INTERVAL_MS) {
+    recentActivityWrites.set(payload.id, now);
+    // Lazy import keeps this file safe to use from contexts (middleware,
+    // tests) that don't want the Prisma client bundled in.
+    import("./prisma").then(({ default: prisma }) => {
+      const fiveMinAgo = new Date(now - HEARTBEAT_INTERVAL_MS);
+      return prisma.user.updateMany({
+        where: { id: payload.id, OR: [{ lastLoginAt: null }, { lastLoginAt: { lt: fiveMinAgo } }] },
+        data: { lastLoginAt: new Date(now) },
+      });
+    }).catch(() => { /* heartbeat must never break auth */ });
+  }
+
+  return payload;
 }
 
 export async function getAdminSession(): Promise<{

@@ -172,13 +172,15 @@ export async function POST(req: NextRequest) {
         const inAppTrialEnds = resolvedUser.trialEndsAt ? Date.parse(resolvedUser.trialEndsAt) : NaN;
         const inAppTrialActive = !Number.isNaN(inAppTrialEnds) && inAppTrialEnds > Date.now();
 
-        // If this is the onboarding card-on-signup path AND the user's
-        // in-app trial is still running, let Paddle's native trial run
-        // alongside it. We save the sub linkage but keep the trial as
-        // the source of truth. The day-8 charge fires automatically.
-        // If the user is past their in-app trial (paid upgrade flow) or
-        // was suspended (reactivating), end Paddle's trial immediately.
-        const letPaddleTrialRun = isPaddleTrial && inAppTrialActive && (fromOnboarding || !resolvedUser.suspended);
+        // Only the initial onboarding signup gets to ride Paddle's trial.
+        // Every other path — re-subscribe after expiry, reactivation from
+        // billing, plan switch, anything else — must charge immediately
+        // (the /activate call below ends Paddle's trial). Previously this
+        // condition also let any non-suspended user keep a fresh trial,
+        // which gave an expired user a second free week when they hit
+        // "Subscribe now". Tightening it to require `fromOnboarding`
+        // guarantees: onboarding = trial, billing-page subscribe = charge.
+        const letPaddleTrialRun = isPaddleTrial && inAppTrialActive && fromOnboarding;
 
         const updateData: Record<string, any> = {
           paddleSubscriptionId: data.id,

@@ -155,9 +155,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         const freshUser = getUser();
         if (freshUser) {
           setUserState(freshUser);
-          // Suspended users are confined to /billing until they
-          // reactivate. Avoid redirect loops by allowing /dashboard/billing.
-          if ((freshUser as any).suspended === true && pathname !== "/dashboard/billing") {
+          // Suspended OR expired users are confined to /billing until
+          // they reactivate. Avoid redirect loops by allowing the page.
+          const fu = freshUser as any;
+          if ((fu.suspended === true || fu.subscriptionStatus === "expired") && pathname !== "/dashboard/billing") {
             router.replace("/dashboard/billing");
             return;
           }
@@ -185,6 +186,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     // Run once on mount only — pathname changes shouldn't re-sync.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Lockout guard for suspended / expired accounts. The mount effect above
+  // catches first paint; this one keeps them pinned to /billing on every
+  // subsequent navigation so they can't open another dashboard page.
+  useEffect(() => {
+    if (!user) return;
+    const u = user as any;
+    if ((u.suspended === true || u.subscriptionStatus === "expired") && pathname !== "/dashboard/billing") {
+      router.replace("/dashboard/billing");
+    }
+  }, [pathname, user, router]);
 
   // Reset the main scroll area to top on every *real* route change.
   // We compare against the last pathname we acted on because a few
