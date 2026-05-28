@@ -21,9 +21,9 @@ async function main() {
     process.exit(1);
   }
   console.log(`Using sample user: ${sample.email} (${sample.businessName})`);
-  console.log(`Sending all 4 welcome emails to ${recipient}...`);
+  console.log(`Sending both welcome emails to ${recipient}...`);
 
-  const keys: WelcomeEmailKey[] = ["day0", "day2", "day5", "day13"];
+  const keys: WelcomeEmailKey[] = ["day0", "day2"];
   for (const key of keys) {
     const result = await sendWelcomeEmail(sample.id, key, { overrideTo: recipient });
     if (result.success) {

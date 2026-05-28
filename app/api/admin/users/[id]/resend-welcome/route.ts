@@ -7,8 +7,8 @@ import { sendWelcomeEmail, type WelcomeEmailKey } from "@/lib/welcome-emails";
 // already set (i.e. the user already received it). Updates tracking so
 // the audit log reflects the new send timestamp.
 //
-// POST { key: "day0" | "day2" | "day5" | "day13" }
-const VALID_KEYS: WelcomeEmailKey[] = ["day0", "day2", "day5", "day13"];
+// POST { key: "day0" | "day2" }
+const VALID_KEYS: WelcomeEmailKey[] = ["day0", "day2"];
 
 export async function POST(
   request: NextRequest,
@@ -27,7 +27,7 @@ export async function POST(
       : null;
     if (!key) {
       return NextResponse.json(
-        { error: "key must be day0, day2, day5, or day13" },
+        { error: "key must be day0 or day2" },
         { status: 400 },
       );
     }

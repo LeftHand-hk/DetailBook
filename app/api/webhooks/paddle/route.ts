@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sendPaymentFailedEmail } from "@/lib/welcome-emails";
 
 // Map Paddle price IDs → plan names
 const PRICE_TO_PLAN: Record<string, string> = {
@@ -300,7 +301,28 @@ export async function POST(req: NextRequest) {
         break;
       }
 
-      case "subscription.canceled":
+      case "subscription.canceled": {
+        const subId = data.id;
+        const user = await prisma.user.findFirst({ where: { paddleSubscriptionId: subId } });
+        if (user) {
+          // If the local status was already "canceled" the user clicked
+          // Cancel themselves and got their confirmation in the billing
+          // UI — no need to email them again. Anything else means Paddle
+          // canceled automatically (failed trial-end charge), so send
+          // the "we couldn't charge your card" notice.
+          const wasUserInitiated = (user.subscriptionStatus || "").toLowerCase() === "canceled";
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { subscriptionStatus: "canceled", suspended: true },
+          });
+          if (!wasUserInitiated) {
+            sendPaymentFailedEmail(user.id).catch((err) =>
+              console.error("[Paddle webhook] payment-failed email send threw:", err),
+            );
+          }
+        }
+        break;
+      }
       case "subscription.paused": {
         const subId = data.id;
         const user = await prisma.user.findFirst({ where: { paddleSubscriptionId: subId } });

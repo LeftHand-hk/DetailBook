@@ -102,12 +102,10 @@ const WELCOME_EMAIL_KEYS = new Set([
   "welcomeEmailsPaused",
 ]);
 
-type WelcomeKey = "day0" | "day2" | "day5" | "day13";
+type WelcomeKey = "day0" | "day2";
 const WELCOME_DEFS: { key: WelcomeKey; label: string; col: string }[] = [
-  { key: "day0",  label: "Day 0 — Welcome",       col: "welcomeEmailDay0At" },
-  { key: "day2",  label: "Day 2 — Engagement",    col: "welcomeEmailDay2At" },
-  { key: "day5",  label: "Day 5 — Share link",    col: "welcomeEmailDay5At" },
-  { key: "day13", label: "Day 13 — Trial ending", col: "welcomeEmailDay13At" },
+  { key: "day0", label: "Day 0 — Welcome",    col: "welcomeEmailDay0At" },
+  { key: "day2", label: "Day 2 — Engagement", col: "welcomeEmailDay2At" },
 ];
 
 function formatTs(value: unknown): string | null {
