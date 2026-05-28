@@ -72,9 +72,9 @@ export async function GET(
     // without loading the multi-MB base64 columns into memory.
     const flagRows = await prisma.$queryRaw<
       Array<{ hasLogo: boolean; hasBanner: boolean; hasCover: boolean }>
-    >`SELECT (logo IS NOT NULL AND logo <> '') AS "hasLogo",
-             ("bannerImage" IS NOT NULL AND "bannerImage" <> '') AS "hasBanner",
-             ("coverImage" IS NOT NULL AND "coverImage" <> '') AS "hasCover"
+    >`SELECT (logo IS NOT NULL AND logo <> '' AND logo NOT LIKE '/api/%') AS "hasLogo",
+             ("bannerImage" IS NOT NULL AND "bannerImage" <> '' AND "bannerImage" NOT LIKE '/api/%') AS "hasBanner",
+             ("coverImage" IS NOT NULL AND "coverImage" <> '' AND "coverImage" NOT LIKE '/api/%') AS "hasCover"
       FROM "User" WHERE id = ${user.id}`;
     const flags = flagRows[0] ?? { hasLogo: false, hasBanner: false, hasCover: false };
     // updatedAt-based cache buster: a new upload bumps updatedAt, changing

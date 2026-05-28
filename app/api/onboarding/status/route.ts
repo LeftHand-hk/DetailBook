@@ -61,8 +61,8 @@ export async function GET() {
   // Existence-only check on the heavy base64 columns. A raw query returns
   // two booleans instead of dragging multiple MB across the wire.
   const flagRows = await prisma.$queryRaw<Array<{ hasLogo: boolean; hasBanner: boolean }>>`
-    SELECT (logo IS NOT NULL AND logo <> '') AS "hasLogo",
-           ("bannerImage" IS NOT NULL AND "bannerImage" <> '') AS "hasBanner"
+    SELECT (logo IS NOT NULL AND logo <> '' AND logo NOT LIKE '/api/%') AS "hasLogo",
+           ("bannerImage" IS NOT NULL AND "bannerImage" <> '' AND "bannerImage" NOT LIKE '/api/%') AS "hasBanner"
     FROM "User" WHERE id = ${session.id}`;
   const flags = flagRows[0] ?? { hasLogo: false, hasBanner: false };
 

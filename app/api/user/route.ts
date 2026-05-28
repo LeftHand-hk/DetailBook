@@ -39,11 +39,14 @@ export async function GET(request: NextRequest) {
     // <img src={user.logo}> keep working — the URL serves from
     // /api/user/me/img/[type] and the browser caches it.
     if (!full) {
+      // Exclude rows where the column was overwritten with our own
+      // placeholder URL ("/api/...") by a client round-trip — those
+      // entries don't hold real image data, so we treat them as missing.
       const flagRows = await prisma.$queryRaw<
         Array<{ hasLogo: boolean; hasBanner: boolean; hasCover: boolean }>
-      >`SELECT (logo IS NOT NULL AND logo <> '') AS "hasLogo",
-               ("bannerImage" IS NOT NULL AND "bannerImage" <> '') AS "hasBanner",
-               ("coverImage" IS NOT NULL AND "coverImage" <> '') AS "hasCover"
+      >`SELECT (logo IS NOT NULL AND logo <> '' AND logo NOT LIKE '/api/%') AS "hasLogo",
+               ("bannerImage" IS NOT NULL AND "bannerImage" <> '' AND "bannerImage" NOT LIKE '/api/%') AS "hasBanner",
+               ("coverImage" IS NOT NULL AND "coverImage" <> '' AND "coverImage" NOT LIKE '/api/%') AS "hasCover"
         FROM "User" WHERE id = ${session.id}`;
       const flags = flagRows[0] ?? { hasLogo: false, hasBanner: false, hasCover: false };
       const ver = (user as any).updatedAt ? new Date((user as any).updatedAt).getTime() : 0;
@@ -97,6 +100,19 @@ export async function PUT(request: NextRequest) {
     for (const key of ALLOWED_FIELDS) {
       if (body[key] !== undefined) {
         updateData[key] = body[key];
+      }
+    }
+
+    // CRITICAL: refuse to write the placeholder URLs that the lightweight
+    // GET response returns for the image columns ("/api/user/me/img/..." ,
+    // "/api/book/.../img/...") back into the actual base64 column. A
+    // client that round-trips the response (storage.setUser → PUT) would
+    // otherwise overwrite the real image data with the URL string and
+    // every consumer of the binary route would then 404.
+    for (const k of ["logo", "bannerImage", "coverImage"] as const) {
+      const v = updateData[k];
+      if (typeof v === "string" && v.startsWith("/api/")) {
+        delete updateData[k];
       }
     }
 
