@@ -37,9 +37,11 @@ export async function GET() {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  // Onboarding needs a few flags + package count + the customize signals
-  // (logo, bannerImage, bookingPageTitle). We deliberately fetch the
-  // base64 image columns only as booleans to keep the payload small.
+  // This endpoint is hit on every dashboard mount AND every window focus
+  // (via SetupExperience). The old query selected the base64 logo +
+  // bannerImage columns — multi-MB blobs — just to check existence, which
+  // made the dashboard feel sluggish on every tab focus. We now pull only
+  // cheap columns here and ask the DB for booleans on the heavy ones.
   const user = await prisma.user.findUnique({
     where: { id: session.id },
     select: {
@@ -47,14 +49,7 @@ export async function GET() {
       onboardingCompletedAt: true,
       onboardingDismissed: true,
       businessHours: true,
-      // Customize-page signals.
-      logo: true,
-      bannerImage: true,
       bookingPageTitle: true,
-      // V2 / "modern" signals — cheap text/JSON columns (no base64):
-      //   bookingPageLayout — flips to "modern" when they switch v1→v2
-      //   pageContent       — any inline edit in the modern editor lands here
-      //   bio               — a short intro typed in either editor
       bookingPageLayout: true,
       pageContent: true,
       bio: true,
@@ -62,6 +57,14 @@ export async function GET() {
     },
   });
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+  // Existence-only check on the heavy base64 columns. A raw query returns
+  // two booleans instead of dragging multiple MB across the wire.
+  const flagRows = await prisma.$queryRaw<Array<{ hasLogo: boolean; hasBanner: boolean }>>`
+    SELECT (logo IS NOT NULL AND logo <> '') AS "hasLogo",
+           ("bannerImage" IS NOT NULL AND "bannerImage" <> '') AS "hasBanner"
+    FROM "User" WHERE id = ${session.id}`;
+  const flags = flagRows[0] ?? { hasLogo: false, hasBanner: false };
 
   const progress = readProgress(user.onboardingProgress);
 
@@ -73,8 +76,8 @@ export async function GET() {
   // banner upload, a custom page title, an intro/bio, switching the
   // design to "modern" (v2), or any inline edit saved into pageContent.
   // Any of these is a strong signal they've engaged with the editor.
-  const hasLogo = typeof user.logo === "string" && user.logo.length > 0;
-  const hasBanner = typeof user.bannerImage === "string" && user.bannerImage.length > 0;
+  const hasLogo = flags.hasLogo;
+  const hasBanner = flags.hasBanner;
   const hasCustomTitle = typeof user.bookingPageTitle === "string" && user.bookingPageTitle.trim().length > 0;
   const hasBio = typeof user.bio === "string" && user.bio.trim().length > 0;
   // bookingPageLayout defaults to "classic", so only a switch to "modern"

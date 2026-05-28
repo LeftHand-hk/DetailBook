@@ -12,17 +12,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // By default we omit the base64 image blobs (coverImage,
-    // bannerImage) — the dashboard reads /api/user constantly and
-    // doesn't need them, so shipping MBs of base64 every time is
-    // wasteful. The booking-page editor DOES need them (to show + edit
-    // the banner and the About-section image), so it requests ?full=1.
+    // By default we omit the base64 image blobs (logo, coverImage,
+    // bannerImage). The dashboard reads /api/user constantly via
+    // syncFromServer; shipping MBs of base64 on every dashboard mount
+    // was the main thing making page loads feel slow. The booking-page
+    // editor DOES need the raw base64 to preview + edit, so it requests
+    // ?full=1 and keeps the old shape.
     const full = request.nextUrl.searchParams.get("full") === "1";
     const user = await prisma.user.findUnique({
       where: { id: session.id },
       omit: full
         ? { password: true }
-        : { password: true, coverImage: true, bannerImage: true },
+        : { password: true, logo: true, coverImage: true, bannerImage: true },
       include: {
         packages: true,
         bookings: true,
@@ -31,6 +32,24 @@ export async function GET(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // For the lightweight (non-full) payload, replace the omitted base64
+    // images with cacheable binary URLs (or null). Components that do
+    // <img src={user.logo}> keep working — the URL serves from
+    // /api/user/me/img/[type] and the browser caches it.
+    if (!full) {
+      const flagRows = await prisma.$queryRaw<
+        Array<{ hasLogo: boolean; hasBanner: boolean; hasCover: boolean }>
+      >`SELECT (logo IS NOT NULL AND logo <> '') AS "hasLogo",
+               ("bannerImage" IS NOT NULL AND "bannerImage" <> '') AS "hasBanner",
+               ("coverImage" IS NOT NULL AND "coverImage" <> '') AS "hasCover"
+        FROM "User" WHERE id = ${session.id}`;
+      const flags = flagRows[0] ?? { hasLogo: false, hasBanner: false, hasCover: false };
+      const ver = (user as any).updatedAt ? new Date((user as any).updatedAt).getTime() : 0;
+      (user as any).logo = flags.hasLogo ? `/api/user/me/img/logo?v=${ver}` : null;
+      (user as any).bannerImage = flags.hasBanner ? `/api/user/me/img/banner?v=${ver}` : null;
+      (user as any).coverImage = flags.hasCover ? `/api/user/me/img/cover?v=${ver}` : null;
     }
 
     return NextResponse.json({ user });
