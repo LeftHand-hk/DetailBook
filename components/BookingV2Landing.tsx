@@ -231,6 +231,34 @@ export default function BookingV2Landing({
   // Re-arm the banner fade whenever the source changes.
   useEffect(() => { setBannerLoaded(false); }, [bannerImage]);
 
+  // ── Empty-state visibility flags ─────────────────────────────────────
+  // On the public page (editable=false) we hide any section the owner
+  // hasn't actually populated, so a brand-new account doesn't look broken
+  // with placeholder "0" stats, sample reviews, or stock gallery panels.
+  // In the editor (editable=true) we keep everything visible so the
+  // owner can fill them in. Demo accounts naturally have real data, so
+  // they show all sections without special-casing.
+  const realBio = textValue("bio").trim();
+  const realYears = (profile.yearsInBusiness ?? 0) > 0 ? (profile.yearsInBusiness ?? 0) : 0;
+  const realServiceArea = profile.serviceAreas && profile.serviceAreas[0] ? profile.serviceAreas[0].trim() : "";
+  // Services count is auto-derived from packages and is true for every
+  // onboarded account, so it doesn't count as "About has real data" on
+  // its own — a lonely "3 Services" stat would still look skeletal.
+  const aboutHasContent = Boolean(realBio) || realYears > 0 || Boolean(realServiceArea);
+  const showAbout = editable || aboutHasContent;
+  const showGallery = editable || photos.length > 0;
+  const showReviews = editable || reviews.length > 0;
+
+  // Nav only lists sections that actually render. Hero is the page itself
+  // (no anchor needed). Services and Contact always render, so they're
+  // always present.
+  const navItems: string[] = [];
+  if (showAbout) navItems.push("About");
+  navItems.push("Services");
+  if (showGallery) navItems.push("Gallery");
+  if (showReviews) navItems.push("Reviews");
+  navItems.push("Contact");
+
   // Inline editable text → input/textarea in editor, plain text in display.
   const Field = ({ k, tag: Tag = "span", className = "", editClassName = "", multiline = false, rows = 2 }: {
     k: string; tag?: any; className?: string; editClassName?: string; multiline?: boolean; rows?: number;
@@ -275,7 +303,7 @@ export default function BookingV2Landing({
         )}
       </div>
       <nav className="hidden sm:flex items-center gap-7 text-sm">
-        {["About", "Services", "Gallery", "Reviews", "Contact"].map((label) => (
+        {navItems.map((label) => (
           <a key={label} href={`#${label.toLowerCase()}`} className={`font-medium transition-colors ${scrolled && !editable ? "text-stone-600 hover:text-stone-900" : "text-white/80 hover:text-white drop-shadow"}`}>{label}</a>
         ))}
         <button onClick={onBookNow} className="inline-flex items-center gap-1.5 text-white text-sm font-semibold px-4 py-2 rounded-full transition-opacity hover:opacity-90" style={{ backgroundColor: accent }}>Book Now</button>
@@ -409,19 +437,31 @@ export default function BookingV2Landing({
       </section>
 
       {/* ── ABOUT ───────────────────────────────────────────────────── */}
+      {showAbout && (
       <section id="about" className="bg-stone-50 py-20 sm:py-28 px-5 sm:px-8">
         <div className="max-w-6xl mx-auto grid lg:grid-cols-[1.1fr_1fr] gap-10 lg:gap-20 items-start">
           <div>
             <Eyebrow k="aboutEyebrow" />
             <h2 className="text-3xl sm:text-5xl font-black leading-tight tracking-tight mb-6">
-              <span>{businessName} — </span>
-              {editable
-                ? <span className="block mt-2"><Field k="aboutTagline" editClassName="text-lg" /></span>
-                : <span className="text-stone-500">{resolve("aboutTagline")}</span>}
+              <span>{businessName}</span>
+              {/* Tagline reads as a real claim ("5+ years of obsession…")
+                  so we only show it when there's a real `years` value to
+                  anchor it. Editor always shows the input so the owner
+                  can fill it in. */}
+              {(editable || realYears > 0) && (
+                <>
+                  <span>{" — "}</span>
+                  {editable
+                    ? <span className="block mt-2"><Field k="aboutTagline" editClassName="text-lg" /></span>
+                    : <span className="text-stone-500">{resolve("aboutTagline")}</span>}
+                </>
+              )}
             </h2>
             {editable
               ? <Field k="bio" multiline rows={5} />
-              : <p className="text-stone-600 text-lg leading-relaxed max-w-xl">{resolve("bio")}</p>}
+              : realBio
+                ? <p className="text-stone-600 text-lg leading-relaxed max-w-xl">{realBio}</p>
+                : null}
 
             {/* Years-in-business editor (number). Drives the stat + the
                 about tagline default. */}
@@ -463,6 +503,7 @@ export default function BookingV2Landing({
           </div>
         </div>
       </section>
+      )}
 
       {/* ── SERVICES ────────────────────────────────────────────────── */}
       <section id="services" className="bg-white py-20 sm:py-28 px-5 sm:px-8 border-y border-stone-200">
@@ -492,7 +533,9 @@ export default function BookingV2Landing({
                     <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">{formatDuration(pkg.duration)}</span>
                   </div>
                   <h3 className="text-lg sm:text-xl font-extrabold leading-snug mb-2">{pkg.name}</h3>
-                  <p className="text-stone-500 text-sm leading-relaxed mb-4 sm:mb-6 flex-1 line-clamp-3">{pkg.description}</p>
+                  {pkg.description
+                    ? <p className="text-stone-500 text-sm leading-relaxed mb-4 sm:mb-6 flex-1 line-clamp-3">{pkg.description}</p>
+                    : <div className="flex-1 mb-4 sm:mb-6" />}
                   <div className="flex items-baseline justify-between border-t border-stone-100 pt-4 sm:pt-5">
                     <div>
                       <p className="text-2xl sm:text-3xl font-black tracking-tight">${pkg.price}</p>
@@ -510,7 +553,7 @@ export default function BookingV2Landing({
       </section>
 
       {/* ── GALLERY ─────────────────────────────────────────────────── */}
-      {(photos.length > 0 || editable) && (
+      {showGallery && (
         <section id="gallery" className="bg-stone-100 py-20 sm:py-28 px-5 sm:px-8">
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-12 flex flex-col items-center">
@@ -535,7 +578,7 @@ export default function BookingV2Landing({
       )}
 
       {/* ── REVIEWS ─────────────────────────────────────────────────── */}
-      {(reviews.length > 0 || editable) && (
+      {showReviews && (
         <section id="reviews" className="bg-stone-900 py-20 sm:py-28 px-5 sm:px-8 text-white">
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-14 flex flex-col items-center">
