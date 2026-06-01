@@ -727,10 +727,10 @@ export default function OnboardingPage() {
                 </div>
 
                 <h1 className="text-2xl font-black text-gray-900 mb-2">
-                  You&apos;re all set!
+                  One last step — add a service so customers can book you
                 </h1>
                 <p className="text-gray-500 text-sm mb-4 max-w-sm mx-auto leading-relaxed">
-                  Your 7-day trial is active and your card is saved. Now let&apos;s add your first service package so you can start taking bookings.
+                  Your trial is active and your card is saved. Add your first service package and your booking link goes live instantly.
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-2">
                   <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-blue-100 text-blue-700">
@@ -764,33 +764,23 @@ export default function OnboardingPage() {
                   </div>
                 </div>
 
-                {/* Primary CTA → straight to package creation. ?setup=services
-                    tells /dashboard/packages to open the "new package" modal
-                    immediately so the user lands in the flow they're being
-                    nudged into. */}
-                <div className="space-y-3">
-                  <Link
-                    href="/dashboard/packages?setup=services"
-                    onClick={() => {
-                      try { sessionStorage.setItem("dB_showTour", "1"); } catch { /* private mode */ }
-                    }}
-                    className="flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-colors text-sm shadow-lg shadow-blue-200"
-                  >
-                    Create Your First Package
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                    </svg>
-                  </Link>
-                  <Link
-                    href="/dashboard"
-                    onClick={() => {
-                      try { sessionStorage.setItem("dB_showTour", "1"); } catch { /* private mode */ }
-                    }}
-                    className="flex items-center justify-center gap-2 w-full text-gray-500 hover:text-gray-700 font-semibold py-2 rounded-xl transition-colors text-xs"
-                  >
-                    Skip for now — go to Dashboard
-                  </Link>
-                </div>
+                {/* Single forward path — no skip. Without a package the
+                    dashboard is empty and the booking link is dead, so the
+                    only way out of onboarding is creating one. The packages
+                    page reads ?setup=services to render a pre-filled
+                    "first-time setup" UI rather than a blank form. */}
+                <Link
+                  href="/dashboard/packages?setup=services"
+                  onClick={() => {
+                    try { sessionStorage.setItem("dB_showTour", "1"); } catch { /* private mode */ }
+                  }}
+                  className="flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-colors text-sm shadow-lg shadow-blue-200"
+                >
+                  Create Your First Package
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </Link>
               </div>
             </div>
           )}

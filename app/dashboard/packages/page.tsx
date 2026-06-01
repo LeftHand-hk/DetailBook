@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { getPackages, setPackages, setPackagesLocal, getUser, generateId } from "@/lib/storage";
 import type { Package, PackageAddon, User } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
@@ -17,6 +18,22 @@ const QUICK_TEMPLATES = [
 ];
 
 const STARTER_LIMIT = 5;
+
+// First-time setup rows shown when /dashboard/packages?setup=services
+// lands an owner with 0 packages. They're pre-filled, fully editable, and
+// the user can delete or add more. The dashboard is gated behind having at
+// least one package, so this screen is the activation funnel — a blank
+// form here was the biggest drop-off in onboarding.
+type SetupRow = { id: string; name: string; price: string; duration: string; description: string };
+const DEFAULT_SETUP_ROWS: SetupRow[] = [
+  { id: "s1", name: "Exterior Wash & Wax",                description: "Hand wash, tire shine, and a protective spray wax — exterior detail.",      price: "49",  duration: "60" },
+  { id: "s2", name: "Interior Detail",                    description: "Deep vacuum, leather and plastic cleaning, glass, and odor removal.",       price: "89",  duration: "90" },
+  { id: "s3", name: "Full Detail (Interior + Exterior)",  description: "Complete interior + exterior detail with premium products and finish.",     price: "149", duration: "180" },
+];
+
+function newSetupRow(): SetupRow {
+  return { id: `s_${Math.random().toString(36).slice(2, 10)}`, name: "", description: "", price: "", duration: "" };
+}
 
 // Addon rows in the form keep price as a string so we can render empty
 // inputs naturally. It's parsed to a number right before submit.
@@ -71,9 +88,17 @@ function defaultVehiclePricingRows(): VehicleSurchargeDraft[] {
 }
 
 export default function PackagesPage() {
+  const router = useRouter();
   const [packages, setPackagesState] = useState<Package[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [showModal, setShowModal] = useState(false);
+  // First-time setup ("?setup=services") state: a separate, simpler form
+  // shown only when the user has 0 packages and arrived via the
+  // onboarding CTA. Rendered before the normal page returns.
+  const [setupMode, setSetupMode] = useState(false);
+  const [setupRows, setSetupRows] = useState<SetupRow[]>(DEFAULT_SETUP_ROWS);
+  const [setupSaving, setSetupSaving] = useState(false);
+  const [setupError, setSetupError] = useState("");
   const [editing, setEditing] = useState<Package | null>(null);
   const [form, setForm] = useState<PackageFormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -92,31 +117,83 @@ export default function PackagesPage() {
   useEffect(() => {
     setUser(getUser());
 
-    // Load packages from API (source of truth), fallback to localStorage
+    // Read query params up front so we can react to setup=services after
+    // packages load. The newPackage=1 modal-auto-open is still one-shot
+    // (we strip the param so a refresh doesn't reopen it).
+    const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const wantsSetup = params?.get("setup") === "services";
+
+    // Load packages from API (source of truth), fallback to localStorage.
     fetch("/api/packages")
       .then((r) => r.ok ? r.json() : [])
-      .then((data: Package[]) => setPackagesState(data))
+      .then((data: Package[]) => {
+        setPackagesState(data);
+        // First-time setup view: arrived from the onboarding CTA AND has
+        // no packages yet. If they already have packages, fall through to
+        // the normal page.
+        if (wantsSetup && data.length === 0) setSetupMode(true);
+      })
       .catch(() => setPackagesState(getPackages()));
 
-    // Auto-open the "new package" modal only when the Setup Guide's
-    // "+ Create custom service" link sent us here — that link uses
-    // ?newPackage=1 specifically. The onboarding "Create Your First
-    // Package" CTA and the dashboard Setup Progress Card just want to
-    // land on the empty packages view, which is why they pass
-    // ?setup=services (informational, no auto-open). One-shot read on
-    // mount; strip the param so a refresh doesn't reopen the modal.
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("newPackage") === "1") {
-        setEditing(null);
-        setForm(EMPTY_FORM);
-        setShowModal(true);
-        const url = new URL(window.location.href);
-        url.searchParams.delete("newPackage");
-        window.history.replaceState({}, "", url.pathname + url.search + url.hash);
-      }
+    if (params?.get("newPackage") === "1") {
+      setEditing(null);
+      setForm(EMPTY_FORM);
+      setShowModal(true);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("newPackage");
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
     }
   }, []);
+
+  // ── First-time setup helpers ─────────────────────────────────────────
+  const updateSetupRow = (idx: number, field: keyof SetupRow, value: string) => {
+    setSetupRows((rows) => rows.map((r, i) => (i === idx ? { ...r, [field]: value } : r)));
+  };
+  const removeSetupRow = (idx: number) => {
+    setSetupRows((rows) => rows.filter((_, i) => i !== idx));
+  };
+  const addSetupRow = () => {
+    setSetupRows((rows) => [...rows, newSetupRow()]);
+  };
+  const handleSetupSave = async () => {
+    setSetupError("");
+    const valid = setupRows
+      .map((r) => ({
+        name: r.name.trim(),
+        description: r.description.trim(),
+        price: parseFloat(r.price),
+        duration: parseInt(r.duration, 10),
+      }))
+      .filter((r) => r.name && Number.isFinite(r.price) && r.price >= 0 && Number.isFinite(r.duration) && r.duration > 0);
+    if (valid.length === 0) {
+      setSetupError("Add at least one service with a name, price, and duration.");
+      return;
+    }
+    setSetupSaving(true);
+    try {
+      for (const r of valid) {
+        const res = await fetch("/api/packages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: r.name,
+            description: r.description || r.name,
+            price: r.price,
+            duration: r.duration,
+            active: true,
+          }),
+        });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j.error || `Couldn't save "${r.name}"`);
+        }
+      }
+      router.push("/dashboard");
+    } catch (err: any) {
+      setSetupError(err?.message || "Something went wrong. Please try again.");
+      setSetupSaving(false);
+    }
+  };
 
   const isStarter = user?.plan === "starter";
   const atLimit = isStarter && packages.length >= STARTER_LIMIT;
@@ -333,6 +410,78 @@ export default function PackagesPage() {
     if (m === 0) return `${h}h`;
     return `${h}h ${m}m`;
   };
+
+  // First-time setup view — replaces the whole page so the owner doesn't
+  // see the regular list/modal until they've created their first packages.
+  if (setupMode) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-2xl font-extrabold text-gray-900">Your first services</h1>
+          <p className="text-sm text-gray-500 mt-1 leading-relaxed">
+            We pre-filled three common detailing packages — edit the prices and details to match what you charge, delete anything you don&apos;t offer, and add your own. You can always change these later from your dashboard.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          {setupRows.map((r, i) => (
+            <div key={r.id} className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5">
+              <div className="flex items-start gap-3">
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-12 gap-3">
+                  <label className="sm:col-span-12 block">
+                    <span className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Service name</span>
+                    <input type="text" value={r.name} onChange={(e) => updateSetupRow(i, "name", e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. Exterior Wash" />
+                  </label>
+                  <label className="sm:col-span-6 block">
+                    <span className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Price ($)</span>
+                    <input type="number" min="0" step="1" value={r.price} onChange={(e) => updateSetupRow(i, "price", e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </label>
+                  <label className="sm:col-span-6 block">
+                    <span className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Duration (min)</span>
+                    <input type="number" min="0" step="5" value={r.duration} onChange={(e) => updateSetupRow(i, "duration", e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </label>
+                  <label className="sm:col-span-12 block">
+                    <span className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Description</span>
+                    <textarea value={r.description} onChange={(e) => updateSetupRow(i, "description", e.target.value)} rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+                  </label>
+                </div>
+                <button type="button" onClick={() => removeSetupRow(i)} title="Remove this service" aria-label="Remove this service" className="flex-shrink-0 w-9 h-9 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" /></svg>
+                </button>
+              </div>
+            </div>
+          ))}
+
+          <button type="button" onClick={addSetupRow} className="w-full border-2 border-dashed border-gray-300 hover:border-blue-400 hover:text-blue-600 text-gray-500 font-semibold py-3 rounded-xl text-sm transition-colors">
+            + Add another service
+          </button>
+        </div>
+
+        {setupError && (
+          <p className="text-sm text-red-600 mt-4 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{setupError}</p>
+        )}
+
+        <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <p className="text-xs text-gray-500 max-w-sm leading-relaxed">
+            Saving makes your booking link live immediately — customers can book the services you list here.
+          </p>
+          <button
+            type="button"
+            onClick={handleSetupSave}
+            disabled={setupSaving || setupRows.length === 0}
+            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors shadow-lg shadow-blue-200 inline-flex items-center justify-center gap-2"
+          >
+            {setupSaving ? "Saving…" : (
+              <>
+                Save &amp; Continue
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
