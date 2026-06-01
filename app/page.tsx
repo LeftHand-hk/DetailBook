@@ -64,11 +64,11 @@ export default function LandingPage() {
   const navLinks = ["Features","Pricing","FAQ"];
 
   const testimonials = [
-    { name: "Mark T.", text: "I was looking for a good booking software for ages because nothing seemed to work the way I wanted it to. DetailBook has been amazing. It took me no time at all to set up and customize everything for my business. Embedding it into my website was super simple and my customers have had zero issues using it. Really happy with how it turned out." },
-    { name: "Logans Mobile Car Wash & Pressure Washing", text: "Honestly this is the best booking system I have used so far. I used to spend way too much time texting back and forth with clients to fix appointments but this does it all for me now. It looks great on my website and the whole process is completely smooth for anyone trying to book a slot. Definite recommendation from me." },
-    { name: "David K.", text: "If you need a simple and reliable software for your diary then just get this one. I tried a couple of other platforms before DetailBook but they were just too complicated to figure out. This one is totally different because it is easy to personalize and it just works. The transition from my site to the scheduler is perfect." },
-    { name: "Adam Johnson Professional Vehicle Cleaning", text: "My clients keep messaging me to say how much they love the new booking layout. It is so quick to use especially on phones which is where most of my bookings come from. Setting up the backend was a breeze and I love that I could make it match my brand. It has saved me so much stress." },
-    { name: "BROS Mobile Auto Care & Detailing", text: "I can not recommend DetailBook enough to be honest. I was running things my own way for years and was hesitant to switch to a software but I am glad I did. It integrates perfectly with my website and makes everything look so professional. It is fast and simple and it just does exactly what you need it to do." },
+    { name: "Mark T.", rating: 5, text: "I was looking for a good booking software for ages because nothing seemed to work the way I wanted it to. DetailBook has been amazing. It took me no time at all to set up and customize everything for my business. Super simple, and my customers have had zero issues using it. Really happy with how it turned out." },
+    { name: "Logans Mobile Car Wash & Pressure Washing", rating: 5, text: "Honestly this is the best booking system I have used so far. I used to spend way too much time texting back and forth with clients to fix appointments but this does it all for me now. The whole process is completely smooth for anyone trying to book a slot. Definite recommendation from me." },
+    { name: "David K.", rating: 4.5, text: "If you need a simple and reliable software for your diary then just get this one. I tried a couple of other platforms before DetailBook but they were just too complicated to figure out. This one is totally different because it is easy to personalize and it just works. Also the support is really helpful." },
+    { name: "Adam Johnson Professional Vehicle Cleaning", rating: 5, text: "My clients keep messaging me to say how much they love the new booking layout. It is so quick to use especially on phones, which is where most of my bookings come from." },
+    { name: "BROS Mobile Auto Care & Detailing", rating: 5, text: "I can not recommend DetailBook enough to be honest. I was running things my own way for years and was hesitant to switch to a software but I am glad I did. The website you get with it by default looks so professional right out of the box. It is fast and simple and it just does exactly what you need it to do." },
   ];
 
   return (
@@ -596,9 +596,24 @@ export default function LandingPage() {
             {testimonials.map((t, i) => (
               <div key={i} className="bg-gray-50 border border-gray-100 rounded-2xl p-6 flex flex-col">
                 <div className="flex items-center gap-0.5 mb-4">
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <svg key={s} className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
-                  ))}
+                  {[1, 2, 3, 4, 5].map((s) => {
+                    const rating = t.rating ?? 5;
+                    const full = s <= Math.floor(rating);
+                    const half = !full && s - 0.5 <= rating;
+                    if (half) {
+                      // Half star: gray full star underneath, amber clipped
+                      // to the left 50% on top.
+                      return (
+                        <span key={s} className="relative inline-block w-4 h-4">
+                          <svg className="absolute inset-0 w-4 h-4 text-gray-200" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                          <svg className="absolute inset-0 w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20" style={{ clipPath: "inset(0 50% 0 0)" }}><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                        </span>
+                      );
+                    }
+                    return (
+                      <svg key={s} className={`w-4 h-4 ${full ? "text-amber-400" : "text-gray-200"}`} fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                    );
+                  })}
                 </div>
                 <p className="text-gray-700 text-sm leading-relaxed flex-1 mb-5">&ldquo;{t.text}&rdquo;</p>
                 <p className="text-gray-900 text-sm font-bold">{t.name}</p>
