@@ -123,6 +123,10 @@ export async function POST(request: NextRequest) {
         promoDiscount: promoData?.discountValue || null,
         signupIp,
         signupCountry,
+        // New accounts ship on the modern (v2) booking page. The schema
+        // default is still "classic" so existing accounts aren't migrated
+        // out from under their preference; only fresh signups land on v2.
+        bookingPageLayout: "modern",
         ...(safeTimezone ? { timezone: safeTimezone } : {}),
       },
     });
