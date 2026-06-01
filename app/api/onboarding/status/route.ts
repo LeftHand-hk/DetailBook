@@ -50,7 +50,6 @@ export async function GET() {
       onboardingDismissed: true,
       businessHours: true,
       bookingPageTitle: true,
-      bookingPageLayout: true,
       pageContent: true,
       bio: true,
       _count: { select: { packages: true } },
@@ -71,23 +70,19 @@ export async function GET() {
   const hasBusinessHours =
     user.businessHours !== null && user.businessHours !== undefined;
 
-  // "Customize booking page" is satisfied as soon as the owner has
-  // changed at least one visual field away from default: a logo or
-  // banner upload, a custom page title, an intro/bio, switching the
-  // design to "modern" (v2), or any inline edit saved into pageContent.
-  // Any of these is a strong signal they've engaged with the editor.
+  // "Customize booking page" is satisfied once the owner has actually
+  // changed something on the page: a logo or banner upload, a custom
+  // page title, an intro/bio, or any inline edit saved into pageContent.
+  // We do NOT count bookingPageLayout="modern" — that's now the default
+  // for new signups, so it would auto-tick the step before the owner
+  // does anything.
   const hasLogo = flags.hasLogo;
   const hasBanner = flags.hasBanner;
   const hasCustomTitle = typeof user.bookingPageTitle === "string" && user.bookingPageTitle.trim().length > 0;
   const hasBio = typeof user.bio === "string" && user.bio.trim().length > 0;
-  // bookingPageLayout defaults to "classic", so only a switch to "modern"
-  // counts as an explicit customization.
-  const switchedToModern = (user as any).bookingPageLayout === "modern";
-  // Any non-empty pageContent object means they saved at least one inline
-  // edit in the modern editor.
   const pc = (user as any).pageContent;
   const hasPageContent = pc && typeof pc === "object" && Object.keys(pc).length > 0;
-  const hasCustomized = hasLogo || hasBanner || hasCustomTitle || hasBio || switchedToModern || hasPageContent;
+  const hasCustomized = hasLogo || hasBanner || hasCustomTitle || hasBio || hasPageContent;
 
   // Sticky completion: once observed done, persist so transient UI states
   // (clearing a field during autosave, etc.) don't flip a step back.

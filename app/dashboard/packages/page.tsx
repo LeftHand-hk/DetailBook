@@ -214,6 +214,32 @@ export default function PackagesPage() {
     setShowModal(true);
   };
 
+  // Opens the package editor straight on the add-ons section with at
+  // least one blank row, so an owner clicking the "Add-ons" button on a
+  // package card can start typing immediately instead of hunting for
+  // the section.
+  const openAddons = (pkg: Package) => {
+    const existingPricing = ((pkg as any).vehiclePricing as Array<{ type: VehicleTypeId; surcharge: number }> | null | undefined) || [];
+    const hasPricing = existingPricing.length > 0;
+    const existingAddons = (pkg.addons || []).map((a) => ({ id: a.id, name: a.name, price: String(a.price) }));
+    setEditing(pkg);
+    setForm({
+      name: pkg.name,
+      description: pkg.description,
+      price: String(pkg.price),
+      duration: String(pkg.duration),
+      deposit: pkg.deposit ? String(pkg.deposit) : "",
+      addons: existingAddons.length > 0 ? existingAddons : [newAddonDraft()],
+      vehiclePricingEnabled: hasPricing,
+      vehiclePricing: hasPricing
+        ? existingPricing.map((p) => ({ type: p.type, surcharge: p.surcharge ? String(p.surcharge) : "" }))
+        : [],
+    });
+    setShowAddons(true);
+    setShowVehiclePricing(hasPricing);
+    setShowModal(true);
+  };
+
   const openEdit = (pkg: Package) => {
     const existingPricing = ((pkg as any).vehiclePricing as Array<{ type: VehicleTypeId; surcharge: number }> | null | undefined) || [];
     const hasPricing = existingPricing.length > 0;
@@ -657,6 +683,14 @@ export default function PackagesPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
                   Edit
+                </button>
+                <button
+                  onClick={() => openAddons(pkg)}
+                  title="Add-ons for this package"
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 border border-purple-100 text-purple-700 text-sm font-semibold rounded-xl hover:bg-purple-50 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                  Add-ons
                 </button>
                 <button
                   onClick={() => setDeleteConfirm(pkg.id)}
