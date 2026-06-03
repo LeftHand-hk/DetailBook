@@ -117,8 +117,22 @@ export default function BookingsPage() {
         setAdding(false);
         return;
       }
-      // API returns the created booking row; merge it in and reset.
-      const created: Booking = (data as any).booking || data;
+      // API returns flat vehicle columns (vehicleMake/Model/Year/Color);
+      // the UI expects them nested as { vehicle: { make, model, year, color } }
+      // — without this map the list crashes with "undefined.year" on the
+      // row we just inserted.
+      const raw: any = (data as any).booking || data;
+      const created: Booking = raw.vehicle
+        ? raw
+        : {
+            ...raw,
+            vehicle: {
+              make: raw.vehicleMake || "",
+              model: raw.vehicleModel || "",
+              year: raw.vehicleYear || "",
+              color: raw.vehicleColor || "",
+            },
+          };
       setBookings((prev) => [created, ...prev]);
       try { saveBookings([created, ...getBookings()]); } catch { /* cache best-effort */ }
       setShowAddModal(false);
