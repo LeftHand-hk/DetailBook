@@ -339,8 +339,13 @@ export async function POST(request: NextRequest) {
     // promises — that's why a fast `.then().catch()` send was unreliable.
     const pendingSends: Promise<unknown>[] = [];
 
+    // Manual bookings from the dashboard Add-booking modal set this so we
+    // don't fire any notification — the owner is the one who just typed
+    // it in, and they may not want to email a walk-in customer either.
+    const skipNotifications = body.skipNotifications === true;
+
     // 1. Notification email to business owner (only if emailReminders enabled, default true)
-    if (user.email && user.emailReminders !== false) {
+    if (!skipNotifications && user.email && user.emailReminders !== false) {
       const ownerHtml = `
         <div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;">
           <div style="background:#2563EB;color:white;padding:24px;border-radius:8px 8px 0 0;">
@@ -379,8 +384,9 @@ export async function POST(request: NextRequest) {
 
     // If the booking is created already "confirmed" (card payment paid),
     // send the customer confirmation email + SMS the same way PUT does on
-    // a status transition. Fire-and-forget.
-    if (booking.status === "confirmed") {
+    // a status transition. Fire-and-forget. Manual dashboard adds skip
+    // this so a walk-in customer doesn't get an unexpected email.
+    if (!skipNotifications && booking.status === "confirmed") {
       console.log("[CONFIRM POST] Booking", booking.id, "created as confirmed. Sending notifications.", {
         hasCustomerEmail: !!booking.customerEmail,
         emailConfirmations: (user as any).emailConfirmations,

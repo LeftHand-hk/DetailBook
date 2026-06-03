@@ -105,6 +105,9 @@ export default function BookingsPage() {
         status: addForm.status,
         depositRequired: 0,
         depositPaid: 0,
+        // Manual entry from the dashboard — don't email the customer or
+        // re-notify the owner; they're the one typing it in.
+        skipNotifications: true,
       };
       const res = await fetch("/api/bookings", {
         method: "POST",
@@ -934,23 +937,39 @@ export default function BookingsPage() {
                   </div>
                 </div>
 
-                {/* Date + Time */}
+                {/* Date + Time — overlay placeholders fix the iOS Safari
+                    "gray empty rectangle" where native date/time inputs
+                    don't render a hint until a value is picked. */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1.5">Date *</label>
-                    <input
-                      type="date" required value={addForm.date}
-                      onChange={(e) => setAddForm({ ...addForm, date: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                    <div className="relative">
+                      <input
+                        type="date" required value={addForm.date}
+                        onChange={(e) => setAddForm({ ...addForm, date: e.target.value })}
+                        className="w-full appearance-none px-3 py-2 min-h-[40px] bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      {!addForm.date && (
+                        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-gray-400">
+                          Pick a date
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1.5">Time *</label>
-                    <input
-                      type="time" required value={addForm.time}
-                      onChange={(e) => setAddForm({ ...addForm, time: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                    <div className="relative">
+                      <input
+                        type="time" required value={addForm.time}
+                        onChange={(e) => setAddForm({ ...addForm, time: e.target.value })}
+                        className="w-full appearance-none px-3 py-2 min-h-[40px] bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      {!addForm.time && (
+                        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-gray-400">
+                          Pick a time
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
