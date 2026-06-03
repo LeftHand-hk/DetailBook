@@ -63,7 +63,8 @@ export default function BookingsPage() {
   const emptyAddForm = {
     customerName: "", customerEmail: "", customerPhone: "",
     vehicleMake: "", vehicleModel: "", vehicleYear: "", vehicleColor: "",
-    serviceId: "", date: "", time: "", notes: "", status: "confirmed",
+    serviceName: "", servicePrice: "",
+    date: "", time: "", notes: "", status: "confirmed",
   };
   const [addForm, setAddForm] = useState(emptyAddForm);
 
@@ -78,8 +79,10 @@ export default function BookingsPage() {
     e.preventDefault();
     setAdding(true);
     setAddError(null);
-    const pkg = packages.find((p) => p.id === addForm.serviceId);
-    if (!pkg) { setAddError("Please pick a service."); setAdding(false); return; }
+    const serviceName = addForm.serviceName.trim();
+    if (!serviceName) { setAddError("Please enter the service name."); setAdding(false); return; }
+    const priceNum = parseFloat(addForm.servicePrice);
+    if (!Number.isFinite(priceNum) || priceNum < 0) { setAddError("Please enter a valid price."); setAdding(false); return; }
     try {
       const body = {
         customerName: addForm.customerName.trim(),
@@ -91,9 +94,11 @@ export default function BookingsPage() {
           year: addForm.vehicleYear.trim(),
           color: addForm.vehicleColor.trim(),
         },
-        serviceId: pkg.id,
-        serviceName: pkg.name,
-        servicePrice: pkg.price,
+        // Always leave serviceId empty so the API trusts the typed name +
+        // price instead of overriding from a matching package.
+        serviceId: "",
+        serviceName,
+        servicePrice: priceNum,
         date: addForm.date,
         time: addForm.time,
         notes: addForm.notes.trim(),
@@ -882,22 +887,37 @@ export default function BookingsPage() {
                   </div>
                 </div>
 
-                {/* Service */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1.5">Service *</label>
-                  <select
-                    required value={addForm.serviceId}
-                    onChange={(e) => setAddForm({ ...addForm, serviceId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                  >
-                    <option value="">— Pick a service —</option>
-                    {packages.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name} — ${p.price}</option>
-                    ))}
-                  </select>
-                  {packages.length === 0 && (
-                    <p className="text-xs text-amber-600 mt-1">No service packages yet. <a href="/dashboard/packages" className="underline font-semibold">Create one</a> first.</p>
-                  )}
+                {/* Service + Price */}
+                <div className="grid grid-cols-[1fr_120px] gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Service *</label>
+                    <input
+                      type="text" required value={addForm.serviceName}
+                      onChange={(e) => setAddForm({ ...addForm, serviceName: e.target.value })}
+                      list="add-booking-service-suggestions"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Full Detail"
+                    />
+                    {packages.length > 0 && (
+                      <datalist id="add-booking-service-suggestions">
+                        {packages.map((p) => (
+                          <option key={p.id} value={p.name} />
+                        ))}
+                      </datalist>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Price *</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                      <input
+                        type="number" min="0" step="1" required value={addForm.servicePrice}
+                        onChange={(e) => setAddForm({ ...addForm, servicePrice: e.target.value })}
+                        className="w-full pl-6 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Date + Time */}
@@ -958,7 +978,7 @@ export default function BookingsPage() {
                   Cancel
                 </button>
                 <button
-                  type="submit" disabled={adding || packages.length === 0}
+                  type="submit" disabled={adding}
                   className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition-colors"
                 >
                   {adding ? "Adding…" : "Add booking"}
