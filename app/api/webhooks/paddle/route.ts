@@ -133,11 +133,26 @@ export async function POST(req: NextRequest) {
 
         // Resolve the user first so we can branch on whether they're
         // already mid in-app-trial vs reactivating after a cancel.
-        let resolvedUser: { id: string; suspended: boolean; trialEndsAt: string | null } | null = null;
+        //
+        // `hadPriorSubscription` is the only reliable "is this the user's
+        // first subscription" signal we have. It comes from a server-side
+        // column we control; the client-passed `customData.source` flag
+        // can vanish (a customer refreshes mid-checkout, a Paddle quirk
+        // strips it, etc.) and we used to fall through to "no trial -
+        // charge immediately" in that case. Now the trial decision rides
+        // on whether the user has ever been linked to a Paddle sub before,
+        // which is exactly what distinguishes a first-time signup from a
+        // re-subscribe.
+        let resolvedUser: { id: string; suspended: boolean; trialEndsAt: string | null; hadPriorSubscription: boolean } | null = null;
 
         if (userId) {
           const u = await prisma.user.findUnique({ where: { id: userId } });
-          if (u) resolvedUser = { id: u.id, suspended: u.suspended === true, trialEndsAt: (u as any).trialEndsAt || null };
+          if (u) resolvedUser = {
+            id: u.id,
+            suspended: u.suspended === true,
+            trialEndsAt: (u as any).trialEndsAt || null,
+            hadPriorSubscription: Boolean((u as any).paddleSubscriptionId),
+          };
         }
 
         if (!resolvedUser && data.customer_id) {
@@ -154,7 +169,12 @@ export async function POST(req: NextRequest) {
             }
           }
           if (existingUser) {
-            resolvedUser = { id: existingUser.id, suspended: existingUser.suspended === true, trialEndsAt: (existingUser as any).trialEndsAt || null };
+            resolvedUser = {
+              id: existingUser.id,
+              suspended: existingUser.suspended === true,
+              trialEndsAt: (existingUser as any).trialEndsAt || null,
+              hadPriorSubscription: Boolean((existingUser as any).paddleSubscriptionId),
+            };
           }
         }
 
@@ -173,15 +193,18 @@ export async function POST(req: NextRequest) {
         const inAppTrialEnds = resolvedUser.trialEndsAt ? Date.parse(resolvedUser.trialEndsAt) : NaN;
         const inAppTrialActive = !Number.isNaN(inAppTrialEnds) && inAppTrialEnds > Date.now();
 
-        // Only the initial onboarding signup gets to ride Paddle's trial.
-        // Every other path — re-subscribe after expiry, reactivation from
-        // billing, plan switch, anything else — must charge immediately
-        // (the /activate call below ends Paddle's trial). Previously this
-        // condition also let any non-suspended user keep a fresh trial,
-        // which gave an expired user a second free week when they hit
-        // "Subscribe now". Tightening it to require `fromOnboarding`
-        // guarantees: onboarding = trial, billing-page subscribe = charge.
-        const letPaddleTrialRun = isPaddleTrial && inAppTrialActive && fromOnboarding;
+        // Only the user's FIRST subscription rides Paddle's trial. Every
+        // resubscribe path (after expiry, reactivation from billing,
+        // plan switch) hits the /activate call below and is charged on
+        // the spot. We DON'T gate this on `fromOnboarding` anymore: that
+        // flag is set in customData by the onboarding checkout, and we
+        // had at least one fresh signup land in the wrong branch because
+        // customData didn't reach the webhook (likely a mid-checkout
+        // refresh) — the user was charged on day 0 instead of getting
+        // their 7-day trial. `hadPriorSubscription` is server-side state
+        // we control, so it can't be lost by a client quirk: false on
+        // the first signup, true on every re-subscribe afterwards.
+        const letPaddleTrialRun = isPaddleTrial && inAppTrialActive && !resolvedUser.hadPriorSubscription;
 
         const updateData: Record<string, any> = {
           paddleSubscriptionId: data.id,
@@ -214,6 +237,9 @@ export async function POST(req: NextRequest) {
             plan: plan || "(unchanged)",
             paddleStatus: data.status,
             mode: letPaddleTrialRun ? "let_paddle_trial_run" : "activate_immediately",
+            inAppTrialActive,
+            hadPriorSubscription: resolvedUser.hadPriorSubscription,
+            fromOnboarding, // logged for diagnostics; not used as a gate
           })
         );
 
