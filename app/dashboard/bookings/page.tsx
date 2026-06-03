@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getBookings, setBookings as saveBookings, getUser } from "@/lib/storage";
-import type { Booking, Staff } from "@/types";
+import type { Booking, Staff, Package } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
 import EmptyState, { EmptyIcons } from "@/components/EmptyState";
 
@@ -52,6 +52,78 @@ export default function BookingsPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [userSlug, setUserSlug] = useState<string>("");
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // "Add booking" modal — lets the owner record a booking manually
+  // (phone call, walk-in, etc) without making the customer use the
+  // public booking page. Submits straight to POST /api/bookings.
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const emptyAddForm = {
+    customerName: "", customerEmail: "", customerPhone: "",
+    vehicleMake: "", vehicleModel: "", vehicleYear: "", vehicleColor: "",
+    serviceId: "", date: "", time: "", notes: "", status: "confirmed",
+  };
+  const [addForm, setAddForm] = useState(emptyAddForm);
+
+  useEffect(() => {
+    fetch("/api/packages", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((p) => { if (Array.isArray(p)) setPackages(p.filter((x: any) => x.active)); })
+      .catch(() => {});
+  }, []);
+
+  const handleAddBooking = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdding(true);
+    setAddError(null);
+    const pkg = packages.find((p) => p.id === addForm.serviceId);
+    if (!pkg) { setAddError("Please pick a service."); setAdding(false); return; }
+    try {
+      const body = {
+        customerName: addForm.customerName.trim(),
+        customerEmail: addForm.customerEmail.trim().toLowerCase(),
+        customerPhone: addForm.customerPhone.trim(),
+        vehicle: {
+          make: addForm.vehicleMake.trim(),
+          model: addForm.vehicleModel.trim(),
+          year: addForm.vehicleYear.trim(),
+          color: addForm.vehicleColor.trim(),
+        },
+        serviceId: pkg.id,
+        serviceName: pkg.name,
+        servicePrice: pkg.price,
+        date: addForm.date,
+        time: addForm.time,
+        notes: addForm.notes.trim(),
+        status: addForm.status,
+        depositRequired: 0,
+        depositPaid: 0,
+      };
+      const res = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAddError(data.error || "Failed to add booking");
+        setAdding(false);
+        return;
+      }
+      // API returns the created booking row; merge it in and reset.
+      const created: Booking = (data as any).booking || data;
+      setBookings((prev) => [created, ...prev]);
+      try { saveBookings([created, ...getBookings()]); } catch { /* cache best-effort */ }
+      setShowAddModal(false);
+      setAddForm(emptyAddForm);
+    } catch {
+      setAddError("Network error.");
+    } finally {
+      setAdding(false);
+    }
+  };
 
   const copyBookingLink = async () => {
     if (!userSlug) return;
@@ -280,7 +352,14 @@ export default function BookingsPage() {
           <h1 className="text-2xl font-extrabold text-gray-900">Bookings</h1>
           <p className="text-gray-500 text-sm">Manage and track all your customer bookings</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2 rounded-xl shadow-sm transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+            Add booking
+          </button>
           <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 text-green-700 text-xs font-semibold px-3 py-1.5 rounded-full">
             ${totalRevenue.toLocaleString()} earned
           </div>
@@ -725,6 +804,170 @@ export default function BookingsPage() {
           </div>
         );
       })()}
+
+      {/* Add booking modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 overflow-y-auto" onClick={() => !adding && setShowAddModal(false)}>
+          <div className="min-h-screen flex items-start sm:items-center justify-center p-4">
+            <form
+              onSubmit={handleAddBooking}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-4"
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                <h2 className="text-lg font-extrabold text-gray-900">Add a booking</h2>
+                <button type="button" onClick={() => !adding && setShowAddModal(false)} className="text-gray-400 hover:text-gray-700 text-2xl leading-none">×</button>
+              </div>
+
+              <div className="px-6 py-5 space-y-4">
+                {/* Customer */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">Customer name *</label>
+                  <input
+                    type="text" required value={addForm.customerName}
+                    onChange={(e) => setAddForm({ ...addForm, customerName: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Sarah Johnson"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Email *</label>
+                    <input
+                      type="email" required value={addForm.customerEmail}
+                      onChange={(e) => setAddForm({ ...addForm, customerEmail: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="sarah@email.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Phone</label>
+                    <input
+                      type="tel" value={addForm.customerPhone}
+                      onChange={(e) => setAddForm({ ...addForm, customerPhone: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="(555) 123-4567"
+                    />
+                  </div>
+                </div>
+
+                {/* Vehicle */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">Vehicle</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="text" value={addForm.vehicleMake}
+                      onChange={(e) => setAddForm({ ...addForm, vehicleMake: e.target.value })}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Make (Tesla)"
+                    />
+                    <input
+                      type="text" value={addForm.vehicleModel}
+                      onChange={(e) => setAddForm({ ...addForm, vehicleModel: e.target.value })}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Model (Model 3)"
+                    />
+                    <input
+                      type="text" value={addForm.vehicleYear}
+                      onChange={(e) => setAddForm({ ...addForm, vehicleYear: e.target.value })}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Year (2023)"
+                    />
+                    <input
+                      type="text" value={addForm.vehicleColor}
+                      onChange={(e) => setAddForm({ ...addForm, vehicleColor: e.target.value })}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Color (White)"
+                    />
+                  </div>
+                </div>
+
+                {/* Service */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">Service *</label>
+                  <select
+                    required value={addForm.serviceId}
+                    onChange={(e) => setAddForm({ ...addForm, serviceId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                  >
+                    <option value="">— Pick a service —</option>
+                    {packages.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name} — ${p.price}</option>
+                    ))}
+                  </select>
+                  {packages.length === 0 && (
+                    <p className="text-xs text-amber-600 mt-1">No service packages yet. <a href="/dashboard/packages" className="underline font-semibold">Create one</a> first.</p>
+                  )}
+                </div>
+
+                {/* Date + Time */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Date *</label>
+                    <input
+                      type="date" required value={addForm.date}
+                      onChange={(e) => setAddForm({ ...addForm, date: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Time *</label>
+                    <input
+                      type="time" required value={addForm.time}
+                      onChange={(e) => setAddForm({ ...addForm, time: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">Status</label>
+                  <select
+                    value={addForm.status}
+                    onChange={(e) => setAddForm({ ...addForm, status: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                  >
+                    <option value="confirmed">Confirmed</option>
+                    <option value="pending">Pending</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">Notes</label>
+                  <textarea
+                    rows={2} value={addForm.notes}
+                    onChange={(e) => setAddForm({ ...addForm, notes: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    placeholder="Anything to remember about this booking"
+                  />
+                </div>
+
+                {addError && (
+                  <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{addError}</div>
+                )}
+              </div>
+
+              <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+                <button
+                  type="button" onClick={() => !adding && setShowAddModal(false)} disabled={adding}
+                  className="px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 rounded-xl transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit" disabled={adding || packages.length === 0}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition-colors"
+                >
+                  {adding ? "Adding…" : "Add booking"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <DashboardHelp page="bookings" />
     </div>
