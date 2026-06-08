@@ -9,6 +9,7 @@ import SquareDepositModal from "@/components/SquareDepositModal";
 import PublicPhotoGallery, { type PublicPhoto } from "@/components/PublicPhotoGallery";
 import PublicReviews, { type PublicReview } from "@/components/PublicReviews";
 import { VEHICLE_TYPES, type VehicleTypeId, surchargeForVehicleType, packageSupportsVehicleType } from "@/lib/vehicle-pricing";
+import { VehicleIcon } from "@/components/VehicleIcon";
 import BookingV2Landing from "@/components/BookingV2Landing";
 
 const TIMES = [
@@ -93,6 +94,55 @@ function MiniStarRating({ rating }: { rating: number }) {
   );
 }
 
+// Inline modal a v2 customer sees after tapping a tiered service card.
+// Lists ONLY the vehicle types the package supports, each with its
+// surcharge so the customer knows the price impact before picking. The
+// classic services step has its own bigger picker further down; this is
+// the lightweight overlay for the v2 path.
+function V2VehiclePickerModal({
+  pkg, onClose, onPick,
+}: {
+  pkg: Package;
+  onClose: () => void;
+  onPick: (vt: VehicleTypeId) => void;
+}) {
+  const pricing = (pkg as any).vehiclePricing as Array<{ type: VehicleTypeId; surcharge: number }> | undefined;
+  const allowed = new Set((pricing || []).map((p) => p.type));
+  const surchargeFor = (id: VehicleTypeId) => pricing?.find((p) => p.type === id)?.surcharge ?? 0;
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/70 flex items-end sm:items-center justify-center p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="px-6 pt-5 pb-3 border-b border-gray-100">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-base font-extrabold text-gray-900">Pick your vehicle</h3>
+            <button onClick={onClose} type="button" className="text-gray-400 hover:text-gray-700 text-2xl leading-none">×</button>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">For <span className="font-semibold text-gray-700">{pkg.name}</span> — pricing varies by vehicle type.</p>
+        </div>
+        <div className="p-5 grid grid-cols-2 gap-2.5">
+          {VEHICLE_TYPES.filter((v) => allowed.has(v.id)).map((v) => {
+            const sur = surchargeFor(v.id);
+            return (
+              <button
+                key={v.id}
+                onClick={() => onPick(v.id)}
+                className="flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 border-gray-100 bg-gray-50 hover:border-blue-400 hover:bg-blue-50 text-center transition-all"
+              >
+                <VehicleIcon type={v.id} className="w-8 h-8 text-gray-700" />
+                <span className="text-xs font-bold text-gray-800">{v.label}</span>
+                <span className={`text-[11px] font-semibold ${sur > 0 ? "text-amber-700" : "text-gray-400"}`}>
+                  {sur > 0 ? `+$${sur}` : "Base price"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BookingPage({ params }: { params: { slug: string } }) {
   const { slug } = params;
   const platformName = usePlatformName();
@@ -139,6 +189,11 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   // make/model/year/color so the dashboard can show the size at a
   // glance.
   const [selectedVehicleType, setSelectedVehicleType] = useState<VehicleTypeId | null>(null);
+  // Set when a customer clicks a tiered service card on the v2 landing.
+  // We hold the package here and overlay a small modal so they can pick
+  // their vehicle type before dropping into the date/time step — without
+  // bouncing them back to the full classic services list.
+  const [pendingVehiclePackage, setPendingVehiclePackage] = useState<Package | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
   const [stripeDepositPaid, setStripeDepositPaid] = useState(false);
   const [smsConsent, setSmsConsent] = useState(false);
@@ -740,7 +795,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   // landing is also skipped once mid-flow via a payment return.
   if (showLanding && step === 0 && (user as any)?.bookingPageLayout === "modern") {
     const u = user as any;
-    return (
+    const landing = (
       <BookingV2Landing
         profile={{
           businessName: user.businessName || "",
@@ -771,20 +826,40 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
         photos={photos.map((p: any) => ({ id: p.id, imageUrl: p.photoUrl || p.imageUrl, title: p.caption || p.title })) as any}
         onBookNow={() => { setShowLanding(false); window.scrollTo({ top: 0 }); }}
         onSelectPackage={(pkg: any) => {
-          // Customer clicked a specific service card. Preselect it and
-          // skip the redundant "choose a service" step.
           const real = allDisplayPackages.find((p) => p.id === pkg.id);
+          if (!real) return;
+          const hasTiers = Array.isArray((real as any).vehiclePricing) && (real as any).vehiclePricing.length > 0;
+          if (hasTiers) {
+            // Stay on the landing and pop an inline modal asking which
+            // vehicle, so the surcharge is locked in before the date step.
+            setPendingVehiclePackage(real);
+            return;
+          }
           setShowLanding(false);
           window.scrollTo({ top: 0 });
-          if (!real) return;
           setSelectedPackage(real);
-          // Tiered packages need the vehicle-type picker (step 0 only),
-          // so the surcharge is applied. Flat-priced packages jump
-          // straight to date/time.
-          const hasTiers = Array.isArray((real as any).vehiclePricing) && (real as any).vehiclePricing.length > 0;
-          setStep(hasTiers ? 0 : 1);
+          setStep(1);
         }}
       />
+    );
+    return (
+      <>
+        {landing}
+        {pendingVehiclePackage && (
+          <V2VehiclePickerModal
+            pkg={pendingVehiclePackage}
+            onClose={() => setPendingVehiclePackage(null)}
+            onPick={(vt) => {
+              setSelectedVehicleType(vt);
+              setSelectedPackage(pendingVehiclePackage);
+              setPendingVehiclePackage(null);
+              setShowLanding(false);
+              window.scrollTo({ top: 0 });
+              setStep(1);
+            }}
+          />
+        )}
+      </>
     );
   }
 
@@ -1346,7 +1421,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                             : "border-gray-100 bg-gray-50 hover:border-blue-300"
                         }`}
                       >
-                        <span className="text-xl sm:text-2xl">{v.emoji}</span>
+                        <VehicleIcon type={v.id} className={`w-7 h-7 sm:w-8 sm:h-8 ${active ? "text-blue-600" : "text-gray-700"}`} />
                         <span className={`text-[11px] sm:text-xs font-bold leading-tight ${active ? "text-blue-700" : "text-gray-700"}`}>
                           {v.label}
                         </span>

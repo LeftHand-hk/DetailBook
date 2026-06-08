@@ -9,6 +9,7 @@ import DashboardHelp from "@/components/DashboardHelp";
 import SetupHint from "@/components/SetupHint";
 import EmptyState, { EmptyIcons } from "@/components/EmptyState";
 import { VEHICLE_TYPES, type VehicleTypeId } from "@/lib/vehicle-pricing";
+import { VehicleIcon } from "@/components/VehicleIcon";
 
 const QUICK_TEMPLATES = [
   { name: "Basic Wash", description: "Exterior wash, tire shine, and quick interior wipe-down.", price: "45", duration: "30", deposit: "" },
@@ -863,7 +864,7 @@ export default function PackagesPage() {
                         return (
                           <div key={row.type} className="grid grid-cols-[1fr_120px_auto] gap-2 items-center">
                             <div className="flex items-center gap-2 text-sm text-gray-800">
-                              <span className="text-lg">{meta.emoji}</span>
+                              <VehicleIcon type={meta.id} className="w-5 h-5 text-gray-700" />
                               <span className="font-medium">{meta.label}</span>
                             </div>
                             <div className="relative">
@@ -906,9 +907,9 @@ export default function PackagesPage() {
                               key={v.id}
                               type="button"
                               onClick={() => addVehicleType(v.id)}
-                              className="text-xs px-2 py-1 rounded-md bg-white border border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 transition-colors inline-flex items-center gap-1"
+                              className="text-xs px-2 py-1 rounded-md bg-white border border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 transition-colors inline-flex items-center gap-1.5"
                             >
-                              <span>{v.emoji}</span>
+                              <VehicleIcon type={v.id} className="w-4 h-4" />
                               {v.label}
                             </button>
                           ))}
