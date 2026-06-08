@@ -678,7 +678,7 @@ export default function OnboardingPage() {
                     </svg>
                   </a>
                   <a
-                    href="/login?from=onboarding"
+                    href="/demo-dashboard"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="group flex items-center justify-between gap-3 bg-white border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 rounded-xl px-4 py-3 transition-colors"
