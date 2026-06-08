@@ -51,6 +51,10 @@ export async function GET(request: NextRequest) {
         status: true,
         staffId: true,
         paymentMethod: true,
+        // Customer's $cashtag / handle from manual-payment flows so the
+        // owner can match incoming Cash App / PayPal payments to the
+        // booking right from the list view.
+        customerPaymentTag: true,
         selectedAddons: true,
         addonsTotal: true,
         createdAt: true,

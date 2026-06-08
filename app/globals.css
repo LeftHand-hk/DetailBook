@@ -249,3 +249,28 @@ body {
 /* Scrollbar track on dark */
 .db-dark ::-webkit-scrollbar-track { background: #0f172a; }
 .db-dark ::-webkit-scrollbar-thumb { background: #475569; }
+
+/* iOS Safari auto-zooms into any form field whose font-size is below
+   16px when it gains focus. On mobile that means the user has to
+   pinch-zoom back out after every tap. Forcing 16px on the inputs
+   themselves (without bumping the visual size of labels around them)
+   silences the zoom while leaving the rest of the design alone. */
+@media (max-width: 767px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="number"],
+  input[type="password"],
+  input[type="search"],
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"],
+  input[type="month"],
+  input[type="week"],
+  input:not([type]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
