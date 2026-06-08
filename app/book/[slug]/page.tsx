@@ -2596,18 +2596,24 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                         <h3 className="text-gray-900 font-bold text-sm">Pay with Cash App</h3>
                       </div>
                       <p className="text-gray-600 text-sm mb-3">
-                        Send <strong className="text-gray-900">${depositAmount}</strong> to:
+                        Send <strong className="text-gray-900">${depositAmount}</strong> to <strong className="text-gray-900">${pm?.cashapp?.cashtag}</strong>.
                       </p>
-                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex items-center justify-between">
-                        <span className="text-gray-900 font-bold text-base">${pm?.cashapp?.cashtag}</span>
-                        <button
-                          type="button"
-                          onClick={() => navigator.clipboard.writeText(`$${pm?.cashapp?.cashtag}`)}
-                          className="text-xs text-blue-600 hover:text-blue-700 font-semibold"
-                        >
-                          Copy
-                        </button>
-                      </div>
+                      {/* Deep link: opens the Cash App mobile app (or
+                          cash.app on desktop) with the cashtag selected
+                          AND the deposit amount pre-filled — one tap to
+                          pay, no copy-paste. */}
+                      <a
+                        href={`https://cash.app/$${pm?.cashapp?.cashtag}/${depositAmount}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-2 w-full bg-[#00D632] hover:bg-[#00BD2C] text-white text-sm font-extrabold px-4 py-3 rounded-xl shadow-md transition-colors"
+                      >
+                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M21.13 7.39c0-.32-.11-.61-.31-.86-.18-.21-.46-.32-.74-.35-.07 0-.13-.01-.2-.01-.36 0-.7.16-.93.42-.69.79-1.69 1.32-2.84 1.32-1.45 0-2.45-.83-2.45-1.85 0-.81.61-1.31 1.95-1.31.95 0 1.75.18 2.35.42.31.13.65.05.86-.21l.99-1.18c.16-.19.22-.45.16-.69-.06-.24-.21-.45-.43-.57C18.43.92 17.04.5 15.5.5c-1.03 0-2.01.21-2.81.59l-.13-.59c-.05-.27-.29-.5-.59-.5h-1.95c-.3 0-.55.21-.59.5L9.18.93C7.16 1.55 5.74 3.18 5.74 5.5c0 2.8 2.5 4.43 5.21 4.43 1.39 0 2.41.74 2.41 1.75 0 .86-.55 1.39-1.86 1.39-1.31 0-2.46-.5-3.22-1-.31-.21-.71-.18-.99.07L5.92 13.49c-.16.14-.25.34-.25.55s.09.41.25.55C7 15.58 8.78 16.5 10.84 16.5c.21 0 .42-.01.62-.04l.13.74c.05.27.29.5.59.5h1.95c.3 0 .55-.21.59-.5l.16-.81c1.91-.7 3.25-2.31 3.25-4.63 0-2.61-2.36-4.36-5.42-4.36-1.21 0-2.19-.64-2.19-1.65 0-.92.71-1.41 1.86-1.41 1.16 0 2.21.39 2.91.86.27.18.64.14.86-.09l1.04-1.07c.27-.27.31-.7.09-1.01z"/></svg>
+                        Pay ${depositAmount} in Cash App
+                      </a>
+                      <p className="text-[11px] text-gray-500 mt-2 text-center leading-snug">
+                        Opens Cash App with <strong>${pm?.cashapp?.cashtag}</strong> and <strong>${depositAmount}</strong> already filled in.
+                      </p>
 
                       {/* Customer's own $cashtag so the owner can identify
                           which incoming Cash App payment belongs to this
