@@ -850,13 +850,25 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
         // expects imageUrl/title — map so photos render.
         photos={photos.map((p: any) => ({ id: p.id, imageUrl: p.photoUrl || p.imageUrl, title: p.caption || p.title })) as any}
         onBookNow={() => { setShowLanding(false); window.scrollTo({ top: 0 }); }}
-        onSelectPackage={(pkg: any) => {
+        onSelectPackage={(pkg: any, vt: VehicleTypeId | null) => {
           const real = allDisplayPackages.find((p) => p.id === pkg.id);
           if (!real) return;
+          // The v2 landing now picks the vehicle type FIRST and passes
+          // it back here. If we got one, lock it in and drop into the
+          // date/time step straight away — no modal middle step.
+          if (vt) {
+            setSelectedVehicleType(vt);
+            setSelectedPackage(real);
+            setShowLanding(false);
+            window.scrollTo({ top: 0 });
+            setStep(1);
+            return;
+          }
+          // Fallback: visitor tapped a tiered package without picking a
+          // tier first (e.g. they ignored the picker). Pop the original
+          // modal so they choose before the surcharge is applied.
           const hasTiers = Array.isArray((real as any).vehiclePricing) && (real as any).vehiclePricing.length > 0;
           if (hasTiers) {
-            // Stay on the landing and pop an inline modal asking which
-            // vehicle, so the surcharge is locked in before the date step.
             setPendingVehiclePackage(real);
             return;
           }

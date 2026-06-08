@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { VEHICLE_TYPES, type VehicleTypeId, surchargeForVehicleType, packageSupportsVehicleType } from "@/lib/vehicle-pricing";
+import { VehicleIcon } from "@/components/VehicleIcon";
 
 // Editorial booking page (v2). Two modes, one component:
 //   • Public (editable=false) — pure display on /book/[slug].
@@ -13,7 +15,7 @@ import { useEffect, useRef, useState } from "react";
 //     slots always fall back to sensible default copy, so the page is
 //     never blank.
 
-export type V2Package = { id: string; name: string; description: string; price: number; duration: number; active: boolean; deposit?: number | null };
+export type V2Package = { id: string; name: string; description: string; price: number; duration: number; active: boolean; deposit?: number | null; vehiclePricing?: Array<{ type: string; surcharge: number }> | null };
 export type V2Review = { id: string; customerName: string; rating: number; reviewText: string; reviewDate: string | null };
 export type V2Photo = { id: string; imageUrl: string; title?: string | null };
 export type V2Profile = {
@@ -117,9 +119,15 @@ export default function BookingV2Landing({
   onBack?: () => void;
   // Customer clicked a specific service card — jump straight into the
   // booking flow with that package preselected (skip re-choosing it).
-  // Falls back to onBookNow when not provided.
-  onSelectPackage?: (pkg: V2Package) => void;
+  // We also pass the picked vehicle type so the parent can lock in the
+  // surcharge without needing a second modal.
+  onSelectPackage?: (pkg: V2Package, vehicleType: VehicleTypeId | null) => void;
 }) {
+  // Customer's chosen vehicle type — lives in the v2 landing so the
+  // tier-picker is the FIRST thing they pick, before any services. Lets
+  // us filter the services grid and bake the surcharge into the price
+  // they see before they tap a card.
+  const [selectedVehicleType, setSelectedVehicleType] = useState<VehicleTypeId | null>(null);
   const [scrolled, setScrolled] = useState(false);
   // Fade the banner in once it's fully decoded so a baseline JPEG doesn't
   // visibly paint top-to-bottom ("piece by piece"). The dark backdrop shows
@@ -508,46 +516,127 @@ export default function BookingV2Landing({
       {/* ── SERVICES ────────────────────────────────────────────────── */}
       <section id="services" className="bg-white py-20 sm:py-28 px-5 sm:px-8 border-y border-stone-200">
         <div className="max-w-6xl mx-auto">
-          <div className="mb-12">
+          <div className="mb-10">
             <Eyebrow k="servicesEyebrow" />
             {editable
               ? <Field k="servicesHeading" editClassName="text-2xl font-black" />
               : <h2 className="text-3xl sm:text-5xl font-black leading-tight tracking-tight max-w-xl">{resolve("servicesHeading")}</h2>}
           </div>
+
+          {/* ── Vehicle-type picker (live page only). Whatever the
+              customer picks here filters the services grid below and
+              gets baked into the price preview, so they never tap a
+              card they can't actually book. */}
+          {!editable && packages.length > 0 && (() => {
+            const tieredExists = packages.some((p) => Array.isArray(p.vehiclePricing) && (p.vehiclePricing as any[]).length > 0);
+            if (!tieredExists) return null;
+            return (
+              <div className="mb-10 bg-stone-50 border border-stone-200 rounded-2xl p-5 sm:p-6">
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-stone-500">Step 1 — Pick your vehicle</p>
+                  {selectedVehicleType && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedVehicleType(null)}
+                      className="text-xs font-semibold text-stone-500 hover:text-stone-900 underline"
+                    >
+                      Show all
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
+                  {VEHICLE_TYPES.map((v) => {
+                    const active = selectedVehicleType === v.id;
+                    const supported = packages.some((p) => packageSupportsVehicleType(p.vehiclePricing ?? null, v.id));
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => setSelectedVehicleType(active ? null : v.id)}
+                        disabled={!supported}
+                        className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border-2 text-center transition-all ${
+                          active
+                            ? "bg-stone-900 border-stone-900 text-white"
+                            : supported
+                              ? "bg-white border-stone-200 text-stone-700 hover:border-stone-400"
+                              : "bg-stone-100 border-stone-100 text-stone-300 cursor-not-allowed"
+                        }`}
+                      >
+                        <VehicleIcon type={v.id} className="w-6 h-6" />
+                        <span className="text-[11px] font-bold leading-tight">{v.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           {packages.length === 0 ? (
             <div className="bg-stone-50 border border-stone-200 rounded-2xl p-10 text-center text-stone-500">No services listed yet.{editable ? " Add them on the Packages page." : ""}</div>
-          ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-              {packages.map((pkg) => {
-                // In the live page the whole card books THIS package
-                // directly (no re-selection). In the editor it's inert.
-                const bookThis = () => { if (editable) return; (onSelectPackage ? onSelectPackage(pkg) : onBookNow()); };
-                return (
-                <div
-                  key={pkg.id}
-                  onClick={bookThis}
-                  className={`group bg-white border border-stone-200 rounded-2xl p-5 sm:p-7 flex flex-col text-left transition-all ${editable ? "" : "cursor-pointer hover:border-stone-900 hover:-translate-y-0.5 hover:shadow-xl shadow-stone-200/60"}`}
-                >
-                  <div className="flex items-start justify-between mb-4 sm:mb-5">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-stone-100 rounded-2xl flex items-center justify-center text-xl sm:text-2xl">{PACKAGE_ICONS[pkg.name] ?? "🚗"}</div>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">{formatDuration(pkg.duration)}</span>
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-extrabold leading-snug mb-2">{pkg.name}</h3>
-                  {pkg.description
-                    ? <p className="text-stone-500 text-sm leading-relaxed mb-4 sm:mb-6 flex-1 line-clamp-3">{pkg.description}</p>
-                    : <div className="flex-1 mb-4 sm:mb-6" />}
-                  <div className="flex items-baseline justify-between border-t border-stone-100 pt-4 sm:pt-5">
-                    <div>
-                      <p className="text-2xl sm:text-3xl font-black tracking-tight">${pkg.price}</p>
-                      {(pkg.deposit ?? 0) > 0 && <p className="text-[11px] text-stone-400 mt-0.5">${pkg.deposit} deposit</p>}
-                    </div>
-                    {!editable && <span className="text-xs font-bold uppercase tracking-widest text-stone-500 group-hover:text-stone-900 transition-colors">Book →</span>}
-                  </div>
+          ) : (() => {
+            // Filter packages by the picked vehicle type (live page only).
+            // packageSupportsVehicleType returns true for flat-priced
+            // packages too, so they always show up regardless of pick.
+            const visible = (!editable && selectedVehicleType)
+              ? packages.filter((p) => packageSupportsVehicleType(p.vehiclePricing ?? null, selectedVehicleType))
+              : packages;
+
+            if (visible.length === 0) {
+              return (
+                <div className="bg-stone-50 border border-stone-200 rounded-2xl p-10 text-center">
+                  <p className="text-stone-600 font-semibold mb-1">No services for that vehicle type yet.</p>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedVehicleType(null)}
+                    className="text-sm text-stone-900 underline font-semibold"
+                  >
+                    Show all services
+                  </button>
                 </div>
-                );
-              })}
-            </div>
-          )}
+              );
+            }
+
+            return (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                {visible.map((pkg) => {
+                  const surcharge = selectedVehicleType
+                    ? surchargeForVehicleType(pkg.vehiclePricing ?? null, selectedVehicleType)
+                    : 0;
+                  const displayPrice = pkg.price + surcharge;
+                  const bookThis = () => { if (editable) return; (onSelectPackage ? onSelectPackage(pkg, selectedVehicleType) : onBookNow()); };
+                  return (
+                  <div
+                    key={pkg.id}
+                    onClick={bookThis}
+                    className={`group bg-white border border-stone-200 rounded-2xl p-5 sm:p-7 flex flex-col text-left transition-all ${editable ? "" : "cursor-pointer hover:border-stone-900 hover:-translate-y-0.5 hover:shadow-xl shadow-stone-200/60"}`}
+                  >
+                    <div className="flex items-start justify-between mb-4 sm:mb-5">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-stone-100 rounded-2xl flex items-center justify-center text-xl sm:text-2xl">{PACKAGE_ICONS[pkg.name] ?? "🚗"}</div>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">{formatDuration(pkg.duration)}</span>
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-extrabold leading-snug mb-2">{pkg.name}</h3>
+                    {pkg.description
+                      ? <p className="text-stone-500 text-sm leading-relaxed mb-4 sm:mb-6 flex-1 line-clamp-3">{pkg.description}</p>
+                      : <div className="flex-1 mb-4 sm:mb-6" />}
+                    <div className="flex items-baseline justify-between border-t border-stone-100 pt-4 sm:pt-5">
+                      <div>
+                        <p className="text-2xl sm:text-3xl font-black tracking-tight">${displayPrice}</p>
+                        {surcharge > 0 && (
+                          <p className="text-[11px] text-stone-400 mt-0.5">${pkg.price} base + ${surcharge}</p>
+                        )}
+                        {surcharge === 0 && (pkg.deposit ?? 0) > 0 && (
+                          <p className="text-[11px] text-stone-400 mt-0.5">${pkg.deposit} deposit</p>
+                        )}
+                      </div>
+                      {!editable && <span className="text-xs font-bold uppercase tracking-widest text-stone-500 group-hover:text-stone-900 transition-colors">Book →</span>}
+                    </div>
+                  </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
           {editable && <p className="text-center text-xs text-stone-400 mt-6">Services are managed on the Packages page — they appear here automatically.</p>}
         </div>
       </section>

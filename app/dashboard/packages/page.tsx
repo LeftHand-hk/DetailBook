@@ -25,30 +25,35 @@ const STARTER_LIMIT = 5;
 // the user can delete or add more. The dashboard is gated behind having at
 // least one package, so this screen is the activation funnel — a blank
 // form here was the biggest drop-off in onboarding.
+type VehiclePricingPick = { type: VehicleTypeId; surcharge: string };
 type SetupRow = {
   id: string;
   name: string;
   price: string;
   duration: string;
   description: string;
-  // Which vehicle tiers this service is offered for. Empty means "no
-  // restriction" — every vehicle type can book it at the base price.
-  // Subset means the service is only available for the picked tiers
-  // (saved with a 0 surcharge so the owner can add per-tier pricing
-  // later from the regular editor).
-  vehicleTypes: VehicleTypeId[];
+  // The tiers this service is offered for + an optional "+$N" surcharge
+  // per tier (string so the input can stay empty). All 5 entries with
+  // an empty/0 surcharge means "flat-priced for any vehicle" and gets
+  // saved as an empty vehiclePricing array; otherwise the array carries
+  // exactly the picked tiers with their parsed surcharges.
+  vehiclePricing: VehiclePricingPick[];
 };
 
 const ALL_VEHICLE_IDS: VehicleTypeId[] = VEHICLE_TYPES.map((v) => v.id) as VehicleTypeId[];
 
+function freshVP(): VehiclePricingPick[] {
+  return ALL_VEHICLE_IDS.map((t) => ({ type: t, surcharge: "" }));
+}
+
 const DEFAULT_SETUP_ROWS: SetupRow[] = [
-  { id: "s1", name: "Exterior Wash & Wax",                description: "Hand wash, tire shine, and a protective spray wax — exterior detail.",      price: "49",  duration: "60",  vehicleTypes: [...ALL_VEHICLE_IDS] },
-  { id: "s2", name: "Interior Detail",                    description: "Deep vacuum, leather and plastic cleaning, glass, and odor removal.",       price: "89",  duration: "90",  vehicleTypes: [...ALL_VEHICLE_IDS] },
-  { id: "s3", name: "Full Detail (Interior + Exterior)",  description: "Complete interior + exterior detail with premium products and finish.",     price: "149", duration: "180", vehicleTypes: [...ALL_VEHICLE_IDS] },
+  { id: "s1", name: "Exterior Wash & Wax",                description: "Hand wash, tire shine, and a protective spray wax — exterior detail.",      price: "49",  duration: "60",  vehiclePricing: freshVP() },
+  { id: "s2", name: "Interior Detail",                    description: "Deep vacuum, leather and plastic cleaning, glass, and odor removal.",       price: "89",  duration: "90",  vehiclePricing: freshVP() },
+  { id: "s3", name: "Full Detail (Interior + Exterior)",  description: "Complete interior + exterior detail with premium products and finish.",     price: "149", duration: "180", vehiclePricing: freshVP() },
 ];
 
 function newSetupRow(): SetupRow {
-  return { id: `s_${Math.random().toString(36).slice(2, 10)}`, name: "", description: "", price: "", duration: "", vehicleTypes: [...ALL_VEHICLE_IDS] };
+  return { id: `s_${Math.random().toString(36).slice(2, 10)}`, name: "", description: "", price: "", duration: "", vehiclePricing: freshVP() };
 }
 
 // Addon rows in the form keep price as a string so we can render empty
@@ -179,27 +184,31 @@ export default function PackagesPage() {
         description: r.description.trim(),
         price: parseFloat(r.price),
         duration: parseInt(r.duration, 10),
-        vehicleTypes: r.vehicleTypes,
+        vehiclePricing: r.vehiclePricing,
       }))
       .filter((r) => r.name && Number.isFinite(r.price) && r.price >= 0 && Number.isFinite(r.duration) && r.duration > 0);
     if (valid.length === 0) {
       setSetupError("Add at least one service with a name, price, and duration.");
       return;
     }
-    if (valid.some((r) => r.vehicleTypes.length === 0)) {
+    if (valid.some((r) => r.vehiclePricing.length === 0)) {
       setSetupError("Each service needs at least one vehicle type checked.");
       return;
     }
     setSetupSaving(true);
     try {
       for (const r of valid) {
-        // Treat "all 5 selected" as flat-priced (vehiclePricing = []).
-        // Any subset gets saved with surcharge=0 so the booking page
-        // restricts the service to those tiers; the owner can edit per-
-        // tier surcharges later from the regular packages screen.
-        const vp = r.vehicleTypes.length === ALL_VEHICLE_IDS.length
-          ? []
-          : r.vehicleTypes.map((t) => ({ type: t, surcharge: 0 }));
+        // Parse each picked tier's surcharge string. If the result is
+        // "all 5 tiers picked AND every surcharge is 0/blank" we save
+        // as flat-priced (vehiclePricing = []) — otherwise the array
+        // carries the picked tiers with their parsed surcharges.
+        const parsed = r.vehiclePricing.map((v) => ({
+          type: v.type,
+          surcharge: Math.max(0, parseFloat(v.surcharge) || 0),
+        }));
+        const allTiersPicked = parsed.length === ALL_VEHICLE_IDS.length;
+        const allZero = parsed.every((p) => p.surcharge === 0);
+        const vp = allTiersPicked && allZero ? [] : parsed;
         const res = await fetch("/api/packages", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -499,37 +508,60 @@ export default function PackagesPage() {
                     <span className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Description</span>
                     <textarea value={r.description} onChange={(e) => updateSetupRow(i, "description", e.target.value)} rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
                   </label>
-                  {/* Which vehicle tiers this service is available for. All
-                      checked = no restriction (most common); deselect to
-                      limit the service to specific tiers. */}
+                  {/* Vehicle tiers + optional per-tier surcharge. Click a
+                      tile to toggle it; once it's picked, a "+$" input
+                      lets you add extra charges for that vehicle type. */}
                   <div className="sm:col-span-12">
                     <p className="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Available for</p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                       {VEHICLE_TYPES.map((v) => {
-                        const on = r.vehicleTypes.includes(v.id);
+                        const pick = r.vehiclePricing.find((p) => p.type === v.id);
+                        const on = Boolean(pick);
                         return (
-                          <button
+                          <div
                             key={v.id}
-                            type="button"
-                            onClick={() => setSetupRows((rows) => rows.map((row, idx) => idx !== i ? row : {
-                              ...row,
-                              vehicleTypes: on
-                                ? row.vehicleTypes.filter((t) => t !== v.id)
-                                : [...row.vehicleTypes, v.id],
-                            }))}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
+                            className={`rounded-xl border-2 p-2.5 transition-all ${
                               on
-                                ? "bg-blue-50 border-blue-500 text-blue-700"
-                                : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
+                                ? "bg-blue-50 border-blue-500"
+                                : "bg-white border-gray-200 hover:border-gray-300"
                             }`}
                           >
-                            <VehicleIcon type={v.id} className="w-4 h-4" />
-                            {v.label}
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => setSetupRows((rows) => rows.map((row, idx) => idx !== i ? row : {
+                                ...row,
+                                vehiclePricing: on
+                                  ? row.vehiclePricing.filter((p) => p.type !== v.id)
+                                  : [...row.vehiclePricing, { type: v.id, surcharge: "" }],
+                              }))}
+                              className="w-full flex items-center gap-1.5 text-left"
+                            >
+                              <VehicleIcon type={v.id} className={`w-4 h-4 flex-shrink-0 ${on ? "text-blue-700" : "text-gray-500"}`} />
+                              <span className={`text-xs font-semibold truncate ${on ? "text-blue-700" : "text-gray-600"}`}>{v.label}</span>
+                            </button>
+                            {on && (
+                              <div className="relative mt-2">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">+$</span>
+                                <input
+                                  type="number" min="0" step="1" inputMode="numeric"
+                                  value={pick?.surcharge ?? ""}
+                                  onChange={(e) => {
+                                    const next = e.target.value;
+                                    setSetupRows((rows) => rows.map((row, idx) => idx !== i ? row : {
+                                      ...row,
+                                      vehiclePricing: row.vehiclePricing.map((p) => p.type === v.id ? { ...p, surcharge: next } : p),
+                                    }));
+                                  }}
+                                  placeholder="0"
+                                  className="w-full pl-7 pr-2 py-1.5 border border-blue-200 bg-white rounded-md text-xs font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                                />
+                              </div>
+                            )}
+                          </div>
                         );
                       })}
                     </div>
-                    <p className="text-[11px] text-gray-400 mt-1.5">All checked = available for any vehicle. Add per-tier prices later from the editor.</p>
+                    <p className="text-[11px] text-gray-400 mt-1.5">All picked with 0 = flat price for any vehicle. Add a number to charge extra for that tier.</p>
                   </div>
                 </div>
                 <button type="button" onClick={() => removeSetupRow(i)} title="Remove this service" aria-label="Remove this service" className="flex-shrink-0 w-9 h-9 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors">
