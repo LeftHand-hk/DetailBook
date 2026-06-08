@@ -430,6 +430,11 @@ model Booking {
   address         String?
   paymentMethod   String  @default("")
   paymentProof    String? @db.Text
+  // The customer's own payment-app handle so the owner can match an
+  // incoming Cash App / PayPal / etc payment to this booking. For Cash
+  // App it's the customer's $cashtag (no $ prefix needed) entered at
+  // checkout. Empty for card payments (we already have the transaction).
+  customerPaymentTag String?
 
   reminderSentAt DateTime?
 

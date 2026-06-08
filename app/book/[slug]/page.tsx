@@ -34,9 +34,14 @@ interface StaffMember {
 interface BookingForm {
   make: string; model: string; year: string; color: string;
   customerName: string; customerEmail: string; customerPhone: string; notes: string;
+  // Customer's own Cash App $cashtag so the owner can match the incoming
+  // payment to this booking. Only collected when selectedPaymentMethod
+  // === "cashapp"; ignored for other methods.
+  customerPaymentTag: string;
 }
 const EMPTY_FORM: BookingForm = {
   make:"",model:"",year:"",color:"",customerName:"",customerEmail:"",customerPhone:"",notes:"",
+  customerPaymentTag:"",
 };
 
 const PLACEHOLDER_REVIEWS = [
@@ -393,6 +398,10 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       address: bookingAddress,
       staffId: assignedStaffId,
       staffName: assignedStaffName,
+      // Only relevant for non-card methods (Cash App today). The server
+      // strips a leading $ and trims; empty string is fine for other
+      // methods and gets stored as null.
+      customerPaymentTag: form.customerPaymentTag.trim(),
     };
   };
 
@@ -2459,6 +2468,30 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                         >
                           Copy
                         </button>
+                      </div>
+
+                      {/* Customer's own $cashtag so the owner can identify
+                          which incoming Cash App payment belongs to this
+                          booking. Required — without it the owner has a
+                          list of anonymous payments. */}
+                      <div className="mt-4">
+                        <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                          Your Cash App tag <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">$</span>
+                          <input
+                            type="text"
+                            value={form.customerPaymentTag.replace(/^\$/, "")}
+                            onChange={(e) => setForm({ ...form, customerPaymentTag: e.target.value.replace(/^\$/, "") })}
+                            placeholder="yourtag"
+                            required
+                            className="w-full pl-6 pr-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+                        <p className="text-[11px] text-gray-500 mt-1.5 leading-snug">
+                          So {(user as any)?.businessName || "the detailer"} knows which payment is yours.
+                        </p>
                       </div>
                     </>
                   )}

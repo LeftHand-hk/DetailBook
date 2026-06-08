@@ -762,6 +762,25 @@ export default function BookingsPage() {
                   {pmLabel && (
                     <p className="text-xs text-gray-500 mt-1">via {pmLabel}</p>
                   )}
+                  {/* Customer's own $cashtag/handle so the owner can match
+                      the incoming Cash App / PayPal etc payment in their
+                      inbox to this booking. Hidden when the customer
+                      didn't supply one (card payments, cash on arrival). */}
+                  {(selected as any).customerPaymentTag && (
+                    <div className="mt-3 bg-white border border-blue-200 rounded-lg px-3 py-2 flex items-center justify-between">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Customer paid from</p>
+                        <p className="text-sm font-bold text-gray-900 truncate">${(selected as any).customerPaymentTag}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => navigator.clipboard.writeText(`$${(selected as any).customerPaymentTag}`)}
+                        className="text-xs text-blue-600 hover:text-blue-700 font-semibold flex-shrink-0"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  )}
                   <div className="border-t border-blue-200/60 mt-4 pt-3 flex items-center justify-between">
                     <span className="text-sm font-semibold text-gray-700">Balance due</span>
                     <span className={`text-lg font-extrabold ${balance > 0 ? "text-gray-900" : "text-green-600"}`}>

@@ -284,6 +284,13 @@ export async function POST(request: NextRequest) {
         staffId: body.staffId || null,
         paymentMethod: body.paymentMethod || "",
         paymentProof: safeProof,
+        // Customer-supplied identifier for non-card payments (e.g. their
+        // own $cashtag for Cash App) so the owner can match the incoming
+        // payment to this booking. Trimmed of a leading $ to stay
+        // consistent regardless of what the customer typed.
+        customerPaymentTag: typeof body.customerPaymentTag === "string"
+          ? body.customerPaymentTag.trim().replace(/^\$/, "")
+          : null,
         selectedAddons: storedSelectedAddons === null ? undefined : (storedSelectedAddons as any),
         addonsTotal: computedAddonsTotal,
       },
