@@ -244,16 +244,27 @@ export default function PaymentsPage() {
         </div>
       </div>
 
-      {/* Require deposit row */}
-      <div className="bg-white rounded-2xl border border-gray-200 px-5 py-4 flex items-center gap-4 shadow-sm">
-        <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+      {/* Require deposit row — primary control on this page. Colored
+          differently from the payment-method cards below so it never
+          gets lost between them. */}
+      <div className={`rounded-2xl border-2 px-5 py-4 flex items-center gap-4 shadow-sm transition-colors ${
+        requireDeposit
+          ? "bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-300"
+          : "bg-gradient-to-br from-blue-50/50 to-indigo-50/40 border-blue-200"
+      }`}>
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${requireDeposit ? "bg-blue-600 text-white shadow-md shadow-blue-300" : "bg-white text-blue-600 border border-blue-200"}`}>
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
           </svg>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[15px] font-bold text-gray-900">Require deposit at booking</p>
-          <p className="text-xs text-gray-500 mt-0.5">Reduces no-shows. Set the amount per service in <a href="/dashboard/packages" className="text-blue-600 font-semibold hover:underline">Packages</a>.</p>
+          <div className="flex items-center gap-2">
+            <p className="text-[15px] font-extrabold text-gray-900">Require deposit at booking</p>
+            {requireDeposit && (
+              <span className="inline-flex items-center text-[10px] font-bold uppercase tracking-wider bg-blue-600 text-white px-1.5 py-0.5 rounded">ON</span>
+            )}
+          </div>
+          <p className="text-xs text-blue-900/70 mt-0.5">Reduces no-shows. Set the amount per service in <a href="/dashboard/packages" className="text-blue-700 font-semibold hover:underline">Packages</a>.</p>
         </div>
         <Toggle value={requireDeposit} onChange={(v) => setRequireDeposit(v)} />
       </div>

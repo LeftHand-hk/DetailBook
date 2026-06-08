@@ -163,6 +163,17 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   // we want it back on a hard refresh so the message keeps signalling
   // "this is not your real page yet" until they actually fix it.
   const [demoBannerDismissed, setDemoBannerDismissed] = useState(false);
+  // True when the visitor arrived from the onboarding "See booking page
+  // demo" link; surfaces a sticky Back-to-onboarding button at the top.
+  // Read once on mount from the URL — keeps it client-only so there's no
+  // SSR mismatch.
+  const [fromOnboarding, setFromOnboarding] = useState(false);
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get("from") === "onboarding") setFromOnboarding(true);
+    } catch { /* ignore */ }
+  }, []);
   // IDs of the add-ons the customer has currently ticked. Reset whenever
   // the customer picks a different package so options from the previous
   // package don't leak into the booking.
@@ -358,11 +369,25 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     return dayCounts[0].id;
   };
 
-  // Deposit comes from per-package setting, gated by global requireDeposit toggle
+  // Deposit comes from a per-package amount when set; otherwise we fall
+  // back to the owner's depositPercentage, and finally to 20% so the
+  // "Require deposit" toggle ALWAYS results in a real charge. The prior
+  // behaviour silently dropped the deposit to 0 when a package had no
+  // per-row amount, letting customers sneak through without paying.
   const requireDeposit = (user as any)?.requireDeposit ?? false;
-  const depositAmount = (selectedPackage && requireDeposit)
-    ? Number((selectedPackage as any).deposit || 0)
-    : 0;
+  const depositAmount = (() => {
+    if (!selectedPackage || !requireDeposit) return 0;
+    const perPackage = Number((selectedPackage as any).deposit || 0);
+    if (perPackage > 0) return perPackage;
+    const pct = Number((user as any)?.depositPercentage || 0);
+    // Use just the package base price here — the vehicle surcharge is
+    // declared further down, and depositing on the surcharge is an
+    // optional polish we can revisit if owners ask.
+    const base = selectedPackage.price;
+    if (pct > 0 && pct <= 100) return Math.max(1, Math.round((base * pct) / 100));
+    // Final fallback so requireDeposit is never silently 0.
+    return Math.max(1, Math.round(base * 0.2));
+  })();
 
   // Reset ticked add-ons whenever the customer switches packages so they
   // don't carry options from the prior package into the new one.

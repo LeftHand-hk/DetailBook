@@ -609,12 +609,11 @@ export default function BookingsPage() {
           pmRaw === "square" ? "Square" :
           pmRaw === "paypal" ? "PayPal" :
           pmRaw === "cash" ? "Cash" : pmRaw;
-        // Only treat the value as a renderable image when it's an uploaded
-        // screenshot (base64 data URL). stripe:/square: references are
-        // payment IDs, not images — rendering them as <img src> produces
-        // a broken-image placeholder.
-        const rawProof = (selected as any).paymentProof as string | undefined;
-        const proof = rawProof && rawProof.startsWith("data:image/") ? rawProof : null;
+        // paymentProof still stores Stripe/Square transaction IDs but the
+        // user-uploaded screenshot path was removed - the manual flow now
+        // just relies on the customer's "I've sent it" tick + the owner
+        // matching the incoming payment by customerPaymentTag.
+        const proof = null;
 
         const allStatusOptions = [
           { key: "confirmed", label: "Confirm", active: "bg-green-600 text-white", idle: "bg-green-50 text-green-700 hover:bg-green-100" },
