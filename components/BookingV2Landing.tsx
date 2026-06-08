@@ -575,6 +575,21 @@ export default function BookingV2Landing({
           {packages.length === 0 ? (
             <div className="bg-stone-50 border border-stone-200 rounded-2xl p-10 text-center text-stone-500">No services listed yet.{editable ? " Add them on the Packages page." : ""}</div>
           ) : (() => {
+            // Gate the services grid on a vehicle pick whenever the
+            // picker is rendered (i.e. at least one package has tiers).
+            // The owner asked for "pick first, then see services" — so
+            // even flat-priced services stay hidden until the customer
+            // tells us what they drive.
+            const tieredExists = packages.some((p) => Array.isArray(p.vehiclePricing) && (p.vehiclePricing as any[]).length > 0);
+            if (!editable && tieredExists && !selectedVehicleType) {
+              return (
+                <div className="bg-stone-50 border-2 border-dashed border-stone-300 rounded-2xl p-10 text-center">
+                  <p className="text-stone-700 font-bold text-base mb-1">Pick your vehicle type above.</p>
+                  <p className="text-stone-500 text-sm">Your services will appear with the price for your vehicle.</p>
+                </div>
+              );
+            }
+
             // Filter packages by the picked vehicle type (live page only).
             // packageSupportsVehicleType returns true for flat-priced
             // packages too, so they always show up regardless of pick.
