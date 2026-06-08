@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendPaymentFailedEmail } from "@/lib/welcome-emails";
+import { sendPaymentFailedEmail, sendWelcomeEmail } from "@/lib/welcome-emails";
 
 // Map Paddle price IDs → plan names
 const PRICE_TO_PLAN: Record<string, string> = {
@@ -242,6 +242,16 @@ export async function POST(req: NextRequest) {
             fromOnboarding, // logged for diagnostics; not used as a gate
           })
         );
+
+        // Brief #15 — fire the day-1 welcome email the moment the trial
+        // activates, so it lands within minutes of the card save instead
+        // of waiting for the next cron tick. Fire-and-forget; the cron
+        // re-runs it later if welcomeEmailDay0At is still null.
+        if (letPaddleTrialRun) {
+          sendWelcomeEmail(resolvedUser.id, "day1").catch((err) =>
+            console.error("[Paddle webhook] day1 welcome email failed:", err),
+          );
+        }
 
         // Only force-activate Paddle when we're skipping the trial
         // window (post-trial subscribers / reactivations).

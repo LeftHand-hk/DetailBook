@@ -102,10 +102,12 @@ const WELCOME_EMAIL_KEYS = new Set([
   "welcomeEmailsPaused",
 ]);
 
-type WelcomeKey = "day0" | "day2";
+type WelcomeKey = "day1" | "day3" | "day5" | "day7";
 const WELCOME_DEFS: { key: WelcomeKey; label: string; col: string }[] = [
-  { key: "day0", label: "Day 0 — Welcome",    col: "welcomeEmailDay0At" },
-  { key: "day2", label: "Day 2 — Engagement", col: "welcomeEmailDay2At" },
+  { key: "day1", label: "Day 1 — Welcome + setup guide", col: "welcomeEmailDay0At" },
+  { key: "day3", label: "Day 3 — Need a hand?",          col: "welcomeEmailDay2At" },
+  { key: "day5", label: "Day 5 — 2 days left",           col: "welcomeEmailDay5At" },
+  { key: "day7", label: "Day 7 — Trial ends today",      col: "welcomeEmailDay13At" },
 ];
 
 function formatTs(value: unknown): string | null {
@@ -173,13 +175,8 @@ function WelcomeEmailsCard({ user, onAction }: { user: Record<string, unknown>; 
         )}
         {WELCOME_DEFS.map((def) => {
           const ts = formatTs(user[def.col]);
-          const skipped = def.key === "day2" && day2Skipped;
-          const statusText = ts
-            ? skipped ? `Skipped (had packages) on ${ts}` : `Sent on ${ts}`
-            : "Pending";
-          const statusClass = ts
-            ? skipped ? "text-gray-500" : "text-green-700"
-            : "text-blue-700";
+          const statusText = ts ? `Sent on ${ts}` : "Pending";
+          const statusClass = ts ? "text-green-700" : "text-blue-700";
           return (
             <div key={def.key} className="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-gray-100 last:border-0">
               <div className="min-w-0">

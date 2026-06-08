@@ -3,7 +3,9 @@ import prisma from "@/lib/prisma";
 import { hashPassword, signToken, cookieSecure } from "@/lib/auth";
 import { isValidEmail, validatePassword } from "@/lib/validation";
 import { getClientIp, getClientCountry } from "@/lib/geo";
-import { sendWelcomeEmail } from "@/lib/welcome-emails";
+// Welcome sequence is now triggered from the Paddle subscription.created
+// webhook (Brief #15) — fires when the user actually saves a card and
+// the trial activates, not at signup. So no welcome email here.
 
 function generateSlug(businessName: string): string {
   return businessName
@@ -137,15 +139,10 @@ export async function POST(request: NextRequest) {
     // make sense for retry reliability, but with 3 attempts × ~10s SMTP
     // timeouts the worst case (~30s) blew past Netlify's 10s function
     // timeout and signup itself started failing for new users. Two
-    // safety nets keep email delivery intact:
-    //   1. sendEmail now has tight SMTP timeouts (5/5/10s) so a single
-    //      attempt fails fast — Netlify usually keeps the function
-    //      alive past the response long enough to complete it.
-    //   2. The hourly /api/cron/welcome-emails picks up any user with
-    //      welcomeEmailDay0At still null and re-runs sendWelcomeEmail.
-    sendWelcomeEmail(user.id, "day0").catch((err) => {
-      console.error("[register] welcome day0 email failed:", err);
-    });
+    // No welcome email fired here anymore — the 4-email trial sequence
+    // (Brief #15) is anchored on trial activation, not signup. The Paddle
+    // subscription.created webhook sends day-1 when the user actually
+    // saves a card; the hourly cron handles day-3/5/7 after that.
 
     const { password: _, ...userWithoutPassword } = user;
 

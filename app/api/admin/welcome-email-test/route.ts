@@ -9,17 +9,16 @@ import {
 
 // Admin-only test endpoint. Two modes:
 //
-//   POST { to, key }      — send a single welcome email (key="day0" |
-//                           "day2") to an arbitrary address. No user
-//                           tracking is touched.
-//   POST { to, all: true } — send both emails in sequence to the address.
-//                           Same no-tracking guarantee.
+//   POST { to, key }      — send a single welcome email (key="day1" |
+//                           "day3" | "day5" | "day7") to an arbitrary
+//                           address. No user tracking is touched.
+//   POST { to, all: true } — send all four emails in sequence to the
+//                           address. Same no-tracking guarantee.
 //
 // Picks the most recent real user as the variable-substitution source
-// so the test email reads with realistic copy (the welcome subject is
-// "Welcome to DetailBook, <businessName>" — it needs a real business
-// name to look right).
-const VALID_KEYS: WelcomeEmailKey[] = ["day0", "day2"];
+// so the test email reads with realistic copy (booking link, first
+// name, etc. — it needs a real record to look right).
+const VALID_KEYS: WelcomeEmailKey[] = ["day1", "day3", "day5", "day7"];
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,7 +40,7 @@ export async function POST(request: NextRequest) {
     }
     if (!all && !key) {
       return NextResponse.json(
-        { error: "Provide either { key: day0|day2 } or { all: true }" },
+        { error: "Provide either { key: day1|day3|day5|day7 } or { all: true }" },
         { status: 400 },
       );
     }
