@@ -25,15 +25,30 @@ const STARTER_LIMIT = 5;
 // the user can delete or add more. The dashboard is gated behind having at
 // least one package, so this screen is the activation funnel — a blank
 // form here was the biggest drop-off in onboarding.
-type SetupRow = { id: string; name: string; price: string; duration: string; description: string };
+type SetupRow = {
+  id: string;
+  name: string;
+  price: string;
+  duration: string;
+  description: string;
+  // Which vehicle tiers this service is offered for. Empty means "no
+  // restriction" — every vehicle type can book it at the base price.
+  // Subset means the service is only available for the picked tiers
+  // (saved with a 0 surcharge so the owner can add per-tier pricing
+  // later from the regular editor).
+  vehicleTypes: VehicleTypeId[];
+};
+
+const ALL_VEHICLE_IDS: VehicleTypeId[] = VEHICLE_TYPES.map((v) => v.id) as VehicleTypeId[];
+
 const DEFAULT_SETUP_ROWS: SetupRow[] = [
-  { id: "s1", name: "Exterior Wash & Wax",                description: "Hand wash, tire shine, and a protective spray wax — exterior detail.",      price: "49",  duration: "60" },
-  { id: "s2", name: "Interior Detail",                    description: "Deep vacuum, leather and plastic cleaning, glass, and odor removal.",       price: "89",  duration: "90" },
-  { id: "s3", name: "Full Detail (Interior + Exterior)",  description: "Complete interior + exterior detail with premium products and finish.",     price: "149", duration: "180" },
+  { id: "s1", name: "Exterior Wash & Wax",                description: "Hand wash, tire shine, and a protective spray wax — exterior detail.",      price: "49",  duration: "60",  vehicleTypes: [...ALL_VEHICLE_IDS] },
+  { id: "s2", name: "Interior Detail",                    description: "Deep vacuum, leather and plastic cleaning, glass, and odor removal.",       price: "89",  duration: "90",  vehicleTypes: [...ALL_VEHICLE_IDS] },
+  { id: "s3", name: "Full Detail (Interior + Exterior)",  description: "Complete interior + exterior detail with premium products and finish.",     price: "149", duration: "180", vehicleTypes: [...ALL_VEHICLE_IDS] },
 ];
 
 function newSetupRow(): SetupRow {
-  return { id: `s_${Math.random().toString(36).slice(2, 10)}`, name: "", description: "", price: "", duration: "" };
+  return { id: `s_${Math.random().toString(36).slice(2, 10)}`, name: "", description: "", price: "", duration: "", vehicleTypes: [...ALL_VEHICLE_IDS] };
 }
 
 // Addon rows in the form keep price as a string so we can render empty
@@ -164,15 +179,27 @@ export default function PackagesPage() {
         description: r.description.trim(),
         price: parseFloat(r.price),
         duration: parseInt(r.duration, 10),
+        vehicleTypes: r.vehicleTypes,
       }))
       .filter((r) => r.name && Number.isFinite(r.price) && r.price >= 0 && Number.isFinite(r.duration) && r.duration > 0);
     if (valid.length === 0) {
       setSetupError("Add at least one service with a name, price, and duration.");
       return;
     }
+    if (valid.some((r) => r.vehicleTypes.length === 0)) {
+      setSetupError("Each service needs at least one vehicle type checked.");
+      return;
+    }
     setSetupSaving(true);
     try {
       for (const r of valid) {
+        // Treat "all 5 selected" as flat-priced (vehiclePricing = []).
+        // Any subset gets saved with surcharge=0 so the booking page
+        // restricts the service to those tiers; the owner can edit per-
+        // tier surcharges later from the regular packages screen.
+        const vp = r.vehicleTypes.length === ALL_VEHICLE_IDS.length
+          ? []
+          : r.vehicleTypes.map((t) => ({ type: t, surcharge: 0 }));
         const res = await fetch("/api/packages", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -182,6 +209,7 @@ export default function PackagesPage() {
             price: r.price,
             duration: r.duration,
             active: true,
+            vehiclePricing: vp,
           }),
         });
         if (!res.ok) {
@@ -471,6 +499,38 @@ export default function PackagesPage() {
                     <span className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Description</span>
                     <textarea value={r.description} onChange={(e) => updateSetupRow(i, "description", e.target.value)} rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
                   </label>
+                  {/* Which vehicle tiers this service is available for. All
+                      checked = no restriction (most common); deselect to
+                      limit the service to specific tiers. */}
+                  <div className="sm:col-span-12">
+                    <p className="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Available for</p>
+                    <div className="flex flex-wrap gap-2">
+                      {VEHICLE_TYPES.map((v) => {
+                        const on = r.vehicleTypes.includes(v.id);
+                        return (
+                          <button
+                            key={v.id}
+                            type="button"
+                            onClick={() => setSetupRows((rows) => rows.map((row, idx) => idx !== i ? row : {
+                              ...row,
+                              vehicleTypes: on
+                                ? row.vehicleTypes.filter((t) => t !== v.id)
+                                : [...row.vehicleTypes, v.id],
+                            }))}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
+                              on
+                                ? "bg-blue-50 border-blue-500 text-blue-700"
+                                : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
+                            }`}
+                          >
+                            <VehicleIcon type={v.id} className="w-4 h-4" />
+                            {v.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1.5">All checked = available for any vehicle. Add per-tier prices later from the editor.</p>
+                  </div>
                 </div>
                 <button type="button" onClick={() => removeSetupRow(i)} title="Remove this service" aria-label="Remove this service" className="flex-shrink-0 w-9 h-9 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" /></svg>
