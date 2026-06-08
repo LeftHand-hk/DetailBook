@@ -63,7 +63,7 @@ const businessNav: NavItem[] = [
     pro: true,
   },
   {
-    label: "Messages",
+    label: "Reminders",
     href: "/dashboard/messages",
     icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>,
     pro: true,
@@ -338,22 +338,38 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       )}
 
-      {/* Navigation */}
+      {/* Navigation — on Starter the entire Business section is
+          Pro-locked (Staff / Analytics / Reminders), so it gets pushed
+          BELOW System and visually marked as upgrade material. Pro
+          accounts keep the original order: Main → Business → System. */}
       <div className="flex-1 px-3 overflow-y-auto scrollbar-thin">
         <SectionLabel label="Main" />
         <nav className="space-y-0.5">
           {mainNav.map((item) => <NavLink key={item.href} item={item} />)}
         </nav>
 
-        <SectionLabel label="Business" />
-        <nav className="space-y-0.5">
-          {businessNav.map((item) => <NavLink key={item.href} item={item} />)}
-        </nav>
+        {isPro && (
+          <>
+            <SectionLabel label="Business" />
+            <nav className="space-y-0.5">
+              {businessNav.map((item) => <NavLink key={item.href} item={item} />)}
+            </nav>
+          </>
+        )}
 
         <SectionLabel label="System" />
         <nav className="space-y-0.5">
           {settingsNav.map((item) => <NavLink key={item.href} item={item} />)}
         </nav>
+
+        {!isPro && (
+          <>
+            <SectionLabel label="Pro features" />
+            <nav className="space-y-0.5">
+              {businessNav.map((item) => <NavLink key={item.href} item={item} />)}
+            </nav>
+          </>
+        )}
       </div>
 
       {/* Upgrade Banner (Starter only, dismissible) */}
