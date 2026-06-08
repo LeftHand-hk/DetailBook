@@ -226,6 +226,13 @@ export default function PackagesPage() {
           throw new Error(j.error || `Couldn't save "${r.name}"`);
         }
       }
+      // Tell BOTH guides (banner + dashboard card) to re-pull status
+      // so the "Add your first service package" step ticks immediately
+      // instead of waiting for a refresh. The dashboard listens for the
+      // same event on mount via the home page useEffect.
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("detailbook:setup-changed"));
+      }
       router.push("/dashboard");
     } catch (err: any) {
       setSetupError(err?.message || "Something went wrong. Please try again.");
