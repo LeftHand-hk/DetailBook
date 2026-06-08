@@ -198,6 +198,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [pathname, user, router]);
 
+  // "Last active" heartbeat — pings /api/auth/me on mount and every 5
+  // minutes after that. The endpoint already has its own throttled
+  // lastLoginAt refresh, so a remember-me user looks active in the admin
+  // dashboard without paying the cost per authenticated API call.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const ping = () => { fetch("/api/auth/me", { cache: "no-store" }).catch(() => {}); };
+    ping();
+    const id = window.setInterval(ping, 5 * 60 * 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
   // Reset the main scroll area to top on every *real* route change.
   // We compare against the last pathname we acted on because a few
   // pages (booking-page editor, dashboard home) re-render with the
