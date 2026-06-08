@@ -655,6 +655,47 @@ export default function OnboardingPage() {
               </div>
 
               <div className="px-8 py-7 space-y-5">
+                {/* Demo links — let prospects preview the product before
+                    they save a card. Both open in a NEW TAB so the
+                    onboarding session stays intact in the original tab.
+                    Closing the demo tab returns the user here. */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <a
+                    href="/book/mikes-mobile-detailing?from=onboarding"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex items-center justify-between gap-3 bg-white border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 rounded-xl px-4 py-3 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-9 h-9 flex-shrink-0 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-base">🌐</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-gray-900 leading-tight">See booking page demo</p>
+                        <p className="text-[11px] text-gray-500 leading-tight">What your customers see</p>
+                      </div>
+                    </div>
+                    <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                  <a
+                    href="/login?from=onboarding"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex items-center justify-between gap-3 bg-white border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 rounded-xl px-4 py-3 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-9 h-9 flex-shrink-0 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center text-base">📊</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-gray-900 leading-tight">See dashboard demo</p>
+                        <p className="text-[11px] text-gray-500 leading-tight">The back-office view</p>
+                      </div>
+                    </div>
+                    <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                </div>
+
                 <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5">
                   <div className="flex items-baseline justify-between mb-3">
                     <span className="text-sm font-bold text-blue-900">Starter Plan</span>

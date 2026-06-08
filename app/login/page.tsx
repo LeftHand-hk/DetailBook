@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { login, syncFromServer } from "@/lib/storage";
 import Logo from "@/components/Logo";
@@ -12,6 +12,15 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPass, setShowPass] = useState(false);
+  // Surface a return-to-onboarding bar + a heads-up about session swap
+  // when the visitor came from the onboarding "Dashboard demo" link.
+  const [fromOnboarding, setFromOnboarding] = useState(false);
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get("from") === "onboarding") setFromOnboarding(true);
+    } catch { /* ignore */ }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -95,7 +104,24 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex flex-col">
+      {fromOnboarding && (
+        <div className="sticky top-0 z-50 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-3 shadow-md">
+          <div className="max-w-3xl mx-auto flex items-center justify-between gap-3">
+            <p className="text-sm font-bold leading-tight">👋 Heads up — using the demo will replace your current session.</p>
+            <a
+              href="/onboarding"
+              className="flex-shrink-0 inline-flex items-center gap-1.5 bg-white text-blue-700 hover:bg-blue-50 font-extrabold text-sm px-4 py-2 rounded-full shadow-sm transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back to onboarding
+            </a>
+          </div>
+        </div>
+      )}
+      <div className="flex-1 flex">
       {/* Left panel — branding */}
       <div className="hidden lg:flex lg:w-[52%] relative bg-[#060c18] flex-col justify-between p-12 overflow-hidden">
         {/* Background glows */}
@@ -318,6 +344,7 @@ export default function LoginPage() {
             <a href="/refund" className="hover:text-gray-500 transition-colors">Refund</a>
           </p>
         </div>
+      </div>
       </div>
     </div>
   );

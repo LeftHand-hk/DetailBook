@@ -869,6 +869,22 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     );
     return (
       <>
+        {fromOnboarding && (
+          <div className="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-3 shadow-md">
+            <div className="max-w-3xl mx-auto flex items-center justify-between gap-3">
+              <p className="text-sm font-bold leading-tight">👋 You&rsquo;re previewing the booking page.</p>
+              <a
+                href="/onboarding"
+                className="flex-shrink-0 inline-flex items-center gap-1.5 bg-white text-blue-700 hover:bg-blue-50 font-extrabold text-sm px-4 py-2 rounded-full shadow-sm transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Back to onboarding
+              </a>
+            </div>
+          </div>
+        )}
         {landing}
         {pendingVehiclePackage && (
           <V2VehiclePickerModal
@@ -1169,6 +1185,29 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   // ── Main Booking Page ────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50">
+
+      {/* "Back to onboarding" bar — shown only when the visitor arrived
+          from the onboarding demo link (?from=onboarding). Fixed at the
+          top so it's always reachable, no matter how deep into the
+          booking flow they wandered. */}
+      {fromOnboarding && (
+        <div className="sticky top-0 z-50 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-3 shadow-md">
+          <div className="max-w-3xl mx-auto flex items-center justify-between gap-3">
+            <p className="text-sm font-bold leading-tight">
+              👋 You&rsquo;re previewing the booking page.
+            </p>
+            <a
+              href="/onboarding"
+              className="flex-shrink-0 inline-flex items-center gap-1.5 bg-white text-blue-700 hover:bg-blue-50 font-extrabold text-sm px-4 py-2 rounded-full shadow-sm transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back to onboarding
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* ── Demo Mode banner — only the owner sees this, only when
             their booking page has 0 real services. Visually distinct
