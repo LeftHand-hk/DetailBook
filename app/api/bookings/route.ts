@@ -264,9 +264,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(recentDuplicate, { status: 200 });
     }
 
+    // Brief #16: link or auto-create the matching Customer row for
+    // this business. Match precedence: email first, phone fallback.
+    // This dedupes the dashboard's Customers list so a returning
+    // customer doesn't get a fresh row on every booking. Empty inputs
+    // skip the lookup so we don't merge on "no contact info" matches.
+    let customerLinkId: string | null = null;
+    const normEmail = (customerEmail || "").trim().toLowerCase();
+    const normPhone = (customerPhone || "").trim();
+    if (normEmail || normPhone) {
+      const matchOr: any[] = [];
+      if (normEmail) matchOr.push({ email: normEmail });
+      if (normPhone) matchOr.push({ phone: normPhone });
+      const match = await prisma.customer.findFirst({
+        where: { userId, OR: matchOr },
+        select: { id: true },
+      });
+      if (match) {
+        customerLinkId = match.id;
+      } else {
+        const [first, ...rest] = (customerName || "").trim().split(/\s+/);
+        const created = await prisma.customer.create({
+          data: {
+            userId,
+            firstName: first || (normEmail || normPhone || "Customer"),
+            lastName: rest.length ? rest.join(" ") : null,
+            email: normEmail || null,
+            phone: normPhone || null,
+            vehicleMake: vMake || null,
+            vehicleModel: vModel || null,
+            vehicleYear: vYear || null,
+            vehicleColor: vColor || null,
+          },
+        });
+        customerLinkId = created.id;
+      }
+    }
+
     const booking = await prisma.booking.create({
       data: {
         userId,
+        customerId: customerLinkId,
         customerName,
         customerEmail,
         customerPhone: customerPhone || "",

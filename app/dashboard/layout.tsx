@@ -28,6 +28,11 @@ const mainNav: NavItem[] = [
     icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
   },
   {
+    label: "Customers",
+    href: "/dashboard/customers",
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+  },
+  {
     label: "Calendar",
     href: "/dashboard/calendar",
     icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
@@ -93,6 +98,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const [user, setUserState] = useState<User | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Customers sidebar badge — fetched once on dashboard mount and
+  // refreshed when /dashboard/customers signals a change via the
+  // customers-changed window event (see customers list page).
+  const [customerCount, setCustomerCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const refresh = () => {
+      fetch("/api/customers", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : []))
+        .then((list: any[]) => setCustomerCount(Array.isArray(list) ? list.length : 0))
+        .catch(() => {});
+    };
+    refresh();
+    window.addEventListener("detailbook:customers-changed", refresh);
+    return () => window.removeEventListener("detailbook:customers-changed", refresh);
+  }, []);
   const [checked, setChecked] = useState(false);
   const [upgradeDismissed, setUpgradeDismissed] = useState(false);
   const [impersonating, setImpersonating] = useState(false);
@@ -345,7 +366,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="flex-1 px-3 overflow-y-auto scrollbar-thin">
         <SectionLabel label="Main" />
         <nav className="space-y-0.5">
-          {mainNav.map((item) => <NavLink key={item.href} item={item} />)}
+          {mainNav.map((item) => (
+            <NavLink
+              key={item.href}
+              item={
+                item.href === "/dashboard/customers" && customerCount && customerCount > 0
+                  ? { ...item, badge: String(customerCount) }
+                  : item
+              }
+            />
+          ))}
         </nav>
 
         {isPro && (

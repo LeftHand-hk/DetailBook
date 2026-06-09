@@ -21,7 +21,7 @@ export async function POST(
     }
 
     const body = await request.json().catch(() => ({}));
-    const keyRaw = typeof body?.key === "string" ? body.key : "day0";
+    const keyRaw = typeof body?.key === "string" ? body.key : "day1";
     const key: WelcomeEmailKey | null = VALID_KEYS.includes(keyRaw as WelcomeEmailKey)
       ? (keyRaw as WelcomeEmailKey)
       : null;

@@ -11,7 +11,7 @@ async function main() {
     console.log(`No user with email ${email}`);
     return;
   }
-  const r = await sendWelcomeEmail(u.id, "day0", { forceResend: true });
+  const r = await sendWelcomeEmail(u.id, "day1", { forceResend: true });
   console.log("Result:", r);
 }
 

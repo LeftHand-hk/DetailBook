@@ -169,9 +169,10 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  packages Package[]
-  bookings Booking[]
-  staff    Staff[]
+  packages  Package[]
+  bookings  Booking[]
+  staff     Staff[]
+  customers Customer[]
   supportTickets SupportTicket[]
   notifications Notification[]
   emailLogs EmailLog[]
@@ -450,6 +451,12 @@ model Booking {
 
   staffId   String?
   staff     Staff?   @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  // Optional link to a Customer row. Set automatically when a new
+  // booking matches an existing customer (by email or phone) under the
+  // same business account. SetNull on customer delete so booking
+  // history isn't lost when an owner removes a customer.
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
@@ -457,6 +464,36 @@ model Booking {
 
   @@index([userId])
   @@index([date])
+  @@index([customerId])
+}
+
+// Per-business customer record. Lives on the dashboard's Customers page
+// and is auto-linked when an incoming booking's email or phone matches
+// an existing row under the same userId — so the owner doesn't end up
+// with duplicate entries for the same person.
+model Customer {
+  id           String  @id @default(cuid())
+  userId       String
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName    String
+  lastName     String?
+  // At least one of email / phone must be present, enforced in the API.
+  email        String?
+  phone        String?
+  notes        String? @db.Text
+  vehicleMake  String?
+  vehicleModel String?
+  vehicleYear  String?
+  vehicleColor String?
+
+  bookings     Booking[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, email])
+  @@index([userId, phone])
 }
 
 model PasswordReset {

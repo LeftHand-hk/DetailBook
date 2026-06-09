@@ -68,6 +68,30 @@ export default function BookingsPage() {
   };
   const [addForm, setAddForm] = useState(emptyAddForm);
 
+  // /dashboard/customers/[id] sends prefill query params when the owner
+  // clicks "Create Booking" on a customer detail page. Pop the modal
+  // pre-filled and clean the URL so reload doesn't re-trigger it.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    if (!sp.get("prefillCustomerId") && !sp.get("prefillName")) return;
+    setAddForm((f) => ({
+      ...f,
+      customerName: sp.get("prefillName") || f.customerName,
+      customerEmail: sp.get("prefillEmail") || f.customerEmail,
+      customerPhone: sp.get("prefillPhone") || f.customerPhone,
+      vehicleMake: sp.get("prefillVMake") || f.vehicleMake,
+      vehicleModel: sp.get("prefillVModel") || f.vehicleModel,
+      vehicleYear: sp.get("prefillVYear") || f.vehicleYear,
+      vehicleColor: sp.get("prefillVColor") || f.vehicleColor,
+    }));
+    setShowAddModal(true);
+    const url = new URL(window.location.href);
+    ["prefillCustomerId", "prefillName", "prefillEmail", "prefillPhone", "prefillVMake", "prefillVModel", "prefillVYear", "prefillVColor"]
+      .forEach((k) => url.searchParams.delete(k));
+    window.history.replaceState({}, "", url.pathname + (url.search ? `?${url.searchParams.toString()}` : ""));
+  }, []);
+
   useEffect(() => {
     fetch("/api/packages", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : []))
