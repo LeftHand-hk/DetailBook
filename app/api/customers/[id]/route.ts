@@ -26,8 +26,14 @@ export async function GET(
   const customer = await ownedCustomer(id, session.id);
   if (!customer) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  // Match BOTH explicit FK links AND email/phone matches so bookings
+  // created before this customer record existed still show up in the
+  // history without needing a backfill migration.
+  const matchOr: any[] = [{ customerId: id }];
+  if (customer.email) matchOr.push({ customerEmail: customer.email.toLowerCase() });
+  if (customer.phone) matchOr.push({ customerPhone: customer.phone });
   const bookings = await prisma.booking.findMany({
-    where: { userId: session.id, customerId: id },
+    where: { userId: session.id, OR: matchOr },
     orderBy: { date: "desc" },
     select: {
       id: true, date: true, time: true,

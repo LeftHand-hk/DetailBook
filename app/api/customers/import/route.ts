@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
+import { linkOrphanBookings } from "@/lib/customer-linking";
 
 // POST /api/customers/import
 // Body: { rows: Array<{ firstName, lastName?, email?, phone?, ... }> }
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
     if (email && emailSet.has(email))   { skipped++; continue; }
     if (phone && phoneSet.has(phone))   { skipped++; continue; }
 
-    await prisma.customer.create({
+    const created = await prisma.customer.create({
       data: {
         userId: session.id,
         firstName,
@@ -57,6 +58,7 @@ export async function POST(request: NextRequest) {
         vehicleColor: String(r.vehicleColor || "").trim() || null,
       },
     });
+    await linkOrphanBookings(session.id, created.id, email || null, phone || null).catch(() => 0);
     if (email) emailSet.add(email);
     if (phone) phoneSet.add(phone);
     imported++;

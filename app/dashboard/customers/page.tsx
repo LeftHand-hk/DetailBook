@@ -377,20 +377,65 @@ function parseCsv(text: string): ParsedCSV {
   return { headers: rows[0], rows: rows.slice(1).filter((r) => r.some((c) => (c || "").trim() !== "")) };
 }
 
-function autoMap(headers: string[]) {
-  const find = (...keys: string[]) => {
-    for (const k of keys) {
-      const idx = headers.findIndex((h) => h.trim().toLowerCase().includes(k));
-      if (idx >= 0) return idx;
-    }
-    return -1;
-  };
+// Score each column for "looks like email/phone/name" using BOTH the
+// header keyword (in 4+ languages) AND the actual cell content. Lets a
+// detailer drop in any CSV — Square exports, contacts dumps, even a
+// no-header dump of "Name, Phone" — without renaming columns first.
+function scoreColumn(header: string, samples: string[]) {
+  const h = (header || "").trim().toLowerCase();
+  const filled = samples.map((s) => (s || "").trim()).filter(Boolean);
+  const n = Math.max(1, filled.length);
+  const hit = (...keys: string[]) => keys.some((k) => h.includes(k));
+
+  const emailHeader = hit("email", "e-mail", "mail", "correo", "posta");
+  const emailContent = filled.filter((s) => s.includes("@") && s.includes(".")).length / n;
+
+  const phoneHeader = hit("phone", "mobile", "tel", "cell", "number", "celular", "movil", "kontakt");
+  const phoneContent = filled.filter((s) => /^[+\d][\d\s\-().]{5,}$/.test(s)).length / n;
+
+  const firstHeader = hit("first", "given", "fname", "fore", "emri");
+  const lastHeader  = hit("last", "surname", "family", "lname", "mbiemr");
+  const fullHeader  = hit("name", "full", "client", "customer", "nom", "nombre");
+  const alphaContent = filled.filter((s) => /^[A-Za-zÀ-ÿ' \-.]+$/.test(s)).length / n;
+  const spaceContent = filled.filter((s) => /\s/.test(s)).length / n;
+
   return {
-    firstName: find("first", "name"),
-    lastName:  find("last", "surname"),
-    email:     find("email", "e-mail", "mail"),
-    phone:     find("phone", "mobile", "tel"),
+    email: (emailHeader ? 0.6 : 0) + emailContent,
+    phone: (phoneHeader ? 0.6 : 0) + phoneContent,
+    firstName: (firstHeader ? 0.9 : 0) + (alphaContent * 0.5),
+    lastName:  (lastHeader  ? 0.9 : 0) + (alphaContent * 0.3),
+    fullName:  (fullHeader && !firstHeader && !lastHeader ? 0.8 : 0) + alphaContent * 0.4 + spaceContent * 0.4,
   };
+}
+
+function autoMap(headers: string[], sampleRows: string[][] = []) {
+  const samples = headers.map((_, i) => sampleRows.slice(0, 10).map((r) => r[i] || ""));
+  const scores = headers.map((h, i) => scoreColumn(h, samples[i]));
+
+  const argmax = (key: keyof ReturnType<typeof scoreColumn>, threshold: number, exclude: number[]) => {
+    let bestIdx = -1; let bestScore = threshold;
+    scores.forEach((sc, i) => {
+      if (exclude.includes(i)) return;
+      if (sc[key] > bestScore) { bestScore = sc[key]; bestIdx = i; }
+    });
+    return bestIdx;
+  };
+
+  const email = argmax("email", 0.4, []);
+  const phone = argmax("phone", 0.4, [email].filter((i) => i >= 0));
+
+  // Prefer a separate Last name column when one clearly exists, otherwise
+  // pick a single combined "Full Name" column and let the server split it.
+  const lastName = argmax("lastName", 0.7, [email, phone].filter((i) => i >= 0));
+  let firstName = -1;
+  if (lastName >= 0) {
+    firstName = argmax("firstName", 0.4, [email, phone, lastName]);
+  } else {
+    firstName = argmax("fullName", 0.4, [email, phone].filter((i) => i >= 0));
+    if (firstName < 0) firstName = argmax("firstName", 0.3, [email, phone].filter((i) => i >= 0));
+  }
+
+  return { firstName, lastName, email, phone };
 }
 
 function ImportModal({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
@@ -411,7 +456,7 @@ function ImportModal({ onClose, onImported }: { onClose: () => void; onImported:
     const p = parseCsv(text);
     if (p.headers.length === 0) { setError("That file is empty."); return; }
     setParsed(p);
-    setMapping(autoMap(p.headers));
+    setMapping(autoMap(p.headers, p.rows));
     setStep("preview");
   };
 
