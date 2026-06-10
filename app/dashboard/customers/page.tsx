@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { parseVcf } from "@/lib/vcf";
 
 type CustomerRow = {
   id: string;
@@ -152,7 +153,7 @@ export default function CustomersPage() {
           <p className="text-sm text-gray-500 mb-5">Add your first customer or import a list.</p>
           <div className="flex items-center justify-center gap-2 flex-wrap">
             <button onClick={openAdd} className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl">Add Customer</button>
-            <button onClick={() => setShowImport(true)} className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-bold px-4 py-2.5 rounded-xl">Import CSV</button>
+            <button onClick={() => setShowImport(true)} className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-bold px-4 py-2.5 rounded-xl">Import CSV / VCF</button>
           </div>
         </div>
         {showAdd && <CustomerFormModal form={form} setForm={setForm} editing={editing} onClose={() => setShowAdd(false)} onSubmit={handleSave} saving={saving} error={error} />}
@@ -175,7 +176,7 @@ export default function CustomersPage() {
           </button>
           <button onClick={() => setShowImport(true)} className="inline-flex items-center gap-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-semibold px-3 py-2 rounded-xl">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-            Import CSV
+            Import CSV / VCF
           </button>
           <button onClick={handleExport} className="inline-flex items-center gap-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-semibold px-3 py-2 rounded-xl">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
@@ -448,11 +449,26 @@ function ImportModal({ onClose, onImported }: { onClose: () => void; onImported:
 
   const handleFile = async (file: File) => {
     setError(null);
-    if (!file.name.toLowerCase().endsWith(".csv") && file.type !== "text/csv") {
-      setError("Please upload a .csv file.");
+    const name = file.name.toLowerCase();
+    const isVcf = name.endsWith(".vcf") || file.type === "text/vcard" || file.type === "text/x-vcard";
+    const isCsv = name.endsWith(".csv") || file.type === "text/csv";
+    if (!isVcf && !isCsv) {
+      setError("Please upload a .csv or .vcf file.");
       return;
     }
     const text = await file.text();
+    if (isVcf) {
+      const contacts = parseVcf(text);
+      if (contacts.length === 0) { setError("No contacts found in that .vcf file."); return; }
+      const p: ParsedCSV = {
+        headers: ["First Name", "Last Name", "Email", "Phone"],
+        rows: contacts.map((c) => [c.firstName, c.lastName, c.email, c.phone]),
+      };
+      setParsed(p);
+      setMapping({ firstName: 0, lastName: 1, email: 2, phone: 3 });
+      setStep("preview");
+      return;
+    }
     const p = parseCsv(text);
     if (p.headers.length === 0) { setError("That file is empty."); return; }
     setParsed(p);
@@ -508,17 +524,17 @@ function ImportModal({ onClose, onImported }: { onClose: () => void; onImported:
       <div className="min-h-screen flex items-start sm:items-center justify-center p-4">
         <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-4">
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-            <h2 className="text-lg font-extrabold text-gray-900">Import customers from CSV</h2>
+            <h2 className="text-lg font-extrabold text-gray-900">Import customers from CSV or VCF</h2>
             <button type="button" onClick={() => !importing && onClose()} className="text-gray-400 hover:text-gray-700 text-2xl leading-none">×</button>
           </div>
           <div className="px-6 py-5">
             {step === "upload" && (
               <>
                 <label className="block w-full border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50/40 rounded-2xl p-10 text-center cursor-pointer transition-colors">
-                  <input type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+                  <input type="file" accept=".csv,.vcf,text/csv,text/vcard,text/x-vcard" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
                   <svg className="w-10 h-10 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                  <p className="text-sm font-bold text-gray-900">Click to upload a CSV</p>
-                  <p className="text-xs text-gray-500 mt-1">Accepted columns: Name, Email, Phone</p>
+                  <p className="text-sm font-bold text-gray-900">Click to upload a CSV or VCF</p>
+                  <p className="text-xs text-gray-500 mt-1">CSV columns: Name, Email, Phone — or drop a phone-contacts .vcf</p>
                 </label>
                 <div className="mt-4 text-center">
                   <button type="button" onClick={downloadSample} className="text-xs font-semibold text-blue-600 hover:underline">Download sample CSV</button>
