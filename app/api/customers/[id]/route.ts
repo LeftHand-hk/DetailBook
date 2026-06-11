@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
+import { normalizePhone } from "@/lib/phone";
 
 // GET   /api/customers/[id]  — single customer + booking history + total spent
 // PATCH /api/customers/[id]  — update any editable field
@@ -28,11 +29,15 @@ export async function GET(
 
   // Match BOTH explicit FK links AND email/phone matches so bookings
   // created before this customer record existed still show up in the
-  // history without needing a backfill migration.
+  // history without needing a backfill migration. Phone is matched on digits
+  // only (formats vary), so we pull phone-bearing rows broadly and then keep
+  // just the ones whose digits actually match below.
+  const matchEmail = (customer.email || "").toLowerCase();
+  const normPhone = normalizePhone(customer.phone);
   const matchOr: any[] = [{ customerId: id }];
-  if (customer.email) matchOr.push({ customerEmail: customer.email.toLowerCase() });
-  if (customer.phone) matchOr.push({ customerPhone: customer.phone });
-  const bookings = await prisma.booking.findMany({
+  if (matchEmail) matchOr.push({ customerEmail: matchEmail });
+  if (normPhone) matchOr.push({ AND: [{ customerPhone: { not: null } }, { customerPhone: { not: "" } }] });
+  const candidates = await prisma.booking.findMany({
     where: { userId: session.id, OR: matchOr },
     orderBy: { date: "desc" },
     select: {
@@ -40,8 +45,14 @@ export async function GET(
       serviceName: true, servicePrice: true,
       addonsTotal: true, depositPaid: true, depositRequired: true,
       status: true, createdAt: true,
+      customerId: true, customerEmail: true, customerPhone: true,
     },
   });
+  const bookings = candidates.filter((b) =>
+    b.customerId === id
+    || (matchEmail && (b.customerEmail || "").toLowerCase() === matchEmail)
+    || (normPhone && normalizePhone(b.customerPhone) === normPhone)
+  );
 
   const totalSpent = bookings
     .filter((b) => b.status === "completed")

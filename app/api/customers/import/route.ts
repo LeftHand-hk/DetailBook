@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { linkOrphanBookings } from "@/lib/customer-linking";
+import { normalizePhone } from "@/lib/phone";
 
 // POST /api/customers/import
 // Body: { rows: Array<{ firstName, lastName?, email?, phone?, ... }> }
@@ -32,18 +33,27 @@ async function linkImportedOrphans(
   if (orphans.length === 0) return;
 
   const orphanEmails = new Set(orphans.map((o) => (o.customerEmail || "").toLowerCase()).filter(Boolean));
-  const orphanPhones = new Set(orphans.map((o) => (o.customerPhone || "").trim()).filter(Boolean));
+  const orphanPhones = new Set(orphans.map((o) => normalizePhone(o.customerPhone)).filter(Boolean));
 
-  const matchEmails = Array.from(new Set(created.map((c) => c.email).filter((e): e is string => !!e && orphanEmails.has(e))));
-  const matchPhones = Array.from(new Set(created.map((c) => c.phone).filter((p): p is string => !!p && orphanPhones.has(p))));
-  if (matchEmails.length === 0 && matchPhones.length === 0) return;
+  // The contacts we just inserted that actually correspond to an orphan
+  // booking — by email, or by phone digits (formats may differ).
+  const relevant = created.filter(
+    (c) =>
+      (!!c.email && orphanEmails.has(c.email)) ||
+      (!!normalizePhone(c.phone) && orphanPhones.has(normalizePhone(c.phone))),
+  );
+  if (relevant.length === 0) return;
 
+  // Fetch their ids by the exact values we just stored, then let
+  // linkOrphanBookings do the normalised matching against the orphan rows.
+  const emails = Array.from(new Set(relevant.map((c) => c.email).filter((e): e is string => !!e)));
+  const phones = Array.from(new Set(relevant.map((c) => c.phone).filter((p): p is string => !!p)));
   const customers = await prisma.customer.findMany({
     where: {
       userId,
       OR: [
-        ...(matchEmails.length ? [{ email: { in: matchEmails } }] : []),
-        ...(matchPhones.length ? [{ phone: { in: matchPhones } }] : []),
+        ...(emails.length ? [{ email: { in: emails } }] : []),
+        ...(phones.length ? [{ phone: { in: phones } }] : []),
       ],
     },
     select: { id: true, email: true, phone: true },

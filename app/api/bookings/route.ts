@@ -5,6 +5,7 @@ import { isValidEmail, escapeHtml } from "@/lib/validation";
 import { syncBookingToGoogleCalendar } from "@/lib/google-calendar";
 import { sendEmail } from "@/lib/email";
 import { sendSms } from "@/lib/twilio";
+import { normalizePhone } from "@/lib/phone";
 
 export async function GET(request: NextRequest) {
   try {
@@ -272,14 +273,26 @@ export async function POST(request: NextRequest) {
     let customerLinkId: string | null = null;
     const normEmail = (customerEmail || "").trim().toLowerCase();
     const normPhone = (customerPhone || "").trim();
+    const digitsPhone = normalizePhone(normPhone);
     if (normEmail || normPhone) {
       const matchOr: any[] = [];
       if (normEmail) matchOr.push({ email: normEmail });
       if (normPhone) matchOr.push({ phone: normPhone });
-      const match = await prisma.customer.findFirst({
+      let match = await prisma.customer.findFirst({
         where: { userId, OR: matchOr },
         select: { id: true },
       });
+      // No exact hit but we have a phone — the existing customer's number may
+      // just be stored in a different format, so compare digits across this
+      // business's phone-bearing customers before creating a duplicate.
+      if (!match && digitsPhone) {
+        const withPhone = await prisma.customer.findMany({
+          where: { userId, phone: { not: null } },
+          select: { id: true, phone: true },
+        });
+        const hit = withPhone.find((c) => normalizePhone(c.phone) === digitsPhone);
+        if (hit) match = { id: hit.id };
+      }
       if (match) {
         customerLinkId = match.id;
       } else {

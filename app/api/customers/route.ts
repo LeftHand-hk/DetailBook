@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { linkOrphanBookings } from "@/lib/customer-linking";
+import { normalizePhone } from "@/lib/phone";
 
 // GET  /api/customers              — list customers for the logged-in
 //                                    business with optional ?search=
@@ -38,11 +39,11 @@ export async function GET(request: NextRequest) {
 
   const list = rows.map((c) => {
     const matchEmail = (c.email || "").toLowerCase();
-    const matchPhone = (c.phone || "").trim();
+    const matchPhone = normalizePhone(c.phone);
     const matches = allBookings.filter((b) =>
       b.customerId === c.id
       || (matchEmail && (b.customerEmail || "").toLowerCase() === matchEmail)
-      || (matchPhone && (b.customerPhone || "").trim() === matchPhone)
+      || (matchPhone && normalizePhone(b.customerPhone) === matchPhone)
     );
     const dates = matches.map((m) => m.date).filter(Boolean).sort();
     return {
