@@ -372,6 +372,7 @@ export default function PackagesPage() {
     setSaving(true);
     setSaveError("");
 
+    try {
     const depositVal = form.deposit ? parseFloat(form.deposit) : undefined;
     // Drop blank addon rows (name empty or invalid price) so a half-typed
     // entry can't end up persisted with a $0 / NaN price.
@@ -411,7 +412,6 @@ export default function PackagesPage() {
       vehiclePricing: cleanVehiclePricing,
     };
 
-    try {
       const res = editing
         ? await fetch(`/api/packages/${editing.id}`, {
             method: "PUT",
@@ -451,7 +451,15 @@ export default function PackagesPage() {
       // duplicate-package bug on create).
       setPackagesLocal(newList);
     } catch (err: any) {
-      setSaveError(err?.message || "Couldn't save. Check your connection and try again.");
+      // Log AND show the exact problem so a failed save is never silent.
+      console.error("[SAVE-ERROR] exact problem:", err);
+      const exact =
+        err instanceof Error
+          ? `${err.name}: ${err.message}`
+          : typeof err === "string"
+            ? err
+            : JSON.stringify(err);
+      setSaveError(exact || "Couldn't save. Check your connection and try again.");
       setSaving(false);
       submittingRef.current = false;
       return; // keep the modal open with the user's input intact

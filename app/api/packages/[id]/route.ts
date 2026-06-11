@@ -74,8 +74,14 @@ export async function PUT(
     return NextResponse.json(updated);
   } catch (error) {
     console.error("PUT /api/packages/[id] error:", error);
+    // Surface the underlying cause (Prisma error code + message) so a
+    // failed save isn't an opaque "Failed to update package". The client
+    // shows `error` in its red banner, which makes production-only
+    // failures diagnosable without server log access.
+    const code = (error as any)?.code ? ` [${(error as any).code}]` : "";
+    const msg = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: "Failed to update package" },
+      { error: `Failed to update package${code}: ${msg}` },
       { status: 500 }
     );
   }
