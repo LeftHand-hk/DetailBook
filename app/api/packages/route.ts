@@ -17,7 +17,10 @@ function sanitizeAddons(input: unknown): unknown[] | null | undefined {
     if (!raw || typeof raw !== "object") continue;
     const r = raw as Record<string, unknown>;
     const name = typeof r.name === "string" ? r.name.trim() : "";
-    const priceNum = typeof r.price === "number" ? r.price : parseFloat(String(r.price));
+    // Blank/absent price = free extra ($0). Only a malformed price drops
+    // the row, so a name+description add-on with no price still saves.
+    const rawPrice = typeof r.price === "number" ? r.price : String(r.price ?? "").trim();
+    const priceNum = rawPrice === "" ? 0 : parseFloat(String(rawPrice));
     if (!name || !Number.isFinite(priceNum) || priceNum < 0) continue;
     const description = typeof r.description === "string" ? r.description.trim() : "";
     out.push({

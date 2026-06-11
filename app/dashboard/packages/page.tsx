@@ -369,7 +369,13 @@ export default function PackagesPage() {
     const cleanAddons: PackageAddon[] = form.addons
       .map((a): PackageAddon | null => {
         const name = a.name.trim();
-        const price = parseFloat(a.price);
+        // A blank price input means "free extra" ($0), not an invalid row.
+        // Only a genuinely malformed (negative / non-numeric-but-typed)
+        // price drops the add-on. Dropping a named row just because the
+        // price was left empty silently discarded the owner's description
+        // along with it — that was the "description won't save" bug.
+        const raw = a.price.trim();
+        const price = raw === "" ? 0 : parseFloat(raw);
         if (!name || !Number.isFinite(price) || price < 0) return null;
         const description = (a.description || "").trim();
         return { id: a.id, name, price, ...(description ? { description } : {}) };
