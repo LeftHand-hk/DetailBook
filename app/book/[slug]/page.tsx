@@ -1910,13 +1910,13 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                         key={addon.id}
                         type="button"
                         onClick={() => toggleAddon(addon.id)}
-                        className={`w-full text-left flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${
+                        className={`w-full text-left flex items-start gap-3 p-3 rounded-xl border-2 transition-all ${
                           checked
                             ? "border-blue-500 bg-blue-50/70 shadow-sm"
                             : "border-gray-100 hover:border-blue-200 hover:bg-blue-50/30"
                         }`}
                       >
-                        <span className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                        <span className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
                           checked ? "bg-blue-600 border-blue-600" : "border-gray-300 bg-white"
                         }`}>
                           {checked && (
@@ -1926,7 +1926,10 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                           )}
                         </span>
                         <span className="flex-1 min-w-0">
-                          <span className="block text-sm font-semibold text-gray-900 truncate">{addon.name}</span>
+                          {/* Full name, wraps to as many lines as needed — a long
+                              add-on label was being clipped with an ellipsis so
+                              customers couldn't read the whole thing. */}
+                          <span className="block text-sm font-semibold text-gray-900 break-words">{addon.name}</span>
                         </span>
                         <span className={`flex-shrink-0 text-sm font-extrabold ${checked ? "text-blue-700" : "text-gray-700"}`}>
                           +${addon.price}

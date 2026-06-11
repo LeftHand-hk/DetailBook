@@ -217,8 +217,20 @@ export default function BookingV2Landing({
       const dataUrl = await compressImage(file, maxW, quality);
       setColDraft((d) => ({ ...d, [key]: dataUrl }));
     } catch (err: any) {
-      setSaveError(err?.message || "Could not load image.");
+      // iPhone photos are often HEIC, which most browsers can't decode to a
+      // canvas — surface a clear hint instead of a silent failure.
+      const heic = /\.(heic|heif)$/i.test(file.name) || /heic|heif/i.test(file.type);
+      setSaveError(heic
+        ? "That looks like an iPhone HEIC photo. Open it in Photos and share/save as JPEG, then upload again."
+        : (err?.message || "Could not load that image. Try a JPEG or PNG."));
     }
+  };
+
+  // Clear an image so the page falls back to its default (banner) or the
+  // next available source (cover → first gallery photo). Persists on Save.
+  const removeImage = (key: "bannerImage" | "logo" | "coverImage") => {
+    setSaveError("");
+    setColDraft((d) => ({ ...d, [key]: "" }));
   };
 
   const accent = colDraft["accentColor"] || profile.accentColor || "#0F172A";
@@ -230,6 +242,19 @@ export default function BookingV2Landing({
   // banner — never empty.
   const aboutImage = colDraft["coverImage"] || profile.coverImage || photos[0]?.imageUrl || bannerImage || "";
   const hasAvg = (profile.rating || 0) > 0 && (profile.reviewCount || 0) > 0;
+  // Whether a custom About/cover image is set (vs the gallery/banner
+  // fallback) — drives the "Remove" control.
+  const coverDraftVal = colDraft["coverImage"];
+  const hasCustomCover = coverDraftVal !== undefined ? !!coverDraftVal : !!profile.coverImage;
+  // Vertical framing (object-position Y, 0–100) for the banner + cover
+  // photos, stored as plain content keys so an owner can reposition a photo
+  // whose subject isn't dead-centre. 50 = centred.
+  const posOf = (key: string, def = 50) => {
+    const n = parseInt(textValue(key), 10);
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : def;
+  };
+  const bannerPos = `50% ${posOf("bannerPosY")}%`;
+  const coverPos = `50% ${posOf("coverPosY")}%`;
   // Years in business — editable number. Draft (string) wins while
   // editing; coerced to a number on save.
   const years = colDraft["yearsInBusiness"] !== undefined
@@ -376,6 +401,7 @@ export default function BookingV2Landing({
             // Covers cached images, where onLoad may not fire after mount.
             ref={(el) => { if (el && el.complete && el.naturalWidth > 0) setBannerLoaded(true); }}
             onLoad={() => setBannerLoaded(true)}
+            style={{ objectPosition: bannerPos }}
             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${bannerLoaded ? "opacity-100" : "opacity-0"}`}
           />
         ) : (
@@ -394,6 +420,7 @@ export default function BookingV2Landing({
               decoding="async"
               ref={(el) => { if (el && el.complete && el.naturalWidth > 0) setBannerLoaded(true); }}
               onLoad={() => setBannerLoaded(true)}
+              style={{ objectPosition: bannerPos }}
               className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${bannerLoaded ? "opacity-100" : "opacity-0"}`}
             />
           </picture>
@@ -404,10 +431,26 @@ export default function BookingV2Landing({
         {editable && <div className="absolute top-0 left-0 right-0 z-30">{navInner}</div>}
 
         {editable && (
-          <button onClick={() => bannerInputRef.current?.click()} className="absolute top-20 right-5 z-30 inline-flex items-center gap-2 bg-white/90 text-stone-900 text-sm font-bold px-4 py-2 rounded-full shadow-lg hover:bg-white">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-            Replace banner photo
-          </button>
+          <div className="absolute top-20 right-5 z-30 flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2">
+              <button onClick={() => bannerInputRef.current?.click()} className="inline-flex items-center gap-2 bg-white/90 text-stone-900 text-sm font-bold px-4 py-2 rounded-full shadow-lg hover:bg-white">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                {bannerImage ? "Replace banner" : "Add banner photo"}
+              </button>
+              {bannerImage && (
+                <button onClick={() => removeImage("bannerImage")} title="Remove banner photo" className="inline-flex items-center gap-1.5 bg-white/90 text-red-600 text-sm font-bold px-3 py-2 rounded-full shadow-lg hover:bg-white">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  Remove
+                </button>
+              )}
+            </div>
+            {bannerImage && (
+              <div className="bg-white/90 rounded-full shadow-lg px-3 py-2 flex items-center gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wide text-stone-600 whitespace-nowrap">Position</span>
+                <input type="range" min={0} max={100} value={posOf("bannerPosY")} onChange={(e) => setText("bannerPosY", e.target.value)} className="w-28 accent-blue-600 cursor-pointer" title="Drag to move the photo up or down" />
+              </div>
+            )}
+          </div>
         )}
 
         <div className="relative z-10 w-full max-w-6xl mx-auto px-5 sm:px-8 pb-10 sm:pb-24">
@@ -495,16 +538,29 @@ export default function BookingV2Landing({
           <div className="relative aspect-[4/5] w-full rounded-2xl overflow-hidden bg-stone-200 shadow-2xl">
             {aboutImage ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={aboutImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
+              <img src={aboutImage} alt="" style={{ objectPosition: coverPos }} className="absolute inset-0 w-full h-full object-cover" />
             ) : (
               <div className="absolute inset-0 bg-gradient-to-br from-stone-700 to-stone-900 flex items-center justify-center text-white/40 text-sm">No photo yet</div>
             )}
             {editable && (
               <>
-                <button onClick={() => aboutImgInputRef.current?.click()} className="absolute top-3 right-3 z-10 inline-flex items-center gap-2 bg-white/90 text-stone-900 text-xs font-bold px-3 py-1.5 rounded-full shadow hover:bg-white">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                  Replace photo
-                </button>
+                <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+                  <button onClick={() => aboutImgInputRef.current?.click()} className="inline-flex items-center gap-2 bg-white/90 text-stone-900 text-xs font-bold px-3 py-1.5 rounded-full shadow hover:bg-white">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                    {hasCustomCover ? "Replace" : "Add photo"}
+                  </button>
+                  {hasCustomCover && (
+                    <button onClick={() => removeImage("coverImage")} title="Remove photo" className="inline-flex items-center justify-center bg-white/90 text-red-600 w-7 h-7 rounded-full shadow hover:bg-white">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  )}
+                </div>
+                {aboutImage && (
+                  <div className="absolute bottom-3 left-3 right-3 z-10 bg-white/90 rounded-full shadow px-3 py-1.5 flex items-center gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-stone-600 whitespace-nowrap">Position</span>
+                    <input type="range" min={0} max={100} value={posOf("coverPosY")} onChange={(e) => setText("coverPosY", e.target.value)} className="flex-1 accent-blue-600 cursor-pointer" title="Drag to move the photo up or down" />
+                  </div>
+                )}
                 <input ref={aboutImgInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => pickImage("coverImage", e.target.files?.[0])} />
               </>
             )}

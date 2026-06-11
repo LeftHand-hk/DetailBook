@@ -69,6 +69,15 @@ export async function PUT(
     if (body.time !== undefined) data.time = body.time;
     if (body.notes !== undefined) data.notes = body.notes;
     if (body.address !== undefined) data.address = body.address;
+    // Final-invoice line items. The owner can add extra charges after the
+    // service (e.g. heavy pet hair, extra coat) — we store them in the same
+    // selectedAddons JSON the customer's picks live in, flagged owner:true,
+    // and keep addonsTotal in sync so revenue + balance stay correct.
+    if (body.selectedAddons !== undefined) data.selectedAddons = body.selectedAddons;
+    if (body.addonsTotal !== undefined) {
+      const n = parseFloat(body.addonsTotal);
+      data.addonsTotal = Number.isFinite(n) && n >= 0 ? n : 0;
+    }
     // Support both flat and nested vehicle
     if (vehicle) {
       if (vehicle.make !== undefined) data.vehicleMake = vehicle.make;

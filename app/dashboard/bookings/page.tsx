@@ -68,6 +68,10 @@ export default function BookingsPage() {
   };
   const [addForm, setAddForm] = useState(emptyAddForm);
 
+  // "Add a charge" inputs for the final invoice on the booking detail panel.
+  const [chargeLabel, setChargeLabel] = useState("");
+  const [chargeAmount, setChargeAmount] = useState("");
+
   // /dashboard/customers/[id] sends prefill query params when the owner
   // clicks "Create Booking" on a customer detail page. Pop the modal
   // pre-filled and clean the URL so reload doesn't re-trigger it.
@@ -317,6 +321,40 @@ export default function BookingsPage() {
         body: JSON.stringify({ depositPaid: newDepositPaid }),
       });
     } catch { /* silent — optimistic update already applied */ }
+  };
+
+  // ── Final-invoice charges ────────────────────────────────────────────
+  // Customer-picked add-ons and owner-added charges share one array
+  // (selectedAddons); owner charges carry `owner: true`. Persisting
+  // recomputes addonsTotal so revenue + balance stay correct. Optimistic.
+  const persistAddons = async (booking: Booking, newAddons: any[]) => {
+    const addonsTotal = newAddons.reduce((s, a) => s + (Number(a.price) || 0), 0);
+    const apply = (b: any) => ({ ...b, selectedAddons: newAddons, addonsTotal });
+    const updated = bookings.map((b) => (b.id === booking.id ? apply(b) : b));
+    setBookings(updated);
+    saveBookings(updated);
+    setSelected((cur) => (cur && cur.id === booking.id ? apply(cur) : cur));
+    try {
+      await fetch(`/api/bookings/${booking.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selectedAddons: newAddons, addonsTotal }),
+      });
+    } catch { /* silent — optimistic update already applied */ }
+  };
+
+  const addCharge = (booking: Booking) => {
+    const name = chargeLabel.trim();
+    const price = Math.round((parseFloat(chargeAmount) || 0) * 100) / 100;
+    if (!name || !(price > 0)) return;
+    const existing = Array.isArray((booking as any).selectedAddons) ? (booking as any).selectedAddons : [];
+    setChargeLabel(""); setChargeAmount("");
+    persistAddons(booking, [...existing, { id: `owner_${Date.now()}`, name, price, owner: true }]);
+  };
+
+  const removeCharge = (booking: Booking, chargeId: string) => {
+    const existing = Array.isArray((booking as any).selectedAddons) ? (booking as any).selectedAddons : [];
+    persistAddons(booking, existing.filter((a: any) => a.id !== chargeId));
   };
 
   const today = new Date().toISOString().split("T")[0];
@@ -616,7 +654,12 @@ export default function BookingsPage() {
           BOOKING DETAIL PANEL
       ═══════════════════════════════════════════════ */}
       {selected && (() => {
-        const balance = selected.servicePrice - selected.depositPaid;
+        const allAddons: any[] = Array.isArray((selected as any).selectedAddons) ? (selected as any).selectedAddons : [];
+        const customerAddons = allAddons.filter((a) => !a.owner);
+        const ownerCharges = allAddons.filter((a) => a.owner);
+        const addonsTotal = allAddons.reduce((s, a) => s + (Number(a.price) || 0), 0);
+        const invoiceTotal = selected.servicePrice + addonsTotal;
+        const balance = invoiceTotal - selected.depositPaid;
         const initials = selected.customerName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
         const member = selected.staffId ? staffList.find((s) => s.id === selected.staffId) : null;
         const dateTag =
@@ -759,6 +802,73 @@ export default function BookingsPage() {
                       <p className="text-sm font-semibold text-gray-900">{selected.staffName}</p>
                     </div>
                   )}
+                </div>
+
+                {/* Invoice — service + customer add-ons + owner charges */}
+                <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                    <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">Invoice</p>
+                    <span className="text-[11px] text-gray-400">Final total</span>
+                  </div>
+                  <div className="px-4 py-3 space-y-2 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-gray-600 min-w-0 truncate">{selected.serviceName}</span>
+                      <span className="font-semibold text-gray-900 flex-shrink-0">${selected.servicePrice}</span>
+                    </div>
+                    {customerAddons.map((a, i) => (
+                      <div key={a.id || `c${i}`} className="flex items-center justify-between gap-3">
+                        <span className="text-gray-500 pl-3 min-w-0 break-words">+ {a.name}</span>
+                        <span className="text-gray-700 flex-shrink-0">${a.price}</span>
+                      </div>
+                    ))}
+                    {ownerCharges.map((a, i) => (
+                      <div key={a.id || `o${i}`} className="flex items-center justify-between gap-3">
+                        <span className="text-gray-500 pl-3 min-w-0 break-words flex items-start gap-1.5">
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 flex-shrink-0" />
+                          <span>{a.name}</span>
+                        </span>
+                        <span className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-gray-700">${a.price}</span>
+                          <button onClick={() => removeCharge(selected, a.id)} title="Remove charge" className="text-gray-300 hover:text-red-500 transition-colors">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                          </button>
+                        </span>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between border-t border-gray-100 pt-2.5 mt-1">
+                      <span className="font-bold text-gray-900">Total</span>
+                      <span className="font-extrabold text-gray-900">${invoiceTotal}</span>
+                    </div>
+                  </div>
+                  {/* Add a charge after the fact (e.g. heavy pet hair, extra coat) */}
+                  <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/70">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2">Add a charge</p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={chargeLabel}
+                        onChange={(e) => setChargeLabel(e.target.value)}
+                        placeholder="e.g. Heavy pet hair"
+                        className="flex-1 min-w-0 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <div className="relative w-24 flex-shrink-0">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                        <input
+                          value={chargeAmount}
+                          onChange={(e) => setChargeAmount(e.target.value)}
+                          inputMode="decimal"
+                          placeholder="0"
+                          className="w-full pl-6 pr-2 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <button
+                        onClick={() => addCharge(selected)}
+                        disabled={!chargeLabel.trim() || !(parseFloat(chargeAmount) > 0)}
+                        className="flex-shrink-0 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-sm font-bold px-3.5 py-2 rounded-lg transition-colors"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Payment card */}
