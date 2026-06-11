@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getPackages, setPackages, setPackagesLocal, getUser, generateId } from "@/lib/storage";
+import { getPackages, setPackagesLocal, getUser } from "@/lib/storage";
 import type { Package, PackageAddon, User } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
 import SetupHint from "@/components/SetupHint";
@@ -124,6 +124,10 @@ export default function PackagesPage() {
   const [editing, setEditing] = useState<Package | null>(null);
   const [form, setForm] = useState<PackageFormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  // Surfaced when a save request fails so the owner isn't left thinking a
+  // change persisted when it didn't. The modal stays open on error so the
+  // typed values (e.g. a freshly added add-on description) aren't lost.
+  const [saveError, setSaveError] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   // The optional sections (add-ons + per-vehicle pricing) start collapsed
   // so the default modal stays a short 5-field form. When editing an
@@ -249,6 +253,7 @@ export default function PackagesPage() {
     setForm(EMPTY_FORM);
     setShowAddons(false);
     setShowVehiclePricing(false);
+    setSaveError("");
     setShowModal(true);
   };
 
@@ -257,6 +262,7 @@ export default function PackagesPage() {
     setForm({ ...t, addons: [], vehiclePricingEnabled: false, vehiclePricing: [] });
     setShowAddons(false);
     setShowVehiclePricing(false);
+    setSaveError("");
     setShowModal(true);
   };
 
@@ -283,6 +289,7 @@ export default function PackagesPage() {
     });
     setShowAddons(true);
     setShowVehiclePricing(hasPricing);
+    setSaveError("");
     setShowModal(true);
   };
 
@@ -310,6 +317,7 @@ export default function PackagesPage() {
     });
     setShowAddons(hasAddons);
     setShowVehiclePricing(hasPricing);
+    setSaveError("");
     setShowModal(true);
   };
 
@@ -362,6 +370,7 @@ export default function PackagesPage() {
     if (submittingRef.current) return;
     submittingRef.current = true;
     setSaving(true);
+    setSaveError("");
 
     const depositVal = form.deposit ? parseFloat(form.deposit) : undefined;
     // Drop blank addon rows (name empty or invalid price) so a half-typed
@@ -403,47 +412,49 @@ export default function PackagesPage() {
     };
 
     try {
-      if (editing) {
-        // Update existing package via API
-        const res = await fetch(`/api/packages/${editing.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (res.ok) {
-          const updated = await res.json();
-          const newList = packages.map((p) => (p.id === editing.id ? updated : p));
-          setPackagesState(newList);
-          // Cache-only write — we already PUT the change; setPackages
-          // would diff and re-PUT the same row, harmless but wasteful.
-          setPackagesLocal(newList);
-        }
-      } else {
-        // Create new package via API
-        const res = await fetch("/api/packages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...payload, active: true }),
-        });
-        if (res.ok) {
-          const created = await res.json();
-          const newList = [...packages, created];
-          setPackagesState(newList);
-          // Cache-only — using the full setPackages here caused the
-          // "duplicate package" bug: its diff saw the just-created
-          // row as new (not yet in prev) and POSTed it a second time.
-          setPackagesLocal(newList);
-        }
+      const res = editing
+        ? await fetch(`/api/packages/${editing.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        : await fetch("/api/packages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...payload, active: true }),
+          });
+
+      // A non-2xx response used to be silently ignored: the modal still
+      // closed and the owner's edits (e.g. a new add-on description) were
+      // dropped with no warning — the "it won't save" bug. Surface it and
+      // keep the modal open so nothing is lost and they can retry.
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || `Save failed (${res.status}). Please try again.`);
       }
-    } catch {
-      // Fallback to localStorage
-      const updated: Package[] = editing
-        ? packages.map((p) =>
-            p.id === editing.id ? { ...p, ...payload, deposit: depositVal, addons: cleanAddons } : p
-          )
-        : [...packages, { id: generateId(), ...payload, active: true, deposit: depositVal, addons: cleanAddons }];
-      setPackages(updated);
-      setPackagesState(updated);
+
+      const saved = await res.json();
+      // Re-pull the authoritative list from the API instead of trusting an
+      // optimistic merge, so the editor and cards always reflect exactly
+      // what's stored (including add-on descriptions on existing rows).
+      const fresh = await fetch("/api/packages")
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+      const newList: Package[] = Array.isArray(fresh)
+        ? fresh
+        : editing
+          ? packages.map((p) => (p.id === editing.id ? saved : p))
+          : [...packages, saved];
+      setPackagesState(newList);
+      // Cache-only write — we already POST/PUT'd; setPackages would diff and
+      // re-fire the same row, harmless but wasteful (and caused a past
+      // duplicate-package bug on create).
+      setPackagesLocal(newList);
+    } catch (err: any) {
+      setSaveError(err?.message || "Couldn't save. Check your connection and try again.");
+      setSaving(false);
+      submittingRef.current = false;
+      return; // keep the modal open with the user's input intact
     }
 
     setSaving(false);
@@ -1124,6 +1135,11 @@ export default function PackagesPage() {
             {/* Sticky footer — always visible at the bottom of the modal
                 so the save button is reachable no matter how long the
                 form gets. The cancel button doubles as a close button. */}
+            {saveError && (
+              <div className="flex-shrink-0 px-6 pt-3 -mb-1">
+                <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{saveError}</p>
+              </div>
+            )}
             <div className="flex-shrink-0 px-6 py-4 border-t border-gray-100 bg-white sm:rounded-b-2xl flex gap-3 sticky bottom-0">
               <button
                 type="button"
