@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { VEHICLE_TYPES, type VehicleTypeId, surchargeForVehicleType, packageSupportsVehicleType } from "@/lib/vehicle-pricing";
 import { VehicleIcon } from "@/components/VehicleIcon";
+import ImageFrameModal, { type FrameValue } from "@/components/ImageFrameModal";
 
 // Editorial booking page (v2). Two modes, one component:
 //   • Public (editable=false) — pure display on /book/[slug].
@@ -141,6 +142,12 @@ export default function BookingV2Landing({
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const aboutImgInputRef = useRef<HTMLInputElement>(null);
+  // Crop/reframe modal: which photo is being framed, and the live aspect
+  // ratio of its on-page frame (measured so the modal rectangle matches).
+  const heroRef = useRef<HTMLElement>(null);
+  const coverBoxRef = useRef<HTMLDivElement>(null);
+  const [framing, setFraming] = useState<null | "banner" | "cover">(null);
+  const [frameAspect, setFrameAspect] = useState(16 / 9);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 80);
@@ -253,8 +260,46 @@ export default function BookingV2Landing({
     const n = parseInt(textValue(key), 10);
     return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : def;
   };
-  const bannerPos = `50% ${posOf("bannerPosY")}%`;
-  const coverPos = `50% ${posOf("coverPosY")}%`;
+  // Zoom factor (1–4) stored as a percent string (100–400). 1 = the cover
+  // baseline that fills the frame; higher zooms further in.
+  const zoomOf = (key: string): number => {
+    const n = parseInt(textValue(key), 10);
+    return Number.isFinite(n) ? Math.min(400, Math.max(100, n)) / 100 : 1;
+  };
+  const bannerPos = `${posOf("bannerPosX")}% ${posOf("bannerPosY")}%`;
+  const coverPos = `${posOf("coverPosX")}% ${posOf("coverPosY")}%`;
+  // Fit mode for the banner + cover photos. "cover" (default) fills the
+  // frame and crops the overflow; "contain" shows the WHOLE photo with no
+  // crop (letterboxed). Stored as plain content keys so it persists on Save.
+  const fitOf = (key: string): "cover" | "contain" =>
+    textValue(key) === "contain" ? "contain" : "cover";
+  const bannerFit = fitOf("bannerFit");
+  const coverFit = fitOf("coverFit");
+  const bannerZoom = zoomOf("bannerZoom");
+  const coverZoom = zoomOf("coverZoom");
+
+  // Open the crop/reframe modal for a photo, measuring the live frame so the
+  // modal's rectangle matches what renders on the page.
+  const openFramer = (which: "banner" | "cover") => {
+    const el = which === "banner" ? heroRef.current : coverBoxRef.current;
+    if (el) {
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) setFrameAspect(r.width / r.height);
+    } else {
+      setFrameAspect(which === "banner" ? 16 / 9 : 4 / 5);
+    }
+    setFraming(which);
+  };
+
+  // Persist the framing the owner picked in the modal.
+  const applyFraming = (which: "banner" | "cover", v: FrameValue) => {
+    const p = which === "banner" ? "banner" : "cover";
+    setText(`${p}PosX`, String(Math.round(v.posX)));
+    setText(`${p}PosY`, String(Math.round(v.posY)));
+    setText(`${p}Zoom`, String(Math.round(v.zoom * 100)));
+    setText(`${p}Fit`, v.fit);
+    setFraming(null);
+  };
   // Years in business — editable number. Draft (string) wins while
   // editing; coerced to a number on save.
   const years = colDraft["yearsInBusiness"] !== undefined
@@ -347,6 +392,22 @@ export default function BookingV2Landing({
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900">
+      {/* Crop/reframe modal — drag + pinch/zoom a photo into its on-page
+          rectangle, or choose to show it whole. */}
+      {editable && framing && (
+        <ImageFrameModal
+          src={framing === "banner" ? bannerImage : aboutImage}
+          aspect={frameAspect}
+          title={framing === "banner" ? "Frame your banner photo" : "Frame your photo"}
+          initial={
+            framing === "banner"
+              ? { zoom: bannerZoom, posX: posOf("bannerPosX"), posY: posOf("bannerPosY"), fit: bannerFit }
+              : { zoom: coverZoom, posX: posOf("coverPosX"), posY: posOf("coverPosY"), fit: coverFit }
+          }
+          onCancel={() => setFraming(null)}
+          onApply={(v) => applyFraming(framing, v)}
+        />
+      )}
       {/* ── EDITOR TOOLBAR ──────────────────────────────────────────── */}
       {editable && (
         <div className="sticky top-0 z-[60] bg-stone-900 text-white">
@@ -386,7 +447,7 @@ export default function BookingV2Landing({
       )}
 
       {/* ── HERO ────────────────────────────────────────────────────── */}
-      <section className="relative w-full h-[58vh] min-h-[440px] sm:h-screen sm:min-h-[640px] flex items-end overflow-hidden">
+      <section ref={heroRef} className="relative w-full h-[58vh] min-h-[440px] sm:h-screen sm:min-h-[640px] flex items-end overflow-hidden">
         {/* Dark base is always present so there's no flash and the photo
             can fade in over it (no visible top-down JPEG paint). */}
         <div className="absolute inset-0 bg-gradient-to-br from-stone-900 via-stone-800 to-stone-950" />
@@ -401,8 +462,8 @@ export default function BookingV2Landing({
             // Covers cached images, where onLoad may not fire after mount.
             ref={(el) => { if (el && el.complete && el.naturalWidth > 0) setBannerLoaded(true); }}
             onLoad={() => setBannerLoaded(true)}
-            style={{ objectPosition: bannerPos }}
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${bannerLoaded ? "opacity-100" : "opacity-0"}`}
+            style={{ objectPosition: bannerPos, objectFit: bannerFit, transform: bannerFit === "cover" && bannerZoom > 1 ? `scale(${bannerZoom})` : undefined, transformOrigin: "center" }}
+            className={`absolute inset-0 w-full h-full transition-opacity duration-700 ${bannerLoaded ? "opacity-100" : "opacity-0"}`}
           />
         ) : (
           // No custom banner → default detailing photos. <picture> lets the
@@ -444,14 +505,25 @@ export default function BookingV2Landing({
                 </button>
               )}
             </div>
-            {/* Position slider is always available — it reframes the default
-                hero photo too, not just an uploaded one, so the owner can
-                always adjust what shows. */}
-            <div className="bg-white/95 rounded-full shadow-lg pl-3 pr-3.5 py-2 flex items-center gap-2.5">
-              <svg className="w-4 h-4 text-stone-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7l4-4m0 0l4 4m-4-4v18m0 0l-4-4m4 4l4-4" /></svg>
-              <span className="text-[11px] font-bold uppercase tracking-wide text-stone-600 whitespace-nowrap">Banner position</span>
-              <input type="range" min={0} max={100} value={posOf("bannerPosY")} onChange={(e) => setText("bannerPosY", e.target.value)} className="w-28 accent-blue-600 cursor-pointer" title="Drag to move the photo up or down" />
-            </div>
+            {/* Adjust = open the crop/reframe modal: drag + pinch/zoom the
+                photo into the banner rectangle, or choose to show it whole. */}
+            {bannerImage ? (
+              <button
+                onClick={() => openFramer("banner")}
+                title="Drag and zoom to frame the banner exactly how you want"
+                className="bg-white/95 rounded-full shadow-lg px-4 py-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-stone-700 hover:bg-white whitespace-nowrap"
+              >
+                <svg className="w-4 h-4 text-stone-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" /></svg>
+                Adjust banner
+              </button>
+            ) : (
+              // No custom banner → keep a simple up/down slider for the default.
+              <div className="bg-white/95 rounded-full shadow-lg pl-3 pr-3.5 py-2 flex items-center gap-2.5">
+                <svg className="w-4 h-4 text-stone-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7l4-4m0 0l4 4m-4-4v18m0 0l-4-4m4 4l4-4" /></svg>
+                <span className="text-[11px] font-bold uppercase tracking-wide text-stone-600 whitespace-nowrap">Banner position</span>
+                <input type="range" min={0} max={100} value={posOf("bannerPosY")} onChange={(e) => setText("bannerPosY", e.target.value)} className="w-28 accent-blue-600 cursor-pointer" title="Drag to move the photo up or down" />
+              </div>
+            )}
           </div>
         )}
 
@@ -537,10 +609,10 @@ export default function BookingV2Landing({
               {packages.length > 0 ? <Stat labelKey="statServicesLabel" value={`${packages.length}`} resolve={resolve} editable={editable} textValue={textValue} setText={setText} /> : null}
             </div>
           </div>
-          <div className="relative aspect-[4/5] w-full rounded-2xl overflow-hidden bg-stone-200 shadow-2xl">
+          <div ref={coverBoxRef} className="relative aspect-[4/5] w-full rounded-2xl overflow-hidden bg-stone-200 shadow-2xl">
             {aboutImage ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={aboutImage} alt="" style={{ objectPosition: coverPos }} className="absolute inset-0 w-full h-full object-cover" />
+              <img src={aboutImage} alt="" style={{ objectPosition: coverPos, objectFit: coverFit, transform: coverFit === "cover" && coverZoom > 1 ? `scale(${coverZoom})` : undefined, transformOrigin: "center" }} className="absolute inset-0 w-full h-full" />
             ) : (
               <div className="absolute inset-0 bg-gradient-to-br from-stone-700 to-stone-900 flex items-center justify-center text-white/40 text-sm">No photo yet</div>
             )}
@@ -558,9 +630,16 @@ export default function BookingV2Landing({
                   )}
                 </div>
                 {aboutImage && (
-                  <div className="absolute bottom-3 left-3 right-3 z-10 bg-white/90 rounded-full shadow px-3 py-1.5 flex items-center gap-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wide text-stone-600 whitespace-nowrap">Position</span>
-                    <input type="range" min={0} max={100} value={posOf("coverPosY")} onChange={(e) => setText("coverPosY", e.target.value)} className="flex-1 accent-blue-600 cursor-pointer" title="Drag to move the photo up or down" />
+                  <div className="absolute bottom-3 left-3 z-10">
+                    {/* Adjust = drag + zoom the photo into this frame. */}
+                    <button
+                      onClick={() => openFramer("cover")}
+                      title="Drag and zoom to frame this photo exactly how you want"
+                      className="bg-white/90 rounded-full shadow px-3 py-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-stone-700 hover:bg-white whitespace-nowrap"
+                    >
+                      <svg className="w-3.5 h-3.5 text-stone-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" /></svg>
+                      Adjust photo
+                    </button>
                   </div>
                 )}
                 <input ref={aboutImgInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => pickImage("coverImage", e.target.files?.[0])} />
