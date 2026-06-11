@@ -1482,7 +1482,8 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                 applies the per-type surcharge to displayed prices. */}
             {hasVehiclePricing && !isDemoMode && (
               <div className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 sm:p-5 shadow-sm">
-                <p className="text-sm font-semibold text-gray-800 mb-3">What type of vehicle?</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600 mb-1">Step 1 · Your vehicle</p>
+                <p className="text-sm font-semibold text-gray-800 mb-3">First, pick your vehicle type</p>
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                   {VEHICLE_TYPES.map((v) => {
                     const active = selectedVehicleType === v.id;
@@ -1517,7 +1518,19 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
               </div>
             )}
 
-            {packages.length === 0 && !viewerIsOwner ? (
+            {hasVehiclePricing && !isDemoMode && !selectedVehicleType ? (
+              /* Gate the service list on a vehicle pick — same flow as the
+                 v2 landing: choose what you drive first, then services appear
+                 with the right price. Flat-priced packages stay hidden too so
+                 the customer always tells us the vehicle first. */
+              <div className="bg-white border-2 border-dashed border-gray-200 rounded-2xl p-8 sm:p-10 text-center animate-fadeInUp">
+                <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-blue-50 flex items-center justify-center">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 13l2-5a2 2 0 011.9-1.4h10.2A2 2 0 0119 8l2 5m-18 0v4a1 1 0 001 1h1a1 1 0 001-1v-1h12v1a1 1 0 001 1h1a1 1 0 001-1v-4m-18 0h18M6.5 16.5h.01M17.5 16.5h.01" /></svg>
+                </div>
+                <p className="text-gray-900 font-bold text-base mb-1">Pick your vehicle type above</p>
+                <p className="text-gray-500 text-sm">Your services will appear with the price for your vehicle.</p>
+              </div>
+            ) : packages.length === 0 && !viewerIsOwner ? (
               /* Public visitor hits an unfinished page — give them a
                  way to reach the business directly instead of the old
                  "No services available" dead end. */
