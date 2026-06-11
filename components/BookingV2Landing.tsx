@@ -444,12 +444,14 @@ export default function BookingV2Landing({
                 </button>
               )}
             </div>
-            {bannerImage && (
-              <div className="bg-white/90 rounded-full shadow-lg px-3 py-2 flex items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-wide text-stone-600 whitespace-nowrap">Position</span>
-                <input type="range" min={0} max={100} value={posOf("bannerPosY")} onChange={(e) => setText("bannerPosY", e.target.value)} className="w-28 accent-blue-600 cursor-pointer" title="Drag to move the photo up or down" />
-              </div>
-            )}
+            {/* Position slider is always available — it reframes the default
+                hero photo too, not just an uploaded one, so the owner can
+                always adjust what shows. */}
+            <div className="bg-white/95 rounded-full shadow-lg pl-3 pr-3.5 py-2 flex items-center gap-2.5">
+              <svg className="w-4 h-4 text-stone-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7l4-4m0 0l4 4m-4-4v18m0 0l-4-4m4 4l4-4" /></svg>
+              <span className="text-[11px] font-bold uppercase tracking-wide text-stone-600 whitespace-nowrap">Banner position</span>
+              <input type="range" min={0} max={100} value={posOf("bannerPosY")} onChange={(e) => setText("bannerPosY", e.target.value)} className="w-28 accent-blue-600 cursor-pointer" title="Drag to move the photo up or down" />
+            </div>
           </div>
         )}
 
