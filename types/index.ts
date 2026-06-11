@@ -117,6 +117,9 @@ export interface PackageAddon {
   id: string;
   name: string;
   price: number;
+  // Optional blurb shown under the add-on name on the booking page so the
+  // customer understands what the extra includes. Empty/absent = no blurb.
+  description?: string;
 }
 
 export interface PackageVehiclePricing {

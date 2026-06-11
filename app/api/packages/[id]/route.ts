@@ -9,17 +9,19 @@ function sanitizeAddons(input: unknown): unknown[] | null | undefined {
   if (input === undefined) return undefined;
   if (input === null) return null;
   if (!Array.isArray(input)) return null;
-  const out: { id: string; name: string; price: number }[] = [];
+  const out: { id: string; name: string; price: number; description?: string }[] = [];
   for (const raw of input) {
     if (!raw || typeof raw !== "object") continue;
     const r = raw as Record<string, unknown>;
     const name = typeof r.name === "string" ? r.name.trim() : "";
     const priceNum = typeof r.price === "number" ? r.price : parseFloat(String(r.price));
     if (!name || !Number.isFinite(priceNum) || priceNum < 0) continue;
+    const description = typeof r.description === "string" ? r.description.trim() : "";
     out.push({
       id: typeof r.id === "string" && r.id ? r.id : `a_${Math.random().toString(36).slice(2, 10)}`,
       name,
       price: Math.round(priceNum * 100) / 100,
+      ...(description ? { description } : {}),
     });
   }
   return out;

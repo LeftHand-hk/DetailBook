@@ -1943,6 +1943,9 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                               add-on label was being clipped with an ellipsis so
                               customers couldn't read the whole thing. */}
                           <span className="block text-sm font-semibold text-gray-900 break-words">{addon.name}</span>
+                          {(addon as any).description && (
+                            <span className="block text-xs text-gray-500 leading-snug mt-0.5 break-words">{(addon as any).description}</span>
+                          )}
                         </span>
                         <span className={`flex-shrink-0 text-sm font-extrabold ${checked ? "text-blue-700" : "text-gray-700"}`}>
                           +${addon.price}

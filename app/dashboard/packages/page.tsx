@@ -62,6 +62,7 @@ interface AddonDraft {
   id: string;
   name: string;
   price: string;
+  description: string;
 }
 
 // Vehicle pricing rows mirror the addon pattern: surcharge stays as a
@@ -98,7 +99,7 @@ const EMPTY_FORM: PackageFormData = {
 };
 
 function newAddonDraft(): AddonDraft {
-  return { id: `a_${Math.random().toString(36).slice(2, 10)}`, name: "", price: "" };
+  return { id: `a_${Math.random().toString(36).slice(2, 10)}`, name: "", price: "", description: "" };
 }
 
 // Default "Different prices per vehicle" list: every vehicle type
@@ -266,7 +267,7 @@ export default function PackagesPage() {
   const openAddons = (pkg: Package) => {
     const existingPricing = ((pkg as any).vehiclePricing as Array<{ type: VehicleTypeId; surcharge: number }> | null | undefined) || [];
     const hasPricing = existingPricing.length > 0;
-    const existingAddons = (pkg.addons || []).map((a) => ({ id: a.id, name: a.name, price: String(a.price) }));
+    const existingAddons = (pkg.addons || []).map((a) => ({ id: a.id, name: a.name, price: String(a.price), description: a.description || "" }));
     setEditing(pkg);
     setForm({
       name: pkg.name,
@@ -300,6 +301,7 @@ export default function PackagesPage() {
         id: a.id,
         name: a.name,
         price: String(a.price),
+        description: a.description || "",
       })),
       vehiclePricingEnabled: hasPricing,
       vehiclePricing: hasPricing
@@ -369,7 +371,8 @@ export default function PackagesPage() {
         const name = a.name.trim();
         const price = parseFloat(a.price);
         if (!name || !Number.isFinite(price) || price < 0) return null;
-        return { id: a.id, name, price };
+        const description = (a.description || "").trim();
+        return { id: a.id, name, price, ...(description ? { description } : {}) };
       })
       .filter((a): a is PackageAddon => a !== null);
     // Vehicle pricing: only serialise when the owner explicitly enabled
@@ -1056,36 +1059,47 @@ export default function PackagesPage() {
                 ) : (
                   <div className="space-y-2">
                     {form.addons.map((addon) => (
-                      <div key={addon.id} className="grid grid-cols-[1fr_110px_auto] gap-2 items-start">
+                      <div key={addon.id} className="border border-gray-100 rounded-xl p-2.5 space-y-2 bg-gray-50/50">
+                        <div className="grid grid-cols-[1fr_110px_auto] gap-2 items-start">
+                          <input
+                            type="text"
+                            value={addon.name}
+                            onChange={(e) => updateAddon(addon.id, { name: e.target.value })}
+                            placeholder="Add-on name"
+                            className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400"
+                          />
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={addon.price}
+                              onChange={(e) => updateAddon(addon.id, { price: e.target.value })}
+                              placeholder="0"
+                              className="w-full pl-6 pr-2 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeAddon(addon.id)}
+                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Remove"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                        {/* Optional blurb — shows under the add-on name on the
+                            booking page so customers know what it includes. */}
                         <input
                           type="text"
-                          value={addon.name}
-                          onChange={(e) => updateAddon(addon.id, { name: e.target.value })}
-                          placeholder="Add-on name"
-                          className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400"
+                          value={addon.description}
+                          onChange={(e) => updateAddon(addon.id, { description: e.target.value })}
+                          placeholder="Short description (optional) — e.g. removes embedded pet hair from seats & carpet"
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400"
                         />
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={addon.price}
-                            onChange={(e) => updateAddon(addon.id, { price: e.target.value })}
-                            placeholder="0"
-                            className="w-full pl-6 pr-2 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeAddon(addon.id)}
-                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Remove"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
                       </div>
                     ))}
                     <button
