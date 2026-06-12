@@ -82,7 +82,14 @@ function formatDuration(minutes: number) {
   return `${h} hr ${m} min`;
 }
 
-function compressImage(file: File, maxWidth = 1600, quality = 0.82): Promise<string> {
+// Downscale + compress an uploaded image to a SMALL base64 string. The hard
+// `maxChars` cap is the important part: a save used to time out (HTTP 504)
+// when a phone photo — or any PNG, which is lossless and balloons to several
+// MB — was sent at full weight. We force photos to JPEG and keep dropping
+// quality, then dimensions, until the payload is guaranteed small, so the
+// save always uploads well within the serverless timeout no matter how big
+// the source file is.
+function compressImage(file: File, maxWidth = 1600, quality = 0.82, maxChars = 700_000): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith("image/")) { reject(new Error("Please choose an image file.")); return; }
     const reader = new FileReader();
@@ -91,14 +98,34 @@ function compressImage(file: File, maxWidth = 1600, quality = 0.82): Promise<str
       const img = new Image();
       img.onerror = () => reject(new Error("Could not load the image."));
       img.onload = () => {
-        const scale = Math.min(1, maxWidth / img.width);
-        const w = Math.round(img.width * scale); const h = Math.round(img.height * scale);
-        const canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) { resolve(reader.result as string); return; }
-        ctx.drawImage(img, 0, 0, w, h);
-        const isPng = file.type === "image/png";
-        resolve(canvas.toDataURL(isPng ? "image/png" : "image/jpeg", isPng ? undefined : quality));
+        // Keep PNG only for small graphics that may need transparency (logos).
+        // A PNG of a *photo* stays lossless and huge — that's what timed out.
+        const keepPng = file.type === "image/png" && maxWidth <= 600;
+        const mime = keepPng ? "image/png" : "image/jpeg";
+        const encode = (targetW: number, q: number): string => {
+          const scale = Math.min(1, targetW / img.width);
+          const w = Math.max(1, Math.round(img.width * scale));
+          const h = Math.max(1, Math.round(img.height * scale));
+          const canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return reader.result as string;
+          // White matte so a transparent PNG flattened to JPEG isn't black.
+          if (mime === "image/jpeg") { ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h); }
+          ctx.drawImage(img, 0, 0, w, h);
+          return canvas.toDataURL(mime, mime === "image/jpeg" ? q : undefined);
+        };
+        let targetW = Math.min(maxWidth, img.width);
+        let q = quality;
+        let out = encode(targetW, q);
+        let guard = 0;
+        while (out.length > maxChars && guard < 10) {
+          guard++;
+          if (mime === "image/jpeg" && q > 0.45) q -= 0.12; // shed quality first
+          else targetW = Math.round(targetW * 0.85);        // then shrink size
+          out = encode(targetW, q);
+        }
+        resolve(out);
       };
       img.src = reader.result as string;
     };
@@ -221,7 +248,10 @@ export default function BookingV2Landing({
       // 1366px@0.8 is still crisp for a full-bleed hero but ~35% lighter.
       const maxW = key === "logo" ? 400 : key === "coverImage" ? 1000 : 1366;
       const quality = key === "bannerImage" ? 0.8 : 0.82;
-      const dataUrl = await compressImage(file, maxW, quality);
+      // Hard cap on the encoded size so the save never times out (HTTP 504),
+      // even from a huge phone photo. ~525KB banner / ~410KB cover / ~150KB logo.
+      const cap = key === "logo" ? 200_000 : key === "coverImage" ? 550_000 : 700_000;
+      const dataUrl = await compressImage(file, maxW, quality, cap);
       setColDraft((d) => ({ ...d, [key]: dataUrl }));
     } catch (err: any) {
       // iPhone photos are often HEIC, which most browsers can't decode to a
