@@ -112,6 +112,9 @@ function defaultVehiclePricingRows(): VehicleSurchargeDraft[] {
 export default function PackagesPage() {
   const router = useRouter();
   const [packages, setPackagesState] = useState<Package[]>([]);
+  // True until the first packages load resolves, so we show a skeleton
+  // instead of flashing the "no packages" empty state on every reload.
+  const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [showModal, setShowModal] = useState(false);
   // First-time setup ("?setup=services") state: a separate, simpler form
@@ -149,17 +152,28 @@ export default function PackagesPage() {
     const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
     const wantsSetup = params?.get("setup") === "services";
 
+    // Show the cached packages immediately so a reload doesn't flash the
+    // empty state before the API responds. The fetch below then refreshes
+    // them from the source of truth.
+    const cached = getPackages();
+    if (cached.length > 0) {
+      setPackagesState(cached);
+      setLoading(false);
+    }
+
     // Load packages from API (source of truth), fallback to localStorage.
     fetch("/api/packages")
       .then((r) => r.ok ? r.json() : [])
       .then((data: Package[]) => {
         setPackagesState(data);
+        setPackagesLocal(data); // keep the cache warm for the next load
         // First-time setup view: arrived from the onboarding CTA AND has
         // no packages yet. If they already have packages, fall through to
         // the normal page.
         if (wantsSetup && data.length === 0) setSetupMode(true);
       })
-      .catch(() => setPackagesState(getPackages()));
+      .catch(() => setPackagesState(getPackages()))
+      .finally(() => setLoading(false));
 
     if (params?.get("newPackage") === "1") {
       setEditing(null);
@@ -693,7 +707,21 @@ export default function PackagesPage() {
       )}
 
       {/* Package Grid */}
-      {packages.length === 0 ? (
+      {loading && packages.length === 0 ? (
+        // First load with no cache yet — show placeholder cards instead of
+        // the empty state so packages don't appear to "pop in" from nothing.
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5" aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 animate-pulse">
+              <div className="h-5 w-2/3 bg-gray-200 rounded mb-3" />
+              <div className="h-7 w-1/3 bg-gray-200 rounded mb-4" />
+              <div className="h-3 w-full bg-gray-100 rounded mb-2" />
+              <div className="h-3 w-5/6 bg-gray-100 rounded mb-5" />
+              <div className="h-9 w-full bg-gray-100 rounded-xl" />
+            </div>
+          ))}
+        </div>
+      ) : packages.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
           <EmptyState
             icon={EmptyIcons.Package}
