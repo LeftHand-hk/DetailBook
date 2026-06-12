@@ -138,8 +138,13 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ user });
   } catch (error) {
     console.error("Update user error:", error);
+    // Surface the real cause (Prisma code + message) so a failed save —
+    // e.g. a photo that won't save — shows the actual reason in the editor's
+    // banner instead of an opaque "Internal server error".
+    const code = (error as { code?: string })?.code ? ` [${(error as { code?: string }).code}]` : "";
+    const msg = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: `Couldn't save${code}: ${msg}` },
       { status: 500 }
     );
   }
