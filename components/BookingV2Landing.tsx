@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { VEHICLE_TYPES, type VehicleTypeId, surchargeForVehicleType, packageSupportsVehicleType } from "@/lib/vehicle-pricing";
 import { VehicleIcon } from "@/components/VehicleIcon";
 import ImageFrameModal, { type FrameValue } from "@/components/ImageFrameModal";
+import { isStorageConfigured, uploadToStorage } from "@/lib/supabase-storage";
 
 // Editorial booking page (v2). Two modes, one component:
 //   • Public (editable=false) — pure display on /book/[slug].
@@ -252,7 +253,24 @@ export default function BookingV2Landing({
       // even from a huge phone photo. ~525KB banner / ~410KB cover / ~150KB logo.
       const cap = key === "logo" ? 200_000 : key === "coverImage" ? 550_000 : 700_000;
       const dataUrl = await compressImage(file, maxW, quality, cap);
-      setColDraft((d) => ({ ...d, [key]: dataUrl }));
+      // Upload to object storage (Supabase) and persist only the URL, so the
+      // save payload stays tiny and can never time out (HTTP 504). If storage
+      // isn't configured or the upload fails, fall back to the inline base64
+      // image — the save still works, just heavier. Existing base64 images on
+      // the platform are left untouched; the img routes already redirect URLs.
+      let value = dataUrl;
+      if (isStorageConfigured()) {
+        try {
+          const blob = await (await fetch(dataUrl)).blob();
+          const ext = blob.type === "image/png" ? "png" : "jpg";
+          const ns = (profile as any).slug || (profile as any).id || "biz";
+          const path = `${ns}/${key}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+          value = await uploadToStorage(blob, path);
+        } catch (e) {
+          console.error("Storage upload failed; using inline image instead:", e);
+        }
+      }
+      setColDraft((d) => ({ ...d, [key]: value }));
     } catch (err: any) {
       // iPhone photos are often HEIC, which most browsers can't decode to a
       // canvas — surface a clear hint instead of a silent failure.
