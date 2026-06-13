@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { isTrialExpired } from "@/lib/auth";
 
+// Always serve the live row. This endpoint backs the public booking page,
+// so it must reflect the owner's current settings the instant they change —
+// e.g. switching the page design (bookingPageLayout) between classic and
+// modern. Without this, a cached response could keep showing the old design
+// after a switch ("I changed it and the live page didn't update").
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }

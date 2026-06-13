@@ -238,8 +238,10 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       setViewerIsOwner(true);
     }
 
-    // Fetch public business data (staff + serviceType) from API
-    fetch(`/api/book/${slug}`)
+    // Fetch public business data (staff + serviceType) from API. no-store so
+    // a design switch (classic ↔ modern) or any other edit shows immediately
+    // instead of serving a stale cached response.
+    fetch(`/api/book/${slug}`, { cache: "no-store" })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (data) {

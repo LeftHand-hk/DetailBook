@@ -25,6 +25,9 @@ export default function BookingPageDesignPicker() {
   const [layout, setLayout] = useState<Layout>("classic");
   const [saving, setSaving] = useState<Layout | null>(null);
   const [loaded, setLoaded] = useState(false);
+  // Surfaced when a switch fails to persist — so a failed save shows a clear
+  // reason instead of the card silently snapping back with no explanation.
+  const [saveError, setSaveError] = useState("");
   // Once the user picks a design, the in-flight background sync below must
   // not stomp their choice. The sync's GET is issued on mount — BEFORE the
   // pick is saved — so when it resolves it carries the OLD layout. Writing
@@ -47,6 +50,7 @@ export default function BookingPageDesignPicker() {
     if (next === layout || saving) { return; }
     userTouched.current = true;
     setSaving(next);
+    setSaveError("");
     const prev = layout;
     setLayout(next); // optimistic
     try {
@@ -54,15 +58,35 @@ export default function BookingPageDesignPicker() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bookingPageLayout: next }),
+        // Never let a cached response stand in for a real write.
+        cache: "no-store",
       });
-      if (!res.ok) { setLayout(prev); userTouched.current = false; return; }
+      const data = await res.json().catch(() => null as any);
+      if (!res.ok) {
+        setLayout(prev);
+        userTouched.current = false;
+        setSaveError(data?.error || `Couldn't switch design (HTTP ${res.status}). Please try again.`);
+        return;
+      }
+      // Confirm the server actually stored the new layout — a 200 with the
+      // wrong value means the write silently didn't take, which is exactly
+      // the "it doesn't switch" symptom. Treat a mismatch as a failure.
+      const savedLayout = data?.user?.bookingPageLayout as Layout | undefined;
+      if (savedLayout && savedLayout !== next) {
+        setLayout(prev);
+        userTouched.current = false;
+        setSaveError("The server didn't save the new design. Please try again.");
+        return;
+      }
       // Persisted by the PUT above — just keep localStorage in step, without
       // firing another (whole-user) PUT. Read the freshest cached user so we
       // don't write a stale snapshot back over a concurrent sync.
       const base = getUser() || user;
       if (base) setUserLocal({ ...base, bookingPageLayout: next } as any);
     } catch {
-      setLayout(prev); userTouched.current = false;
+      setLayout(prev);
+      userTouched.current = false;
+      setSaveError("Network error — couldn't switch design. Please try again.");
     } finally {
       setSaving(null);
     }
@@ -78,6 +102,12 @@ export default function BookingPageDesignPicker() {
           Choose how your public booking page looks. Switch anytime — it won&apos;t affect your services, bookings, or settings.
         </p>
       </div>
+
+      {saveError && (
+        <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {saveError}
+        </div>
+      )}
 
       {!loaded ? (
         <div className="grid sm:grid-cols-2 gap-5">
