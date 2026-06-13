@@ -250,7 +250,8 @@ export async function POST(req: NextRequest) {
         const hasTargetPrice = itemsToCheck.some(
           (i: any) => (i.price?.id || i.price_id) === targetPriceId
         );
-        if (hasTargetPrice) {
+        const statusConfirmed = !isTrialing || subData.status === "active";
+        if (hasTargetPrice && statusConfirmed) {
           paddleVerified = true;
         } else {
           console.warn(
@@ -267,6 +268,13 @@ export async function POST(req: NextRequest) {
       }
     } catch (e) {
       console.warn("[change-plan] verification GET threw:", e);
+    }
+
+    if (!paddleVerified) {
+      return NextResponse.json(
+        { error: "Paddle did not confirm the subscription change yet. Please try again shortly." },
+        { status: 502 }
+      );
     }
 
     // Mirror locally so the UI flips immediately. Webhook will reconcile

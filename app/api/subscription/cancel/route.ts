@@ -19,6 +19,13 @@ export async function POST() {
     const subId = (user as any).paddleSubscriptionId as string | null;
     const apiKey = process.env.PADDLE_API_KEY?.replace(/^["']|["']$/g, "")?.trim();
 
+    if (subId && !apiKey) {
+      return NextResponse.json(
+        { error: "Payment system is temporarily unavailable. Your subscription was not canceled." },
+        { status: 503 }
+      );
+    }
+
     if (subId && apiKey) {
       const headers = {
         Authorization: `Bearer ${apiKey}`,

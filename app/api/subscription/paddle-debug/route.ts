@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
 
 // Diagnostic endpoint. Visit /api/subscription/_paddle-debug while
 // logged in to see exactly what's wrong with the Paddle config.
 // Reveals key shape (masked), env, and a live auth probe to Paddle.
 
 export async function GET() {
-  const session = await getSessionUser();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const admin = await getAdminSession();
+  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const raw = process.env.PADDLE_API_KEY || "";
   const trimmed = raw.replace(/^["']|["']$/g, "").trim();
@@ -21,8 +21,6 @@ export async function GET() {
     hasTrailingWhitespace: raw !== raw.trimEnd(),
     hasInternalWhitespace: /\s/.test(trimmed),
     hasQuotes: /^["']|["']$/.test(raw),
-    prefix: trimmed.slice(0, 14),
-    suffix: trimmed.slice(-4),
     looksLikePaddleKey: /^(pdl_|apikey_)/.test(trimmed),
   };
 

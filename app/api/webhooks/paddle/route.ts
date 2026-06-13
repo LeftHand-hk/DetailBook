@@ -44,8 +44,11 @@ async function verifyPaddleSignature(
 ): Promise<{ ok: boolean; reason?: string }> {
   const secret = process.env.PADDLE_WEBHOOK_SECRET;
   if (!secret) {
-    console.warn("[Paddle webhook] PADDLE_WEBHOOK_SECRET is NOT set — accepting unsigned requests (dev mode).");
-    return { ok: true, reason: "no_secret_configured" };
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[Paddle webhook] PADDLE_WEBHOOK_SECRET is not set; allowing local development request.");
+      return { ok: true, reason: "no_secret_configured_dev" };
+    }
+    return { ok: false, reason: "webhook_secret_not_configured" };
   }
 
   const signatureHeader = req.headers.get("paddle-signature");
@@ -59,17 +62,22 @@ async function verifyPaddleSignature(
   const ts = parts["ts"];
   const h1 = parts["h1"];
   if (!ts || !h1) return { ok: false, reason: "malformed_signature_header" };
+  const timestampMs = Number(ts) * 1000;
+  if (!Number.isFinite(timestampMs) || Math.abs(Date.now() - timestampMs) > 5 * 60 * 1000) {
+    return { ok: false, reason: "signature_timestamp_outside_tolerance" };
+  }
 
   const signedPayload = `${ts}:${body}`;
   const encoder = new TextEncoder();
   const keyData = encoder.encode(secret);
   const msgData = encoder.encode(signedPayload);
 
-  const key = await crypto.subtle.importKey("raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const sig = await crypto.subtle.sign("HMAC", key, msgData);
-  const computed = Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  if (!/^[0-9a-f]{64}$/i.test(h1)) return { ok: false, reason: "malformed_signature_digest" };
+  const supplied = Uint8Array.from(h1.match(/.{2}/g)!, (byte) => parseInt(byte, 16));
+  const key = await crypto.subtle.importKey("raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+  const valid = await crypto.subtle.verify("HMAC", key, supplied, msgData);
 
-  if (computed !== h1) {
+  if (!valid) {
     return { ok: false, reason: "signature_mismatch — secret in Netlify env does NOT match Paddle Dashboard destination secret" };
   }
   return { ok: true };
@@ -206,14 +214,36 @@ export async function POST(req: NextRequest) {
         // the first signup, true on every re-subscribe afterwards.
         const letPaddleTrialRun = isPaddleTrial && inAppTrialActive && !resolvedUser.hadPriorSubscription;
 
+        let effectiveStatus = data.status;
+        if (isPaddleTrial && !letPaddleTrialRun) {
+          try {
+            const apiKey = process.env.PADDLE_API_KEY?.replace(/^["']|["']$/g, "")?.trim();
+            if (apiKey) {
+              const res = await fetch(`${paddleApiBase()}/subscriptions/${data.id}/activate`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${apiKey}` },
+              });
+              if (res.ok) {
+                effectiveStatus = "active";
+                console.log("[Paddle webhook] ended Paddle trial for", resolvedUser.id);
+              } else {
+                const err = await res.json().catch(() => ({}));
+                console.warn("[Paddle webhook] /activate failed:", res.status, err);
+              }
+            }
+          } catch (e) {
+            console.warn("[Paddle webhook] /activate threw:", e);
+          }
+        }
+
         const updateData: Record<string, any> = {
           paddleSubscriptionId: data.id,
           paddleCustomerId: data.customer_id,
-          suspended: false,
         };
         if (plan) updateData.plan = plan;
 
-        if (letPaddleTrialRun) {
+        if (effectiveStatus === "trialing" && letPaddleTrialRun) {
+          updateData.suspended = false;
           updateData.subscriptionStatus = "trialing";
           // Align the in-app trial end with Paddle's ACTUAL first-charge
           // date so the two can never drift. The Paddle trial length is set
@@ -224,9 +254,12 @@ export async function POST(req: NextRequest) {
           // and flips the subscription to active.
           const paddleTrialEnd = data.next_billed_at || data.current_billing_period?.ends_at;
           if (paddleTrialEnd) updateData.trialEndsAt = new Date(paddleTrialEnd).toISOString();
-        } else {
+        } else if (effectiveStatus === "active") {
+          updateData.suspended = false;
           updateData.subscriptionStatus = "active";
           updateData.trialEndsAt = "";
+        } else {
+          updateData.subscriptionStatus = effectiveStatus;
         }
 
         await prisma.user.update({ where: { id: resolvedUser.id }, data: updateData });
@@ -247,27 +280,6 @@ export async function POST(req: NextRequest) {
         // is trialing. Keeping SMTP work out of the webhook prevents Paddle
         // retries and duplicate delivery when a serverless request is cut off.
 
-        // Only force-activate Paddle when we're skipping the trial
-        // window (post-trial subscribers / reactivations).
-        if (isPaddleTrial && !letPaddleTrialRun) {
-          try {
-            const apiKey = process.env.PADDLE_API_KEY?.replace(/^["']|["']$/g, "")?.trim();
-            if (apiKey) {
-              const res = await fetch(`${paddleApiBase()}/subscriptions/${data.id}/activate`, {
-                method: "POST",
-                headers: { Authorization: `Bearer ${apiKey}` },
-              });
-              if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                console.warn("[Paddle webhook] /activate failed:", res.status, err);
-              } else {
-                console.log("[Paddle webhook] ended Paddle trial for", resolvedUser.id);
-              }
-            }
-          } catch (e) {
-            console.warn("[Paddle webhook] /activate threw:", e);
-          }
-        }
         break;
       }
 
@@ -304,8 +316,13 @@ export async function POST(req: NextRequest) {
               JSON.stringify({ userId: user.id, paddleStatus: status })
             );
           } else {
-            const updateData: Record<string, string> = { subscriptionStatus: status };
+            const updateData: Record<string, any> = { subscriptionStatus: status };
             if (plan) updateData.plan = plan;
+            if (status === "active" || status === "trialing") {
+              updateData.suspended = false;
+            } else if (status === "past_due" || status === "paused" || status === "canceled") {
+              updateData.suspended = true;
+            }
             // Keep the in-app trial window aligned with Paddle through the
             // whole lifecycle: once Paddle charges and the sub goes active,
             // clear the trial; while still trialing, mirror Paddle's

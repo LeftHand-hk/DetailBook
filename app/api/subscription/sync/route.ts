@@ -32,7 +32,7 @@ export async function POST() {
   const session = await getSessionUser();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const apiKey = process.env.PADDLE_API_KEY?.trim();
+  const apiKey = process.env.PADDLE_API_KEY?.replace(/^["']|["']$/g, "")?.trim();
   if (!apiKey) {
     return NextResponse.json(
       { error: "Payment system not configured", reason: "missing_api_key" },
@@ -43,7 +43,10 @@ export async function POST() {
   try {
     const user = await prisma.user.findUnique({
       where: { id: session.id },
-      select: { id: true, email: true, plan: true, subscriptionStatus: true },
+      select: {
+        id: true, email: true, plan: true, subscriptionStatus: true,
+        paddleCustomerId: true, paddleSubscriptionId: true,
+      },
     });
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
@@ -102,7 +105,9 @@ export async function POST() {
       const subJson = await subRes.json();
       const subs: any[] = subJson.data || [];
       if (subs.length > 0) {
-        activeSub = subs[0];
+        activeSub = subs.find((s) => s.id === user.paddleSubscriptionId)
+          || subs.find((s) => s.status === "active")
+          || subs.find((s) => s.status === "trialing");
         matchedCustomer = c;
         break;
       }
@@ -118,26 +123,42 @@ export async function POST() {
       );
     }
 
-    // 3. Activate locally. This mirrors the webhook handler exactly.
+    // 3. Mirror Paddle exactly. A captured card creates a `trialing`
+    // subscription; it is not paid/active until Paddle charges it.
     const plan = planFromItems(activeSub.items);
+    const paddleStatus = activeSub.status === "trialing" ? "trialing" : "active";
     const updateData: Record<string, string> = {
       paddleSubscriptionId: activeSub.id,
       paddleCustomerId: matchedCustomer.id,
-      subscriptionStatus: "active",
-      trialEndsAt: "",
+      subscriptionStatus: paddleStatus,
+      trialEndsAt: paddleStatus === "trialing"
+        ? activeSub.next_billed_at || activeSub.current_billing_period?.ends_at || ""
+        : "",
     };
     if (plan) updateData.plan = plan;
 
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id: user.id },
       data: { ...updateData, suspended: false },
+      select: {
+        id: true,
+        email: true,
+        plan: true,
+        subscriptionStatus: true,
+        trialEndsAt: true,
+        suspended: true,
+        paddleCustomerId: true,
+        paddleSubscriptionId: true,
+      },
     });
 
     return NextResponse.json({
       success: true,
       plan: plan || user.plan,
+      status: paddleStatus,
       subscriptionId: activeSub.id,
       customerId: matchedCustomer.id,
+      user: updatedUser,
     });
   } catch (err) {
     console.error("[sync] error:", err);

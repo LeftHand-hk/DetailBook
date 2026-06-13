@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import prisma from "@/lib/prisma";
-import { getPlatformStripe, getBusinessStripe } from "@/lib/stripe";
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,17 +36,41 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // If platform verification failed, try parsing the event payload directly.
-    // Business-owner webhooks will be verified by their own Stripe instance below.
+    // A business may send deposit events using its own Stripe webhook secret.
+    // Parse only enough untrusted data to locate the owning business, then
+    // verify the original raw body before processing anything.
     if (!event) {
       try {
-        event = JSON.parse(rawBody) as Stripe.Event;
+        const candidate = JSON.parse(rawBody) as Stripe.Event;
+        const object = (candidate.data as any)?.object;
+        const bookingId = object?.metadata?.bookingId;
+        if (typeof bookingId === "string" && bookingId) {
+          const booking = await prisma.booking.findUnique({
+            where: { id: bookingId },
+            select: { user: { select: { paymentMethods: true } } },
+          });
+          const stripeConfig = (booking?.user?.paymentMethods as any)?.stripe;
+          if (stripeConfig?.secretKey && stripeConfig?.webhookSecret) {
+            const businessStripe = new Stripe(stripeConfig.secretKey);
+            event = businessStripe.webhooks.constructEvent(
+              rawBody,
+              signature,
+              stripeConfig.webhookSecret
+            );
+          }
+        }
       } catch {
-        return NextResponse.json(
-          { error: "Invalid webhook payload" },
-          { status: 400 }
-        );
+        event = null;
       }
+    }
+
+    // Never process an unverified payment event. Parsing the body directly
+    // without verifying it would let anyone forge a subscription or deposit.
+    if (!event) {
+      return NextResponse.json(
+        { error: "Invalid webhook signature" },
+        { status: 401 }
+      );
     }
 
     switch (event.type) {

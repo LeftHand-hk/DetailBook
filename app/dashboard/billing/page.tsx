@@ -293,7 +293,9 @@ export default function BillingPage() {
       // Without a paddleSubscriptionId the change-plan endpoint will
       // (correctly) reject the request, so first-time subscribers must
       // go through Paddle Checkout.
-      const hasLinkedSub = Boolean((user as any).paddleSubscriptionId);
+      const localStatus = (user.subscriptionStatus || "").toLowerCase();
+      const hasLinkedSub = Boolean((user as any).paddleSubscriptionId)
+        && !["canceled", "expired"].includes(localStatus);
 
       const trimmedCode = discountCode.trim();
 
