@@ -59,31 +59,27 @@ export async function GET(
       );
     }
 
-    // Fetch confirmed/pending bookings for availability (next 60 days only)
+    // Both queries only need user.id — run them in parallel.
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + 60);
-    const bookedSlots = await prisma.booking.findMany({
-      where: {
-        userId: user.id,
-        status: { in: ["confirmed", "pending", "in_progress"] },
-        date: {
-          gte: new Date().toISOString().split("T")[0],
-          lte: futureDate.toISOString().split("T")[0],
+    const [bookedSlots, flagRows] = await Promise.all([
+      prisma.booking.findMany({
+        where: {
+          userId: user.id,
+          status: { in: ["confirmed", "pending", "in_progress"] },
+          date: {
+            gte: new Date().toISOString().split("T")[0],
+            lte: futureDate.toISOString().split("T")[0],
+          },
         },
-      },
-      select: { date: true, time: true, staffId: true },
-    });
-
-    // Brand images are served as cacheable binary from /img/[type] rather
-    // than inlined as base64. We only need to know WHICH images exist so we
-    // can hand back a URL (or null). A tiny raw query checks existence
-    // without loading the multi-MB base64 columns into memory.
-    const flagRows = await prisma.$queryRaw<
-      Array<{ hasLogo: boolean; hasBanner: boolean; hasCover: boolean }>
-    >`SELECT (logo IS NOT NULL AND logo <> '' AND logo NOT LIKE '/api/%') AS "hasLogo",
-             ("bannerImage" IS NOT NULL AND "bannerImage" <> '' AND "bannerImage" NOT LIKE '/api/%') AS "hasBanner",
-             ("coverImage" IS NOT NULL AND "coverImage" <> '' AND "coverImage" NOT LIKE '/api/%') AS "hasCover"
-      FROM "User" WHERE id = ${user.id}`;
+        select: { date: true, time: true, staffId: true },
+      }),
+      prisma.$queryRaw<Array<{ hasLogo: boolean; hasBanner: boolean; hasCover: boolean }>>`
+        SELECT (logo IS NOT NULL AND logo <> '' AND logo NOT LIKE '/api/%') AS "hasLogo",
+               ("bannerImage" IS NOT NULL AND "bannerImage" <> '' AND "bannerImage" NOT LIKE '/api/%') AS "hasBanner",
+               ("coverImage" IS NOT NULL AND "coverImage" <> '' AND "coverImage" NOT LIKE '/api/%') AS "hasCover"
+        FROM "User" WHERE id = ${user.id}`,
+    ]);
     const flags = flagRows[0] ?? { hasLogo: false, hasBanner: false, hasCover: false };
     // updatedAt-based cache buster: a new upload bumps updatedAt, changing
     // the URL so caches refetch; otherwise the image is served from cache.

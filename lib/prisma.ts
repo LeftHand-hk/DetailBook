@@ -17,9 +17,14 @@ function tunedDatabaseUrl(): string | undefined {
     const url = new URL(raw);
     const p = url.searchParams;
     if (!p.has("pgbouncer")) p.set("pgbouncer", "true");
-    p.set("connection_limit", process.env.DB_CONNECTION_LIMIT ?? "5");
-    p.set("pool_timeout", process.env.DB_POOL_TIMEOUT ?? "20");
-    if (!p.has("connect_timeout")) p.set("connect_timeout", "15");
+    // Serverless: 1 connection per instance is correct (pgbouncer multiplexes).
+    // 5 connections per instance was exhausting Supabase's pool under any load.
+    p.set("connection_limit", process.env.DB_CONNECTION_LIMIT ?? "1");
+    // Must be well under Netlify's 10s function timeout so a pool-pressure
+    // spike returns a clean error instead of a 504 (Netlify kills at ~10s;
+    // the old value of 20s guaranteed a 504 every time the pool was busy).
+    p.set("pool_timeout", process.env.DB_POOL_TIMEOUT ?? "5");
+    if (!p.has("connect_timeout")) p.set("connect_timeout", "5");
     return url.toString();
   } catch {
     return raw;

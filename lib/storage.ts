@@ -306,6 +306,15 @@ export function setUser(user: User): void {
       delete (payload as any)[k];
     }
   }
+  // The booking-page DESIGN (bookingPageLayout) has exactly ONE writer: the
+  // design picker (/dashboard/booking-page), which PUTs just that field on
+  // its own. This whole-user background sync also runs from the editors,
+  // and it carries a `bookingPageLayout` that came from a possibly-stale
+  // cache (the editor loaded it before the switch). If such a sync lands
+  // after a switch it silently REVERTS the design — e.g. you pick Classic
+  // and the live page snaps back to Modern, so "it won't save". Never let
+  // the bulk sync touch it; the picker's targeted PUT is the source of truth.
+  delete (payload as any).bookingPageLayout;
   apiFire("/api/user", {
     method: "PUT",
     body: JSON.stringify(payload),
