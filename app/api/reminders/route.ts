@@ -66,7 +66,19 @@ export async function GET(request: NextRequest) {
         status: { in: ["pending", "confirmed"] },
         date: { gte: dayBefore, lte: dayAfter },
       },
-      include: { user: true },
+      include: {
+        user: {
+          select: {
+            businessName: true,
+            timezone: true,
+            plan: true,
+            smsRemindersEnabled: true,
+            emailRemindersEnabled: true,
+            smsTemplates: true,
+            emailTemplates: true,
+          },
+        },
+      },
     });
 
     const results: { id: string; sms?: string; email?: string; reason?: string }[] = [];
@@ -84,6 +96,12 @@ export async function GET(request: NextRequest) {
         // Outside 90–150 minute window — skip silently (don't pollute results)
         continue;
       }
+
+      const claimed = await prisma.booking.updateMany({
+        where: { id: booking.id, reminderSentAt: null },
+        data: { reminderSentAt: new Date() },
+      });
+      if (claimed.count === 0) continue;
 
       const ctx: Record<string, string> = {
         customerName: booking.customerName || "",
@@ -128,11 +146,6 @@ export async function GET(request: NextRequest) {
 
       // Mark sent so we don't retry — even if both were skipped (toggle off),
       // we don't want to keep polling this row forever.
-      await prisma.booking.update({
-        where: { id: booking.id },
-        data: { reminderSentAt: new Date() },
-      });
-
       results.push({ id: booking.id, sms: smsResult, email: emailResult });
     }
 

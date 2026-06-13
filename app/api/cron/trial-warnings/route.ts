@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
           { subscriptionStatus: "trialing" },
         ],
         NOT: { trialEndsAt: "" },
+        paddleSubscriptionId: { not: null },
       },
       select: {
         id: true,
@@ -63,15 +64,21 @@ export async function GET(request: NextRequest) {
       // Paddle subscription on file we confirm with Paddle (source of truth)
       // and self-heal the local record before deciding. Paddle "active" =
       // they've been charged (paying); "trialing" = genuine trial (send).
-      if (u.paddleSubscriptionId) {
-        const liveStatus = await fetchPaddleSubscriptionStatus(u.paddleSubscriptionId);
-        if (liveStatus === "active") {
-          await prisma.user
-            .update({ where: { id: u.id }, data: { subscriptionStatus: "active", trialEndsAt: "" } })
-            .catch((e) => console.error("[cron/trial-warnings] self-heal failed:", e));
-          skipped.push({ id: u.id, reason: "active_subscriber" });
-          continue;
-        }
+      const liveStatus = await fetchPaddleSubscriptionStatus(u.paddleSubscriptionId);
+      if (liveStatus === "active") {
+        await prisma.user.update({
+          where: { id: u.id },
+          data: { subscriptionStatus: "active", trialEndsAt: "" },
+          select: { id: true },
+        });
+        skipped.push({ id: u.id, reason: "active_subscriber" });
+        continue;
+      }
+      // Fail closed: only Paddle-confirmed trials receive trial warnings.
+      // Unknown/canceled/paused/past_due must not receive trial messaging.
+      if (liveStatus !== "trialing") {
+        skipped.push({ id: u.id, reason: liveStatus ? `subscription_${liveStatus}` : "paddle_status_unknown" });
+        continue;
       }
 
       const result = await sendEmail({

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendPaymentFailedEmail, sendWelcomeEmail } from "@/lib/welcome-emails";
+import { sendPaymentFailedEmail } from "@/lib/welcome-emails";
 
 // Map Paddle price IDs → plan names
 const PRICE_TO_PLAN: Record<string, string> = {
@@ -243,15 +243,9 @@ export async function POST(req: NextRequest) {
           })
         );
 
-        // Brief #15 — fire the day-1 welcome email the moment the trial
-        // activates, so it lands within minutes of the card save instead
-        // of waiting for the next cron tick. Fire-and-forget; the cron
-        // re-runs it later if welcomeEmailDay0At is still null.
-        if (letPaddleTrialRun) {
-          sendWelcomeEmail(resolvedUser.id, "day1").catch((err) =>
-            console.error("[Paddle webhook] day1 welcome email failed:", err),
-          );
-        }
+        // The hourly cron sends day 1 after Paddle can confirm the subscription
+        // is trialing. Keeping SMTP work out of the webhook prevents Paddle
+        // retries and duplicate delivery when a serverless request is cut off.
 
         // Only force-activate Paddle when we're skipping the trial
         // window (post-trial subscribers / reactivations).
@@ -350,11 +344,13 @@ export async function POST(req: NextRequest) {
           await prisma.user.update({
             where: { id: user.id },
             data: { subscriptionStatus: "canceled", suspended: true },
+            select: { id: true },
           });
           if (!wasUserInitiated) {
-            sendPaymentFailedEmail(user.id).catch((err) =>
-              console.error("[Paddle webhook] payment-failed email send threw:", err),
-            );
+            const failedEmail = await sendPaymentFailedEmail(user.id);
+            if (!failedEmail.success && failedEmail.error !== "already_sent") {
+              console.error("[Paddle webhook] payment-failed email send failed:", failedEmail.error);
+            }
           }
         }
         break;
