@@ -48,6 +48,51 @@ function emit(name: string) {
   }
 }
 
+// Deterministic avatar color per customer so the same person always
+// gets the same gradient — purely cosmetic, keyed off their name.
+const AVATAR_GRADIENTS = [
+  "from-blue-500 to-indigo-600",
+  "from-emerald-500 to-teal-600",
+  "from-amber-500 to-orange-600",
+  "from-rose-500 to-pink-600",
+  "from-violet-500 to-purple-600",
+  "from-cyan-500 to-sky-600",
+  "from-fuchsia-500 to-pink-600",
+  "from-lime-500 to-green-600",
+];
+
+function hashString(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash << 5) - hash + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function avatarGradient(c: CustomerRow): string {
+  return AVATAR_GRADIENTS[hashString(fullName(c)) % AVATAR_GRADIENTS.length];
+}
+
+function initials(c: CustomerRow): string {
+  const first = (c.firstName || "").trim();
+  const last = (c.lastName || "").trim();
+  const a = first.charAt(0);
+  const b = last.charAt(0) || first.charAt(1) || "";
+  return (a + b).toUpperCase() || "?";
+}
+
+function vehicleLabel(c: CustomerRow): string | null {
+  const parts = [c.vehicleYear, c.vehicleColor, c.vehicleMake, c.vehicleModel]
+    .map((p) => (p || "").trim())
+    .filter(Boolean);
+  return parts.length ? parts.join(" ") : null;
+}
+
+function money(n: number): string {
+  return `$${n.toLocaleString("en-US")}`;
+}
+
 export default function CustomersPage() {
   const [rows, setRows] = useState<CustomerRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,6 +135,19 @@ export default function CustomersPage() {
   }, [rows, page]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+
+  // Headline metrics across the whole (filtered) list — drives the
+  // summary cards at the top of the page.
+  const stats = useMemo(() => {
+    const totalBookings = rows.reduce((s, c) => s + c.totalBookings, 0);
+    const totalRevenue = rows.reduce((s, c) => s + c.totalSpent, 0);
+    return {
+      customers: rows.length,
+      totalBookings,
+      totalRevenue,
+      avgRevenue: rows.length ? Math.round(totalRevenue / rows.length) : 0,
+    };
+  }, [rows]);
 
   const openAdd = () => {
     setEditing(null);
@@ -151,19 +209,31 @@ export default function CustomersPage() {
 
   if (!loading && rows.length === 0 && !search) {
     return (
-      <div className="p-6 max-w-4xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-extrabold text-gray-900">Customers</h1>
+      <div className="p-4 sm:p-8 max-w-3xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-black tracking-tight text-gray-900">Customers</h1>
+          <p className="text-sm text-gray-500 mt-1">Your customer book — every client, vehicle, and visit in one place.</p>
         </div>
-        <div className="bg-white border border-gray-100 rounded-2xl p-10 text-center">
-          <div className="w-16 h-16 mx-auto rounded-full bg-blue-50 flex items-center justify-center mb-4">
-            <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-          </div>
-          <h2 className="text-lg font-extrabold text-gray-900 mb-1">No customers yet</h2>
-          <p className="text-sm text-gray-500 mb-5">Add your first customer or import a list.</p>
-          <div className="flex items-center justify-center gap-2 flex-wrap">
-            <button onClick={openAdd} className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl">Add Customer</button>
-            <button onClick={() => setShowImport(true)} className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-bold px-4 py-2.5 rounded-xl">Import CSV / VCF</button>
+        <div className="relative overflow-hidden bg-white border border-gray-200/80 rounded-3xl p-10 sm:p-14 text-center shadow-sm">
+          {/* soft decorative blobs */}
+          <div className="pointer-events-none absolute -top-16 -right-16 w-56 h-56 rounded-full bg-blue-100/50 blur-2xl" />
+          <div className="pointer-events-none absolute -bottom-20 -left-10 w-48 h-48 rounded-full bg-indigo-100/40 blur-2xl" />
+          <div className="relative">
+            <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-5 shadow-lg shadow-blue-200">
+              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            </div>
+            <h2 className="text-xl font-black text-gray-900 mb-1.5">Build your customer list</h2>
+            <p className="text-sm text-gray-500 mb-7 max-w-sm mx-auto leading-relaxed">Add a customer by hand, or import your existing clients from a CSV or your phone contacts (.vcf). Bookings link to them automatically.</p>
+            <div className="flex items-center justify-center gap-2.5 flex-wrap">
+              <button onClick={openAdd} className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-5 py-3 rounded-xl shadow-lg shadow-blue-200 transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                Add Customer
+              </button>
+              <button onClick={() => setShowImport(true)} className="inline-flex items-center gap-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-bold px-5 py-3 rounded-xl transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                Import CSV / VCF
+              </button>
+            </div>
           </div>
         </div>
         {showAdd && <CustomerFormModal form={form} setForm={setForm} editing={editing} onClose={() => setShowAdd(false)} onSubmit={handleSave} saving={saving} error={error} />}
@@ -173,111 +243,202 @@ export default function CustomersPage() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+    <div className="p-4 sm:p-8 max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900">Customers</h1>
-          <p className="text-sm text-gray-500">{rows.length} customer{rows.length === 1 ? "" : "s"}</p>
+          <h1 className="text-3xl font-black tracking-tight text-gray-900">Customers</h1>
+          <p className="text-sm text-gray-500 mt-1">Every client, vehicle, and visit — in one place.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={openAdd} className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2 rounded-xl">
+          <button onClick={openAdd} className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-blue-200/70 transition-colors">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
             Add Customer
           </button>
-          <button onClick={() => setShowImport(true)} className="inline-flex items-center gap-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-semibold px-3 py-2 rounded-xl">
+          <button onClick={() => setShowImport(true)} className="inline-flex items-center gap-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-semibold px-3 py-2.5 rounded-xl transition-colors">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-            Import CSV / VCF
+            Import
           </button>
-          <button onClick={handleExport} className="inline-flex items-center gap-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-semibold px-3 py-2 rounded-xl">
+          <button onClick={handleExport} className="inline-flex items-center gap-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-semibold px-3 py-2.5 rounded-xl transition-colors">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-            Export CSV
+            Export
           </button>
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+      {/* Summary metrics */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+        {[
+          {
+            label: "Customers", value: stats.customers.toLocaleString(),
+            grad: "from-blue-500 to-indigo-600",
+            icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />,
+          },
+          {
+            label: "Total bookings", value: stats.totalBookings.toLocaleString(),
+            grad: "from-emerald-500 to-teal-600",
+            icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />,
+          },
+          {
+            label: "Lifetime revenue", value: money(stats.totalRevenue),
+            grad: "from-amber-500 to-orange-600",
+            icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />,
+          },
+          {
+            label: "Avg / customer", value: money(stats.avgRevenue),
+            grad: "from-violet-500 to-purple-600",
+            icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />,
+          },
+        ].map((s) => (
+          <div key={s.label} className="bg-white border border-gray-200/80 rounded-2xl p-4 sm:p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${s.grad} flex items-center justify-center flex-shrink-0 shadow-sm`}>
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">{s.icon}</svg>
+              </div>
+              <div className="min-w-0">
+                <div className="text-xl sm:text-2xl font-black text-gray-900 leading-none truncate">{s.value}</div>
+                <div className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-gray-400 mt-1">{s.label}</div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-2.5 mb-5">
         <div className="relative flex-1">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
           <input
             type="search" value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(0); }}
             placeholder="Search by name, email, or phone"
-            className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition-shadow"
           />
         </div>
-        <select
-          value={sort}
-          onChange={(e) => { setSort(e.target.value as SortKey); setPage(0); }}
-          className="border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="name">Sort: Name</option>
-          <option value="bookings">Sort: Total bookings</option>
-          <option value="spent">Sort: Total spent</option>
-          <option value="last">Sort: Last booking</option>
-        </select>
+        <div className="relative">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4 4m0 0l4-4m-4 4V4" /></svg>
+          <select
+            value={sort}
+            onChange={(e) => { setSort(e.target.value as SortKey); setPage(0); }}
+            className="w-full sm:w-auto appearance-none pl-9 pr-9 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+          >
+            <option value="name">Name (A–Z)</option>
+            <option value="bookings">Most bookings</option>
+            <option value="spent">Highest spend</option>
+            <option value="last">Most recent visit</option>
+          </select>
+          <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+        </div>
       </div>
 
-      <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
-        {loading ? (
-          <div className="p-10 text-center text-sm text-gray-400">Loading…</div>
-        ) : rows.length === 0 ? (
-          <div className="p-10 text-center text-sm text-gray-500">No customers match your search.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-left text-xs font-bold uppercase text-gray-500 tracking-wider">
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Email</th>
-                  <th className="px-4 py-3">Phone</th>
-                  <th className="px-4 py-3 whitespace-nowrap">Bookings</th>
-                  <th className="px-4 py-3 whitespace-nowrap">Total Spent</th>
-                  <th className="px-4 py-3 whitespace-nowrap">Last Booking</th>
-                  <th className="px-4 py-3 whitespace-nowrap">Last Service</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {visible.map((c) => (
-                  <tr key={c.id} className="hover:bg-gray-50/60">
-                    <td className="px-4 py-3 font-semibold text-gray-900">
-                      <Link href={`/dashboard/customers/${c.id}`} className="hover:text-blue-600">
-                        {fullName(c)}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{c.email || "—"}</td>
-                    <td className="px-4 py-3 text-gray-600">{c.phone || "—"}</td>
-                    <td className="px-4 py-3 text-gray-700">{c.totalBookings}</td>
-                    <td className="px-4 py-3 font-semibold text-gray-900">${c.totalSpent.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{formatDate(c.lastBookingDate)}</td>
-                    <td className="px-4 py-3 text-gray-700 max-w-[180px] truncate" title={c.lastService || ""}>{c.lastService || "-"}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5 justify-end">
-                        <Link href={`/dashboard/customers/${c.id}`} title="View" className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                        </Link>
-                        <button onClick={() => openEdit(c)} title="Edit" className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                        </button>
-                        <button onClick={() => setDeleteId(c.id)} title="Delete" className="p-1.5 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="bg-white border border-gray-200/80 rounded-2xl p-5 shadow-sm animate-pulse">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-gray-100" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3.5 bg-gray-100 rounded w-2/3" />
+                  <div className="h-2.5 bg-gray-100 rounded w-1/3" />
+                </div>
+              </div>
+              <div className="mt-4 space-y-2">
+                <div className="h-2.5 bg-gray-100 rounded w-4/5" />
+                <div className="h-2.5 bg-gray-100 rounded w-3/5" />
+              </div>
+              <div className="mt-4 pt-4 border-t border-gray-100 h-8 bg-gray-50 rounded" />
+            </div>
+          ))}
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="bg-white border border-gray-200/80 rounded-2xl p-12 text-center shadow-sm">
+          <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 flex items-center justify-center">
+            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
           </div>
-        )}
-      </div>
+          <p className="text-sm font-semibold text-gray-900">No customers match “{search}”.</p>
+          <p className="text-sm text-gray-500 mt-1">Try a different name, email, or phone number.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {visible.map((c) => {
+            const href = `/dashboard/customers/${c.id}`;
+            const vehicle = vehicleLabel(c);
+            return (
+              <div
+                key={c.id}
+                className="group relative bg-white border border-gray-200/80 rounded-2xl p-5 shadow-sm hover:shadow-xl hover:shadow-gray-200/60 hover:border-blue-200 hover:-translate-y-0.5 transition-all duration-200"
+              >
+                {/* Header: avatar + name + actions */}
+                <div className="flex items-start gap-3">
+                  <Link href={href} className={`w-12 h-12 rounded-xl bg-gradient-to-br ${avatarGradient(c)} text-white flex items-center justify-center font-black text-base shadow-sm flex-shrink-0`}>
+                    {initials(c)}
+                  </Link>
+                  <div className="min-w-0 flex-1">
+                    <Link href={href} className="block font-bold text-gray-900 truncate hover:text-blue-600 transition-colors">
+                      {fullName(c)}
+                    </Link>
+                    {vehicle ? (
+                      <span className="inline-flex items-center gap-1 mt-1.5 max-w-full text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-full pl-1.5 pr-2 py-0.5">
+                        <svg className="w-3 h-3 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 13l1.5-4.5A2 2 0 016.4 7h11.2a2 2 0 011.9 1.5L21 13m-18 0v5a1 1 0 001 1h1a1 1 0 001-1v-1h12v1a1 1 0 001 1h1a1 1 0 001-1v-5m-18 0h18M7 16h.01M17 16h.01" /></svg>
+                        <span className="truncate">{vehicle}</span>
+                      </span>
+                    ) : (
+                      <span className="block mt-1.5 text-[11px] text-gray-400">No vehicle on file</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                    <button onClick={() => openEdit(c)} title="Edit" className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                    </button>
+                    <button onClick={() => setDeleteId(c.id)} title="Delete" className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Contact */}
+                <div className="mt-4 space-y-1.5">
+                  <div className="flex items-center gap-2 text-xs text-gray-600 min-w-0">
+                    <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                    {c.email
+                      ? <a href={`mailto:${c.email}`} className="truncate hover:text-blue-600 transition-colors">{c.email}</a>
+                      : <span className="text-gray-400">No email</span>}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-600 min-w-0">
+                    <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                    {c.phone
+                      ? <a href={`tel:${c.phone}`} className="truncate hover:text-blue-600 transition-colors">{c.phone}</a>
+                      : <span className="text-gray-400">No phone</span>}
+                  </div>
+                </div>
+
+                {/* Stats footer */}
+                <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <div className="text-base font-black text-gray-900 leading-none">{c.totalBookings}</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mt-1">Bookings</div>
+                  </div>
+                  <div className="border-x border-gray-100">
+                    <div className="text-base font-black text-gray-900 leading-none">{money(c.totalSpent)}</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mt-1">Spent</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-gray-900 leading-tight" title={c.lastService || ""}>{formatDate(c.lastBookingDate)}</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mt-1">Last visit</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
-          <span>Page {page + 1} of {totalPages}</span>
+        <div className="flex items-center justify-between mt-6 text-sm text-gray-500">
+          <span>
+            Showing <strong className="text-gray-700">{page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, rows.length)}</strong> of <strong className="text-gray-700">{rows.length}</strong>
+          </span>
           <div className="flex gap-2">
-            <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className="px-3 py-1.5 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50">Prev</button>
-            <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="px-3 py-1.5 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50">Next</button>
+            <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className="px-3.5 py-2 rounded-xl border border-gray-200 bg-white font-semibold text-gray-700 disabled:opacity-40 hover:bg-gray-50 transition-colors">Prev</button>
+            <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="px-3.5 py-2 rounded-xl border border-gray-200 bg-white font-semibold text-gray-700 disabled:opacity-40 hover:bg-gray-50 transition-colors">Next</button>
           </div>
         </div>
       )}

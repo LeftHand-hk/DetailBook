@@ -194,7 +194,13 @@ export default function BillingPage() {
   }, []);
 
   useEffect(() => {
-    if (user?.subscriptionStatus === "active") fetchCard({ retry: true });
+    // Trialing users already have a card on file at Paddle (it was
+    // captured during onboarding), so fetch it too — not just for
+    // "active". Without this the card never loads during the trial and
+    // the page falsely shows "No payment method yet".
+    if (user?.subscriptionStatus === "active" || user?.subscriptionStatus === "trialing") {
+      fetchCard({ retry: true });
+    }
   }, [user?.subscriptionStatus]);
 
   // After Paddle Checkout closes successfully, activation happens
@@ -351,6 +357,12 @@ export default function BillingPage() {
 
   const isPro = user?.plan === "pro";
   const isSubscribed = user?.subscriptionStatus === "active";
+  const isTrialing = user?.subscriptionStatus === "trialing";
+  // A trialing user has a live Paddle subscription with a card already
+  // on file (captured at onboarding). For card display and current-plan
+  // marking they should be treated exactly like an active subscriber —
+  // only the messaging differs (trial vs. billed).
+  const hasSubscription = isSubscribed || isTrialing;
   const trialDaysLeft = (() => {
     if (!user?.trialEndsAt) return null;
     const diff = new Date(user.trialEndsAt).getTime() - Date.now();
@@ -501,7 +513,25 @@ export default function BillingPage() {
                 Next charge on <strong className="text-gray-700">{new Date(nextBilledAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</strong>
               </p>
             )}
-            {!isSubscribed && trialDaysLeft !== null && (
+            {/* Trialing with a card on file: reassure, don't nag. They've
+                already subscribed — Paddle auto-charges at trial end. */}
+            {isTrialing && trialDaysLeft !== null && (
+              <p className="text-sm mt-3 text-gray-500">
+                Your free trial is active.{" "}
+                {nextBilledAt ? (
+                  <>
+                    You&apos;ll be charged <strong className="text-gray-700">${isPro ? 50 : 29}</strong> on{" "}
+                    <strong className="text-gray-700">{new Date(nextBilledAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</strong>{" "}
+                    unless you cancel.
+                  </>
+                ) : (
+                  <>{trialDaysLeft} day{trialDaysLeft === 1 ? "" : "s"} left — your card is on file and you can cancel anytime before then.</>
+                )}
+              </p>
+            )}
+            {/* In-app trial with no Paddle subscription yet (e.g. never
+                finished onboarding). Nudge them to add a card. */}
+            {!hasSubscription && trialDaysLeft !== null && (
               <p className={`text-sm mt-3 ${trialDaysLeft <= 3 ? "text-red-700 font-semibold" : "text-amber-700"}`}>
                 {trialDaysLeft <= 3
                   ? "Your trial ends very soon — subscribe now to keep your booking page live."
@@ -523,7 +553,7 @@ export default function BillingPage() {
             <h2 className="text-lg font-bold text-gray-900">Payment method</h2>
             <p className="text-sm text-gray-500">Card on file for your monthly subscription.</p>
           </div>
-          {isSubscribed && card && (
+          {hasSubscription && card && (
             <button
               onClick={handleUpdateCard}
               disabled={updatingCard}
@@ -534,7 +564,7 @@ export default function BillingPage() {
           )}
         </div>
 
-        {!isSubscribed ? (
+        {!hasSubscription ? (
           <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-8 text-center">
             <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 flex items-center justify-center">
               <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -651,7 +681,7 @@ export default function BillingPage() {
         <div className="grid sm:grid-cols-2 gap-4">
           {plans.map((plan) => {
             const isCurrent = user?.plan === plan.id;
-            const isActive = isCurrent && isSubscribed;
+            const isActive = isCurrent && hasSubscription;
             const isPopular = plan.popular;
             return (
               <div
@@ -708,10 +738,8 @@ export default function BillingPage() {
                   >
                     {changingPlan === plan.id
                       ? "Preparing checkout…"
-                      : isSubscribed
-                        ? user?.plan === "pro" && plan.id === "starter"
-                          ? `Switch to ${plan.name}`
-                          : `Switch to ${plan.name}`
+                      : hasSubscription
+                        ? `Switch to ${plan.name}`
                         : `Subscribe to ${plan.name}`}
                   </button>
                 )}
