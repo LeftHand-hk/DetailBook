@@ -16,10 +16,12 @@ type CustomerRow = {
   vehicleYear: string | null;
   vehicleColor: string | null;
   totalBookings: number;
+  totalSpent: number;
   lastBookingDate: string | null;
+  lastService: string | null;
 };
 
-type SortKey = "name" | "bookings" | "last";
+type SortKey = "name" | "bookings" | "spent" | "last";
 
 const PAGE_SIZE = 20;
 
@@ -30,6 +32,14 @@ const emptyForm = {
 
 function fullName(c: CustomerRow): string {
   return `${c.firstName}${c.lastName ? " " + c.lastName : ""}`;
+}
+
+function formatDate(value: string | null): string {
+  if (!value) return "-";
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function emit(name: string) {
@@ -202,6 +212,7 @@ export default function CustomersPage() {
         >
           <option value="name">Sort: Name</option>
           <option value="bookings">Sort: Total bookings</option>
+          <option value="spent">Sort: Total spent</option>
           <option value="last">Sort: Last booking</option>
         </select>
       </div>
@@ -220,7 +231,9 @@ export default function CustomersPage() {
                   <th className="px-4 py-3">Email</th>
                   <th className="px-4 py-3">Phone</th>
                   <th className="px-4 py-3 whitespace-nowrap">Bookings</th>
+                  <th className="px-4 py-3 whitespace-nowrap">Total Spent</th>
                   <th className="px-4 py-3 whitespace-nowrap">Last Booking</th>
+                  <th className="px-4 py-3 whitespace-nowrap">Last Service</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -235,9 +248,14 @@ export default function CustomersPage() {
                     <td className="px-4 py-3 text-gray-600">{c.email || "—"}</td>
                     <td className="px-4 py-3 text-gray-600">{c.phone || "—"}</td>
                     <td className="px-4 py-3 text-gray-700">{c.totalBookings}</td>
-                    <td className="px-4 py-3 text-gray-700">{c.lastBookingDate || "—"}</td>
+                    <td className="px-4 py-3 font-semibold text-gray-900">${c.totalSpent.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{formatDate(c.lastBookingDate)}</td>
+                    <td className="px-4 py-3 text-gray-700 max-w-[180px] truncate" title={c.lastService || ""}>{c.lastService || "-"}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5 justify-end">
+                        <Link href={`/dashboard/customers/${c.id}`} title="View" className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                        </Link>
                         <button onClick={() => openEdit(c)} title="Edit" className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                         </button>

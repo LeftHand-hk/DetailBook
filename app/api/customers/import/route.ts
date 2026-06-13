@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     select: { email: true, phone: true },
   });
   const emailSet = new Set(existing.map((c) => (c.email || "").toLowerCase()).filter(Boolean));
-  const phoneSet = new Set(existing.map((c) => (c.phone || "").trim()).filter(Boolean));
+  const phoneSet = new Set(existing.map((c) => normalizePhone(c.phone)).filter(Boolean));
 
   let skipped = 0;
   const failures: { row: number; reason: string }[] = [];
@@ -102,7 +102,8 @@ export async function POST(request: NextRequest) {
 
     // Dedup against existing rows AND earlier rows in this same batch.
     if (email && emailSet.has(email))   { skipped++; continue; }
-    if (phone && phoneSet.has(phone))   { skipped++; continue; }
+    const normalizedPhone = normalizePhone(phone);
+    if (normalizedPhone && phoneSet.has(normalizedPhone)) { skipped++; continue; }
 
     toCreate.push({
       userId: session.id,
@@ -117,7 +118,7 @@ export async function POST(request: NextRequest) {
       vehicleColor: String(r.vehicleColor || "").trim() || null,
     });
     if (email) emailSet.add(email);
-    if (phone) phoneSet.add(phone);
+    if (normalizedPhone) phoneSet.add(normalizedPhone);
   }
 
   let imported = 0;

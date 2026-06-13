@@ -28,6 +28,13 @@ type Booking = {
   status: string;
 };
 
+type VehicleInfo = {
+  make: string | null;
+  model: string | null;
+  year: string | null;
+  color: string | null;
+};
+
 const STATUS_PILL: Record<string, string> = {
   confirmed: "bg-green-100 text-green-700 border border-green-200",
   pending:   "bg-yellow-100 text-yellow-700 border border-yellow-200",
@@ -43,6 +50,7 @@ export default function CustomerDetailPage() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [totalSpent, setTotalSpent] = useState(0);
+  const [latestVehicle, setLatestVehicle] = useState<VehicleInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<any>({});
@@ -58,6 +66,7 @@ export default function CustomerDetailPage() {
       setCustomer(data.customer);
       setBookings(data.bookings || []);
       setTotalSpent(data.totalSpent || 0);
+      setLatestVehicle(data.latestVehicle || null);
       setForm({
         firstName: data.customer.firstName,
         lastName:  data.customer.lastName || "",
@@ -117,7 +126,12 @@ export default function CustomerDetailPage() {
   if (!customer) return <div className="p-6 max-w-4xl mx-auto text-sm text-gray-500">Customer not found. <Link href="/dashboard/customers" className="text-blue-600 underline">Back</Link></div>;
 
   const upcomingBookings = bookings.filter((b) => b.status !== "completed" && b.status !== "cancelled");
-  const pastBookings     = bookings.filter((b) => b.status === "completed" || b.status === "cancelled");
+  const displayVehicle = {
+    make: customer.vehicleMake || latestVehicle?.make || "",
+    model: customer.vehicleModel || latestVehicle?.model || "",
+    year: customer.vehicleYear || latestVehicle?.year || "",
+    color: customer.vehicleColor || latestVehicle?.color || "",
+  };
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -209,8 +223,8 @@ export default function CustomerDetailPage() {
             <div className="sm:col-span-2"><span className="text-gray-500">Notes:</span> <span className="text-gray-900">{customer.notes || "—"}</span></div>
             <div className="sm:col-span-2 pt-2 border-t border-gray-100 mt-2 text-gray-700">
               <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">Vehicle</p>
-              {(customer.vehicleMake || customer.vehicleModel || customer.vehicleYear || customer.vehicleColor)
-                ? `${customer.vehicleYear || ""} ${customer.vehicleMake || ""} ${customer.vehicleModel || ""}${customer.vehicleColor ? ` (${customer.vehicleColor})` : ""}`.trim()
+              {(displayVehicle.make || displayVehicle.model || displayVehicle.year || displayVehicle.color)
+                ? `${displayVehicle.year} ${displayVehicle.make} ${displayVehicle.model}${displayVehicle.color ? ` (${displayVehicle.color})` : ""}`.trim()
                 : "—"}
             </div>
           </div>

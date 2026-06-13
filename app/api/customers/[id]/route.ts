@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { normalizePhone } from "@/lib/phone";
+import { linkOrphanBookings } from "@/lib/customer-linking";
 
 // GET   /api/customers/[id]  — single customer + booking history + total spent
 // PATCH /api/customers/[id]  — update any editable field
@@ -36,15 +37,16 @@ export async function GET(
   const normPhone = normalizePhone(customer.phone);
   const matchOr: any[] = [{ customerId: id }];
   if (matchEmail) matchOr.push({ customerEmail: matchEmail });
-  if (normPhone) matchOr.push({ AND: [{ customerPhone: { not: null } }, { customerPhone: { not: "" } }] });
+  if (normPhone) matchOr.push({ customerPhone: { not: "" } });
   const candidates = await prisma.booking.findMany({
     where: { userId: session.id, OR: matchOr },
-    orderBy: { date: "desc" },
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     select: {
       id: true, date: true, time: true,
       serviceName: true, servicePrice: true,
       addonsTotal: true, depositPaid: true, depositRequired: true,
       status: true, createdAt: true,
+      vehicleMake: true, vehicleModel: true, vehicleYear: true, vehicleColor: true,
       customerId: true, customerEmail: true, customerPhone: true,
     },
   });
@@ -58,7 +60,20 @@ export async function GET(
     .filter((b) => b.status === "completed")
     .reduce((s, b) => s + (b.servicePrice || 0) + (b.addonsTotal || 0), 0);
 
-  return NextResponse.json({ customer, bookings, totalSpent });
+  const latestBooking = bookings[0] || null;
+  return NextResponse.json({
+    customer,
+    bookings,
+    totalSpent,
+    lastBookingDate: latestBooking?.date || null,
+    lastService: latestBooking?.serviceName || null,
+    latestVehicle: latestBooking ? {
+      make: latestBooking.vehicleMake || null,
+      model: latestBooking.vehicleModel || null,
+      year: latestBooking.vehicleYear || null,
+      color: latestBooking.vehicleColor || null,
+    } : null,
+  });
 }
 
 export async function PATCH(
@@ -92,6 +107,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
   const updated = await prisma.customer.update({ where: { id }, data });
+  await linkOrphanBookings(session.id, updated.id, updated.email, updated.phone).catch(() => 0);
   return NextResponse.json(updated);
 }
 

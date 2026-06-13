@@ -34,18 +34,50 @@ export async function GET(request: NextRequest) {
   // on rows created before the customer was added). One query, no N+1.
   const allBookings = await prisma.booking.findMany({
     where: { userId: session.id },
-    select: { customerId: true, customerEmail: true, customerPhone: true, date: true },
+    select: {
+      id: true,
+      customerId: true,
+      customerEmail: true,
+      customerPhone: true,
+      date: true,
+      serviceName: true,
+      servicePrice: true,
+      addonsTotal: true,
+      status: true,
+      createdAt: true,
+    },
   });
+
+  const byCustomerId = new Map<string, typeof allBookings>();
+  const byEmail = new Map<string, typeof allBookings>();
+  const byPhone = new Map<string, typeof allBookings>();
+  const addToIndex = (index: Map<string, typeof allBookings>, key: string, booking: typeof allBookings[number]) => {
+    if (!key) return;
+    const current = index.get(key);
+    if (current) current.push(booking);
+    else index.set(key, [booking]);
+  };
+  for (const booking of allBookings) {
+    if (booking.customerId) addToIndex(byCustomerId, booking.customerId, booking);
+    addToIndex(byEmail, (booking.customerEmail || "").toLowerCase(), booking);
+    addToIndex(byPhone, normalizePhone(booking.customerPhone), booking);
+  }
 
   const list = rows.map((c) => {
     const matchEmail = (c.email || "").toLowerCase();
     const matchPhone = normalizePhone(c.phone);
-    const matches = allBookings.filter((b) =>
-      b.customerId === c.id
-      || (matchEmail && (b.customerEmail || "").toLowerCase() === matchEmail)
-      || (matchPhone && normalizePhone(b.customerPhone) === matchPhone)
-    );
-    const dates = matches.map((m) => m.date).filter(Boolean).sort();
+    const matches = Array.from(new Map([
+      ...(byCustomerId.get(c.id) || []),
+      ...(matchEmail ? byEmail.get(matchEmail) || [] : []),
+      ...(matchPhone ? byPhone.get(matchPhone) || [] : []),
+    ].map((booking) => [booking.id, booking])).values());
+    const latest = matches.sort((a, b) =>
+      (b.date || "").localeCompare(a.date || "")
+      || b.createdAt.getTime() - a.createdAt.getTime()
+    )[0];
+    const totalSpent = matches
+      .filter((b) => b.status === "completed")
+      .reduce((sum, b) => sum + (b.servicePrice || 0) + (b.addonsTotal || 0), 0);
     return {
       id: c.id,
       firstName: c.firstName,
@@ -58,7 +90,9 @@ export async function GET(request: NextRequest) {
       vehicleYear: c.vehicleYear,
       vehicleColor: c.vehicleColor,
       totalBookings: matches.length,
-      lastBookingDate: dates.length ? dates[dates.length - 1] : null,
+      totalSpent,
+      lastBookingDate: latest?.date || null,
+      lastService: latest?.serviceName || null,
       createdAt: c.createdAt,
     };
   });
@@ -66,6 +100,7 @@ export async function GET(request: NextRequest) {
   // Sort in JS so we can sort by derived fields.
   list.sort((a, b) => {
     if (sort === "bookings") return b.totalBookings - a.totalBookings;
+    if (sort === "spent")    return b.totalSpent - a.totalSpent;
     if (sort === "last")     return (b.lastBookingDate || "").localeCompare(a.lastBookingDate || "");
     // default — name (case-insensitive)
     const an = `${a.firstName} ${a.lastName || ""}`.toLowerCase();

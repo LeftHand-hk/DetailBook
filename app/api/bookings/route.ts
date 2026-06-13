@@ -295,6 +295,16 @@ export async function POST(request: NextRequest) {
       }
       if (match) {
         customerLinkId = match.id;
+        // Keep the CRM vehicle current from the customer's latest booking.
+        await prisma.customer.updateMany({
+          where: { id: match.id, userId },
+          data: {
+            ...(vMake ? { vehicleMake: vMake } : {}),
+            ...(vModel ? { vehicleModel: vModel } : {}),
+            ...(vYear ? { vehicleYear: vYear } : {}),
+            ...(vColor ? { vehicleColor: vColor } : {}),
+          },
+        });
       } else {
         const [first, ...rest] = (customerName || "").trim().split(/\s+/);
         const created = await prisma.customer.create({

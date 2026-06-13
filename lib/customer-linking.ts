@@ -23,7 +23,7 @@ export async function linkOrphanBookings(
 
   const orParts: any[] = [];
   if (cleanEmail) orParts.push({ customerEmail: cleanEmail });
-  if (normPhone) orParts.push({ AND: [{ customerPhone: { not: null } }, { customerPhone: { not: "" } }] });
+  if (normPhone) orParts.push({ customerPhone: { not: "" } });
 
   const candidates = await prisma.booking.findMany({
     where: { userId, customerId: null, OR: orParts },
