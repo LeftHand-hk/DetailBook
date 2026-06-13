@@ -131,6 +131,8 @@ export default function PackagesPage() {
   // change persisted when it didn't. The modal stays open on error so the
   // typed values (e.g. a freshly added add-on description) aren't lost.
   const [saveError, setSaveError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [pendingPackageId, setPendingPackageId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   // The optional sections (add-ons + per-vehicle pricing) start collapsed
   // so the default modal stays a short 5-field form. When editing an
@@ -162,8 +164,13 @@ export default function PackagesPage() {
     }
 
     // Load packages from API (source of truth), fallback to localStorage.
-    fetch("/api/packages")
-      .then((r) => r.ok ? r.json() : [])
+    fetch("/api/packages", { cache: "no-store" })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`Couldn't refresh packages (${r.status}).`);
+        const data = await r.json();
+        if (!Array.isArray(data)) throw new Error("Invalid packages response.");
+        return data as Package[];
+      })
       .then((data: Package[]) => {
         setPackagesState(data);
         setPackagesLocal(data); // keep the cache warm for the next load
@@ -172,7 +179,12 @@ export default function PackagesPage() {
         // the normal page.
         if (wantsSetup && data.length === 0) setSetupMode(true);
       })
-      .catch(() => setPackagesState(getPackages()))
+      // Keep the cached list on a transient API failure. Treating a 504/401
+      // as [] made every package disappear until the next successful reload.
+      .catch((err) => {
+        console.error("[PACKAGES-LOAD-ERROR]", err);
+        setActionError("Couldn't refresh packages. Showing your last loaded list.");
+      })
       .finally(() => setLoading(false));
 
     if (params?.get("newPackage") === "1") {
@@ -385,6 +397,7 @@ export default function PackagesPage() {
     submittingRef.current = true;
     setSaving(true);
     setSaveError("");
+    setActionError("");
 
     try {
     const depositVal = form.deposit ? parseFloat(form.deposit) : undefined;
@@ -492,28 +505,57 @@ export default function PackagesPage() {
   };
 
   const handleToggle = async (id: string) => {
+    if (pendingPackageId) return;
     const pkg = packages.find((p) => p.id === id);
     if (!pkg) return;
-    const updated = packages.map((p) => (p.id === id ? { ...p, active: !p.active } : p));
-    setPackagesState(updated);
-    setPackagesLocal(updated);
+    const nextActive = !pkg.active;
+    setPendingPackageId(id);
+    setActionError("");
     try {
-      await fetch(`/api/packages/${id}`, {
+      const res = await fetch(`/api/packages/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ active: !pkg.active }),
+        body: JSON.stringify({ active: nextActive }),
       });
-    } catch { /* optimistic update already applied */ }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Couldn't update package (${res.status}).`);
+      }
+      const saved = await res.json() as Package;
+      setPackagesState((current) => {
+        const updated = current.map((p) => (p.id === id ? saved : p));
+        setPackagesLocal(updated);
+        return updated;
+      });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Couldn't update package.");
+    } finally {
+      setPendingPackageId(null);
+    }
   };
 
   const handleDelete = async (id: string) => {
-    const updated = packages.filter((p) => p.id !== id);
-    setPackagesState(updated);
-    setPackagesLocal(updated);
-    setDeleteConfirm(null);
+    if (pendingPackageId) return;
+    setPendingPackageId(id);
+    setActionError("");
     try {
-      await fetch(`/api/packages/${id}`, { method: "DELETE" });
-    } catch { /* optimistic update already applied */ }
+      const res = await fetch(`/api/packages/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Couldn't delete package (${res.status}).`);
+      }
+      setPackagesState((current) => {
+        const updated = current.filter((p) => p.id !== id);
+        setPackagesLocal(updated);
+        return updated;
+      });
+      setDeleteConfirm(null);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Couldn't delete package.");
+      setDeleteConfirm(null);
+    } finally {
+      setPendingPackageId(null);
+    }
   };
 
   const formatDuration = (minutes: number) => {
@@ -690,6 +732,12 @@ export default function PackagesPage() {
         </div>
       </div>
 
+      {actionError && (
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+          {actionError}
+        </div>
+      )}
+
       {/* Upgrade prompt if starter at limit */}
       {atLimit && (
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-5 mb-6 text-white flex flex-col sm:flex-row sm:items-center gap-4">
@@ -807,9 +855,11 @@ export default function PackagesPage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleToggle(pkg.id)}
+                      disabled={pendingPackageId !== null}
+                      aria-label={pkg.active ? "Deactivate package" : "Activate package"}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                         pkg.active ? "bg-blue-600" : "bg-gray-300"
-                      }`}
+                      } disabled:opacity-50`}
                     >
                       <span
                         className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -833,6 +883,7 @@ export default function PackagesPage() {
               <div className="px-5 pb-5 flex gap-2">
                 <button
                   onClick={() => openEdit(pkg)}
+                  disabled={pendingPackageId !== null}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -842,6 +893,7 @@ export default function PackagesPage() {
                 </button>
                 <button
                   onClick={() => openAddons(pkg)}
+                  disabled={pendingPackageId !== null}
                   title="Add-ons for this package"
                   className="flex items-center justify-center gap-1.5 px-3 py-2 border border-purple-100 text-purple-700 text-sm font-semibold rounded-xl hover:bg-purple-50 transition-colors"
                 >
@@ -850,6 +902,7 @@ export default function PackagesPage() {
                 </button>
                 <button
                   onClick={() => setDeleteConfirm(pkg.id)}
+                  disabled={pendingPackageId !== null}
                   className="flex items-center justify-center gap-1.5 px-3 py-2 border border-red-100 text-red-500 text-sm font-semibold rounded-xl hover:bg-red-50 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -870,7 +923,7 @@ export default function PackagesPage() {
         // the "can't reach the close button" bug.
         <div
           className="fixed inset-0 z-50 bg-black/60 overflow-y-auto"
-          onClick={() => setShowModal(false)}
+          onClick={() => { if (!saving) setShowModal(false); }}
         >
           <div className="min-h-full flex items-start sm:items-center justify-center p-0 sm:p-4">
             <div
@@ -883,7 +936,8 @@ export default function PackagesPage() {
               </h2>
               <button
                 type="button"
-                onClick={() => setShowModal(false)}
+                onClick={() => { if (!saving) setShowModal(false); }}
+                disabled={saving}
                 aria-label="Close"
                 className="p-2 -mr-2 rounded-xl hover:bg-gray-100"
               >
@@ -1180,6 +1234,7 @@ export default function PackagesPage() {
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
+                disabled={saving}
                 className="flex-1 border border-gray-200 text-gray-700 font-semibold py-3 rounded-xl hover:bg-gray-50 transition-colors"
               >
                 Cancel
@@ -1218,15 +1273,17 @@ export default function PackagesPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setDeleteConfirm(null)}
+                disabled={pendingPackageId !== null}
                 className="flex-1 border border-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleDelete(deleteConfirm)}
-                className="flex-1 bg-red-600 text-white font-bold py-2.5 rounded-xl hover:bg-red-700"
+                disabled={pendingPackageId !== null}
+                className="flex-1 bg-red-600 disabled:bg-red-400 text-white font-bold py-2.5 rounded-xl hover:bg-red-700"
               >
-                Delete
+                {pendingPackageId === deleteConfirm ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>
