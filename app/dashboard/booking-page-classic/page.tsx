@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { getUser, setUser } from "@/lib/storage";
+import { getUser, setUserLocal } from "@/lib/storage";
 import type { User } from "@/types";
 import { compressAndUploadImage } from "@/lib/image-upload";
 import DashboardHelp from "@/components/DashboardHelp";
@@ -118,6 +118,7 @@ export default function BookingPagePage() {
   const [serviceAreasText, setServiceAreasText] = useState("");
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const initialLoadDone = useRef(false);
 
   useEffect(() => {
@@ -167,10 +168,9 @@ export default function BookingPagePage() {
   useEffect(() => {
     if (!initialLoadDone.current || !user) return;
     setHasChanges(true);
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       const sanitizedSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, "-");
-      const updated: User = {
-        ...user,
+      const patch = {
         slug: sanitizedSlug,
         customMessage,
         advanceBookingDays,
@@ -207,18 +207,28 @@ export default function BookingPagePage() {
         logo,
         serviceAreas: serviceAreasText.split(",").map((s) => s.trim()).filter(Boolean),
       };
-      setUser(updated);
-      setUserState(updated);
-      setHasChanges(false);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-      // The "Customize your booking page" setup step auto-completes the
-      // moment the owner uploads a logo or banner, or sets a custom page
-      // title. Pinging the setup banner + dashboard progress card here
-      // makes that flip happen the instant they save instead of after
-      // the next focus/refresh.
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("detailbook:setup-changed"));
+      try {
+        const res = await fetch("/api/user", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          setSaveError(data?.error || `Save failed (${res.status}). Try again.`);
+          return;
+        }
+        setSaveError("");
+        setUserLocal({ ...user, ...patch } as any);
+        setUserState((u) => u ? { ...u, ...patch } as any : u);
+        setHasChanges(false);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("detailbook:setup-changed"));
+        }
+      } catch {
+        setSaveError("Network error — couldn't save. Check your connection.");
       }
     }, 600);
     return () => clearTimeout(timer);
@@ -243,6 +253,11 @@ export default function BookingPagePage() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
+      {saveError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {saveError}
+        </div>
+      )}
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div>

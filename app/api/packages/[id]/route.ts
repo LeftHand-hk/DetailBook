@@ -41,16 +41,6 @@ export async function PUT(
     }
 
     const { id } = await params;
-
-    // Verify ownership
-    const existing = await prisma.package.findUnique({ where: { id } });
-    if (!existing) {
-      return NextResponse.json({ error: "Package not found" }, { status: 404 });
-    }
-    if (existing.userId !== session.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const body = await request.json();
     const { name, description, price, duration, deposit, active } = body;
 
@@ -66,18 +56,19 @@ export async function PUT(
     const cleanedVehiclePricing = sanitizeVehiclePricing(body.vehiclePricing);
     if (cleanedVehiclePricing !== undefined) data.vehiclePricing = cleanedVehiclePricing;
 
+    // Single query: update only if id + userId match (ownership check
+    // built into the WHERE). Eliminates the separate findUnique round-trip.
     const updated = await prisma.package.update({
-      where: { id },
+      where: { id, userId: session.id },
       data,
     });
 
     return NextResponse.json(updated);
   } catch (error) {
+    if ((error as any)?.code === "P2025") {
+      return NextResponse.json({ error: "Package not found" }, { status: 404 });
+    }
     console.error("PUT /api/packages/[id] error:", error);
-    // Surface the underlying cause (Prisma error code + message) so a
-    // failed save isn't an opaque "Failed to update package". The client
-    // shows `error` in its red banner, which makes production-only
-    // failures diagnosable without server log access.
     const code = (error as any)?.code ? ` [${(error as any).code}]` : "";
     const msg = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
@@ -99,16 +90,8 @@ export async function DELETE(
 
     const { id } = await params;
 
-    // Verify ownership
-    const existing = await prisma.package.findUnique({ where: { id } });
-    if (!existing) {
-      return NextResponse.json({ error: "Package not found" }, { status: 404 });
-    }
-    if (existing.userId !== session.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    await prisma.package.delete({ where: { id } });
+    // Single query: delete only if id + userId match.
+    await prisma.package.delete({ where: { id, userId: session.id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {
