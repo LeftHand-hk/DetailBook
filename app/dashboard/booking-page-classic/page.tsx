@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { getUser, setUserLocal } from "@/lib/storage";
+import { fetchBookingPageSettings, saveBookingPageSettings } from "@/lib/booking-page-settings";
 import { compressAndUploadImage } from "@/lib/image-upload";
 import DashboardHelp from "@/components/DashboardHelp";
 import PhotoGalleryEditor from "@/components/PhotoGalleryEditor";
@@ -222,22 +223,21 @@ export default function BookingPageClassicEditor() {
     setForm((f) => ({ ...f, ...patch }));
   }, []);
 
-  // ── Load: instant paint from cache, then authoritative ?full=1 (which
-  // carries the real banner/logo base64 so they render and can be edited). ──
+  // ── Load: instant paint from cache, then the authoritative settings from
+  // the single GET /api/booking-page (image columns come back as small display
+  // URLs that render + can be edited; the heavy base64 never ships). ──
   useEffect(() => {
     const cached = getUser();
     if (cached) { setForm(formFromUser(cached)); setMeta({ id: (cached as any).id, plan: (cached as any).plan }); }
 
     let alive = true;
-    fetch("/api/user?full=1", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!alive || !data?.user) return;
+    fetchBookingPageSettings()
+      .then((settings) => {
+        if (!alive || !settings) return;
         // Don't stomp edits the owner started typing while this was in flight.
-        if (!hasEdited.current) setForm(formFromUser(data.user));
-        setMeta({ id: data.user.id, plan: data.user.plan });
+        if (!hasEdited.current) setForm(formFromUser(settings));
+        setMeta({ id: settings.id, plan: settings.plan });
       })
-      .catch(() => {})
       .finally(() => { if (alive) setLoaded(true); });
     return () => { alive = false; };
   }, []);
@@ -258,16 +258,12 @@ export default function BookingPageClassicEditor() {
       if (logoTouched.current) payload.logo = f.logo ?? null;
       if (bannerTouched.current) payload.bannerImage = f.bannerImage ?? null;
 
-      const res = await fetch("/api/user", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        cache: "no-store",
-      });
-      const data = await res.json().catch(() => null as any);
-      if (!res.ok) {
+      // Single writer + built-in retry on transient 504/5xx. No whole-user
+      // PUT, so a stale background sync can never revert what we just saved.
+      const result = await saveBookingPageSettings(payload);
+      if (!result.ok) {
         setStatus("error");
-        setSaveError(data?.error || `Couldn't save (HTTP ${res.status}). Please try again.`);
+        setSaveError(result.error || "Couldn't save. Please try again.");
         return;
       }
       // Keep the local cache in step without a second whole-user PUT.

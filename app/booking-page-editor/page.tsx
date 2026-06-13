@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { getUser, setUser as cacheUser, isLoggedIn, syncFromServer } from "@/lib/storage";
+import { getUser, setUserLocal, isLoggedIn } from "@/lib/storage";
+import { fetchBookingPageSettings, saveBookingPageSettings } from "@/lib/booking-page-settings";
 import type { User } from "@/types";
 import BookingV2Landing, { type V2Package, type V2Review, type V2Photo } from "@/components/BookingV2Landing";
 import PhotoGalleryEditor from "@/components/PhotoGalleryEditor";
@@ -64,17 +65,15 @@ export default function BookingPageEditorStandalone() {
     const cached = getUser();
     if (cached) { setUserState(cached); hydrateOpts(cached); setReady(true); }
 
-    // The editor needs the full user INCLUDING the banner/cover base64
-    // images (the cached/synced user omits them). Fetch ?full=1 so the
-    // banner + About image show and can be edited.
-    fetch("/api/user?full=1", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.user) {
-          const { packages: _p, bookings: _b, ...fields } = data.user;
-          const fresh = fields as User;
-          setUserState(fresh);
-          hydrateOpts(fresh);
+    // Pull the authoritative design settings from the single GET. Image
+    // columns arrive as small display URLs (real upload URL, or the binary
+    // route for legacy base64) so the banner + About image render and can be
+    // edited without ever shipping the heavy base64 to the client.
+    fetchBookingPageSettings()
+      .then((settings) => {
+        if (settings) {
+          setUserState(settings as unknown as User);
+          hydrateOpts(settings);
         }
         setReady(true);
       })
@@ -93,8 +92,10 @@ export default function BookingPageEditorStandalone() {
     if (!initialLoad.current || !user) return;
     const t = setTimeout(() => {
       const patch = { galleryLayout, galleryShowTitle, galleryTitle, reviewsLayout, reviewsShowStars, reviewsShowAvatars, reviewsShowDates };
-      cacheUser({ ...user, ...patch } as User);
-      fetch("/api/user", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) }).catch(() => {});
+      // Cache-only locally (no whole-user background PUT) + the single design
+      // writer, so this autosave can't race or revert other design edits.
+      setUserLocal({ ...user, ...patch } as User);
+      void saveBookingPageSettings(patch);
     }, 500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -142,9 +143,11 @@ export default function BookingPageEditorStandalone() {
         onBack={() => router.push("/dashboard")}
         onBookNow={() => { /* preview only */ }}
         onSaved={(fields) => {
+          // BookingV2Landing already persisted via PATCH /api/booking-page;
+          // just mirror the change into state + local cache (no extra PUT).
           const updated = { ...user, ...fields } as User;
           setUserState(updated);
-          cacheUser(updated);
+          setUserLocal(updated);
         }}
         onManageGallery={() => galleryRef.current?.scrollIntoView({ behavior: "smooth" })}
         onManageReviews={() => reviewsRef.current?.scrollIntoView({ behavior: "smooth" })}

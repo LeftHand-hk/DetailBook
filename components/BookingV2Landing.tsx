@@ -177,7 +177,9 @@ export default function BookingV2Landing({
         payload.yearsInBusiness = parseInt(payload.yearsInBusiness, 10) || 0;
       }
       if (Object.keys(contentDraft).length) payload.pageContent = { ...pc, ...contentDraft };
-      const res = await fetch("/api/user", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      // Single design writer (PATCH /api/booking-page) — same endpoint the
+      // editors use, so inline edits here can't race the whole-user sync.
+      const res = await fetch("/api/booking-page", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setSaveError(data.error || `Could not save (HTTP ${res.status}).`); return;

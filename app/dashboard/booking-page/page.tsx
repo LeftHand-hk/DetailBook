@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getUser, setUserLocal } from "@/lib/storage";
+import { saveBookingPageSettings, type BookingPageLayout } from "@/lib/booking-page-settings";
 import type { User } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
 
@@ -13,48 +14,15 @@ import DashboardHelp from "@/components/DashboardHelp";
 // editorial WYSIWYG). Picking one writes user.bookingPageLayout; the public
 // /book/[slug] renders whichever is selected. "Edit" opens the matching editor.
 //
-// Reliability notes (this page was rewritten to stop the "Failed to switch
-// (504)" problem):
-//   • Reads the current design from the local cache on mount — fires NO
-//     request of its own. The dashboard layout already syncs the user, so a
-//     second GET here only added to the request storm that was saturating the
-//     DB pool and making the switch itself time out.
-//   • The switch hits a tiny dedicated endpoint (PUT /api/user/layout) and
-//     RETRIES transient failures (504 / 5xx / network) a few times with
-//     backoff. A 504 here is almost always the pool being momentarily busy,
-//     so a retry a beat later succeeds instead of dumping an error on the user.
+// Plumbing: the design (and everything the editors save) now flows through the
+// single PATCH /api/booking-page writer via saveBookingPageSettings — no more
+// split between /api/user/layout and the whole-user sync that used to race and
+// silently revert the pick. We read the current design from the local cache on
+// mount (the dashboard layout already syncs the user) so the page fires no
+// request of its own, and the switch retries transient 504/5xx internally.
 // ──────────────────────────────────────────────────────────────────────────
 
-type Layout = "classic" | "modern";
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-// Persist the chosen layout. Retries transient errors (504/5xx/network) so a
-// momentarily busy connection pool doesn't surface as a hard failure.
-async function persistLayout(next: Layout): Promise<{ ok: boolean; error?: string }> {
-  let lastError = "Couldn't switch design. Please try again.";
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const res = await fetch("/api/user/layout", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingPageLayout: next }),
-        cache: "no-store",
-      });
-      if (res.ok) return { ok: true };
-      // 4xx is a real, non-retryable rejection; 5xx/504 are transient.
-      if (res.status < 500) {
-        const data = await res.json().catch(() => null);
-        return { ok: false, error: data?.error || `Couldn't switch design (HTTP ${res.status}).` };
-      }
-      lastError = `Server busy (HTTP ${res.status}).`;
-    } catch {
-      lastError = "Network error.";
-    }
-    await sleep(500 * (attempt + 1)); // 500ms, 1000ms backoff between retries
-  }
-  return { ok: false, error: `${lastError} Please try again.` };
-}
+type Layout = BookingPageLayout;
 
 export default function BookingPageDesignPicker() {
   const router = useRouter();
@@ -81,7 +49,7 @@ export default function BookingPageDesignPicker() {
     setSaveError("");
     setLayout(next); // optimistic
 
-    const result = await persistLayout(next);
+    const result = await saveBookingPageSettings({ bookingPageLayout: next });
 
     if (!result.ok) {
       setLayout(prev);
