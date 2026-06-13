@@ -9,8 +9,4 @@
   package = "@netlify/plugin-nextjs"
 
 [functions]
-  node_bundler = "nft"
-  # Raise the serverless function timeout to the Netlify maximum (26s).
-  # Default is 10s — shorter than our DB pool_timeout, which guaranteed
-  # 504s whenever the connection pool had any back-pressure.
   timeout = 26
