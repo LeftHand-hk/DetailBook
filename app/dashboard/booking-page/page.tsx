@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getUser, setUser as cacheUser, syncFromServer } from "@/lib/storage";
+import { getUser, setUserLocal, syncFromServer } from "@/lib/storage";
 import type { User } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
 
@@ -25,19 +25,27 @@ export default function BookingPageDesignPicker() {
   const [layout, setLayout] = useState<Layout>("classic");
   const [saving, setSaving] = useState<Layout | null>(null);
   const [loaded, setLoaded] = useState(false);
+  // Once the user picks a design, the in-flight background sync below must
+  // not stomp their choice. The sync's GET is issued on mount — BEFORE the
+  // pick is saved — so when it resolves it carries the OLD layout. Writing
+  // that back was the "I click the other design and it snaps back" bug
+  // (most visible switching v2 → classic). After a pick, we trust local
+  // state, which the targeted PUT has already persisted server-side.
+  const userTouched = useRef(false);
 
   useEffect(() => {
     const u = getUser();
-    if (u) { setUserState(u); setLayout(((u as any).bookingPageLayout as Layout) || "classic"); setLoaded(true); }
+    if (u) { setUserState(u); if (!userTouched.current) setLayout(((u as any).bookingPageLayout as Layout) || "classic"); setLoaded(true); }
     syncFromServer().then(() => {
       const fresh = getUser();
-      if (fresh) { setUserState(fresh); setLayout(((fresh as any).bookingPageLayout as Layout) || "classic"); }
+      if (fresh) { setUserState(fresh); if (!userTouched.current) setLayout(((fresh as any).bookingPageLayout as Layout) || "classic"); }
       setLoaded(true);
     }).catch(() => setLoaded(true));
   }, []);
 
   const choose = async (next: Layout) => {
     if (next === layout || saving) { return; }
+    userTouched.current = true;
     setSaving(next);
     const prev = layout;
     setLayout(next); // optimistic
@@ -47,10 +55,14 @@ export default function BookingPageDesignPicker() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bookingPageLayout: next }),
       });
-      if (!res.ok) { setLayout(prev); return; }
-      if (user) cacheUser({ ...user, bookingPageLayout: next } as any);
+      if (!res.ok) { setLayout(prev); userTouched.current = false; return; }
+      // Persisted by the PUT above — just keep localStorage in step, without
+      // firing another (whole-user) PUT. Read the freshest cached user so we
+      // don't write a stale snapshot back over a concurrent sync.
+      const base = getUser() || user;
+      if (base) setUserLocal({ ...base, bookingPageLayout: next } as any);
     } catch {
-      setLayout(prev);
+      setLayout(prev); userTouched.current = false;
     } finally {
       setSaving(null);
     }

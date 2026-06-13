@@ -15,6 +15,39 @@ function paddleApiKey(): string | null {
   return key;
 }
 
+// Live status of a Paddle subscription — "active" | "trialing" | "past_due"
+// | "paused" | "canceled" | ... — or null when it can't be determined (no
+// API key configured, network error, not found). Callers MUST treat null as
+// "unknown" and fall back to local state; never as "not active".
+//
+// Used by the email crons to confirm — against Paddle, the source of truth —
+// that a user is genuinely a paying ("active") subscriber before sending any
+// trial-ending email. Our local subscriptionStatus can go stale if a Paddle
+// webhook was missed/rejected, which is how a paying customer ends up getting
+// "your trial is ending" mail. Note: Paddle keeps a subscription "trialing"
+// for the whole trial window and only flips it to "active" once it charges
+// the saved card — so "active" reliably means "paying" (safe to suppress
+// trial mail), while "trialing" is a genuine trial where the reminder is
+// still wanted.
+export async function fetchPaddleSubscriptionStatus(
+  subId: string | null | undefined
+): Promise<string | null> {
+  if (!subId) return null;
+  const apiKey = paddleApiKey();
+  if (!apiKey) return null;
+  try {
+    const res = await fetch(`${paddleApiBase()}/subscriptions/${subId}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const j = await res.json().catch(() => null as any);
+    return j?.data?.status ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export type PaddleCancelResult = {
   status: "canceled" | "already_clear" | "not_configured" | "failed";
   detail?: string;

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { getUser, setUser } from "@/lib/storage";
 import type { User } from "@/types";
+import { compressAndUploadImage } from "@/lib/image-upload";
 import DashboardHelp from "@/components/DashboardHelp";
 import PhotoGalleryEditor from "@/components/PhotoGalleryEditor";
 import ReviewsEditor from "@/components/ReviewsEditor";
@@ -67,6 +68,9 @@ export default function BookingPagePage() {
   const [user, setUserState] = useState<User | null>(null);
   const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<EditorTab>("profile");
+  // Surfaced when an image upload fails to compress/offload — so a bad
+  // photo shows a clear message instead of silently doing nothing.
+  const [uploadError, setUploadError] = useState("");
 
   // Booking page state
   const [slug, setSlug] = useState("");
@@ -306,12 +310,23 @@ export default function BookingPagePage() {
               </div>
               <div className="flex flex-col gap-2">
                 <input ref={logoInputRef} type="file" accept="image/*" className="hidden"
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = (ev) => setLogo(ev.target?.result as string);
-                    reader.readAsDataURL(file);
+                    setUploadError("");
+                    try {
+                      // Compress + offload to object storage and keep only the
+                      // tiny URL. Raw base64 here used to balloon the autosave
+                      // PUT to several MB and time out (HTTP 504) — see
+                      // lib/image-upload.
+                      const ns = (user as any)?.slug || (user as any)?.id || "biz";
+                      setLogo(await compressAndUploadImage(file, "logo", ns));
+                    } catch (err: any) {
+                      const heic = /\.(heic|heif)$/i.test(file.name) || /heic|heif/i.test(file.type);
+                      setUploadError(heic
+                        ? "That looks like an iPhone HEIC photo. Open it in Photos and share/save as JPEG, then upload again."
+                        : (err?.message || "Could not load that image. Try a JPEG or PNG."));
+                    }
                   }} />
                 <button type="button" onClick={() => logoInputRef.current?.click()}
                   className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-colors">
@@ -327,6 +342,7 @@ export default function BookingPagePage() {
                   </button>
                 )}
                 <p className="text-xs text-gray-400">Recommended: 200×200px. PNG or JPG.</p>
+                {uploadError && <p className="text-xs text-red-600 font-medium">{uploadError}</p>}
               </div>
             </div>
           </div>
@@ -457,12 +473,21 @@ export default function BookingPagePage() {
           {/* Upload */}
           <div className="flex items-center gap-3">
             <input ref={bannerInputRef} type="file" accept="image/*" className="hidden"
-              onChange={(e) => {
+              onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (ev) => setBannerImage(ev.target?.result as string);
-                reader.readAsDataURL(file);
+                setUploadError("");
+                try {
+                  // Compress + offload to object storage; store only the URL so
+                  // the autosave stays tiny and never times out (HTTP 504).
+                  const ns = (user as any)?.slug || (user as any)?.id || "biz";
+                  setBannerImage(await compressAndUploadImage(file, "bannerImage", ns));
+                } catch (err: any) {
+                  const heic = /\.(heic|heif)$/i.test(file.name) || /heic|heif/i.test(file.type);
+                  setUploadError(heic
+                    ? "That looks like an iPhone HEIC photo. Open it in Photos and share/save as JPEG, then upload again."
+                    : (err?.message || "Could not load that image. Try a JPEG or PNG."));
+                }
               }} />
             <button type="button" onClick={() => bannerInputRef.current?.click()}
               className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-colors">
@@ -479,6 +504,7 @@ export default function BookingPagePage() {
             )}
           </div>
           <p className="text-xs text-gray-400">Recommended: 1200×400px or wider. JPG or PNG.</p>
+          {uploadError && <p className="text-xs text-red-600 font-medium">{uploadError}</p>}
 
           {/* Overlay Opacity Slider */}
           <div>

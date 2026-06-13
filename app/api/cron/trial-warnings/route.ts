@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
+import { fetchPaddleSubscriptionStatus } from "@/lib/paddle";
 
 // Daily cron — called once per 24h by cron-job.org.
 // Sends a "your trial ends tomorrow" email to users in the precise
@@ -36,6 +37,8 @@ export async function GET(request: NextRequest) {
         name: true,
         businessName: true,
         trialEndsAt: true,
+        subscriptionStatus: true,
+        paddleSubscriptionId: true,
       },
     });
 
@@ -52,6 +55,23 @@ export async function GET(request: NextRequest) {
       if (ends <= lower || ends > upper) {
         // Outside the 1-day window — either too far, or already past.
         continue;
+      }
+
+      // NEVER send a trial-ending email to an actual paying subscriber. The
+      // query above already excludes status "active", but that local value
+      // can be stale if a Paddle webhook was missed — so for anyone with a
+      // Paddle subscription on file we confirm with Paddle (source of truth)
+      // and self-heal the local record before deciding. Paddle "active" =
+      // they've been charged (paying); "trialing" = genuine trial (send).
+      if (u.paddleSubscriptionId) {
+        const liveStatus = await fetchPaddleSubscriptionStatus(u.paddleSubscriptionId);
+        if (liveStatus === "active") {
+          await prisma.user
+            .update({ where: { id: u.id }, data: { subscriptionStatus: "active", trialEndsAt: "" } })
+            .catch((e) => console.error("[cron/trial-warnings] self-heal failed:", e));
+          skipped.push({ id: u.id, reason: "active_subscriber" });
+          continue;
+        }
       }
 
       const result = await sendEmail({

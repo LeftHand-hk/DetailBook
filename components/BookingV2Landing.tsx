@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { VEHICLE_TYPES, type VehicleTypeId, surchargeForVehicleType, packageSupportsVehicleType } from "@/lib/vehicle-pricing";
 import { VehicleIcon } from "@/components/VehicleIcon";
 import ImageFrameModal, { type FrameValue } from "@/components/ImageFrameModal";
-import { isStorageConfigured, uploadToStorage } from "@/lib/supabase-storage";
+import { compressAndUploadImage } from "@/lib/image-upload";
 
 // Editorial booking page (v2). Two modes, one component:
 //   • Public (editable=false) — pure display on /book/[slug].
@@ -81,57 +81,6 @@ function formatDuration(minutes: number) {
   if (h === 0) return `${m} min`;
   if (m === 0) return `${h} hr`;
   return `${h} hr ${m} min`;
-}
-
-// Downscale + compress an uploaded image to a SMALL base64 string. The hard
-// `maxChars` cap is the important part: a save used to time out (HTTP 504)
-// when a phone photo — or any PNG, which is lossless and balloons to several
-// MB — was sent at full weight. We force photos to JPEG and keep dropping
-// quality, then dimensions, until the payload is guaranteed small, so the
-// save always uploads well within the serverless timeout no matter how big
-// the source file is.
-function compressImage(file: File, maxWidth = 1600, quality = 0.82, maxChars = 700_000): Promise<string> {
-  return new Promise((resolve, reject) => {
-    if (!file.type.startsWith("image/")) { reject(new Error("Please choose an image file.")); return; }
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Could not read the image."));
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error("Could not load the image."));
-      img.onload = () => {
-        // Keep PNG only for small graphics that may need transparency (logos).
-        // A PNG of a *photo* stays lossless and huge — that's what timed out.
-        const keepPng = file.type === "image/png" && maxWidth <= 600;
-        const mime = keepPng ? "image/png" : "image/jpeg";
-        const encode = (targetW: number, q: number): string => {
-          const scale = Math.min(1, targetW / img.width);
-          const w = Math.max(1, Math.round(img.width * scale));
-          const h = Math.max(1, Math.round(img.height * scale));
-          const canvas = document.createElement("canvas");
-          canvas.width = w; canvas.height = h;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) return reader.result as string;
-          // White matte so a transparent PNG flattened to JPEG isn't black.
-          if (mime === "image/jpeg") { ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h); }
-          ctx.drawImage(img, 0, 0, w, h);
-          return canvas.toDataURL(mime, mime === "image/jpeg" ? q : undefined);
-        };
-        let targetW = Math.min(maxWidth, img.width);
-        let q = quality;
-        let out = encode(targetW, q);
-        let guard = 0;
-        while (out.length > maxChars && guard < 10) {
-          guard++;
-          if (mime === "image/jpeg" && q > 0.45) q -= 0.12; // shed quality first
-          else targetW = Math.round(targetW * 0.85);        // then shrink size
-          out = encode(targetW, q);
-        }
-        resolve(out);
-      };
-      img.src = reader.result as string;
-    };
-    reader.readAsDataURL(file);
-  });
 }
 
 export default function BookingV2Landing({
@@ -244,32 +193,11 @@ export default function BookingV2Landing({
   const pickImage = async (key: "bannerImage" | "logo" | "coverImage", file: File | undefined) => {
     if (!file) return;
     try {
-      // Smaller banners save much faster. Phone photos at 1600px@0.82
-      // produced ~1 MB+ of base64, which took ~10s to upload + persist.
-      // 1366px@0.8 is still crisp for a full-bleed hero but ~35% lighter.
-      const maxW = key === "logo" ? 400 : key === "coverImage" ? 1000 : 1366;
-      const quality = key === "bannerImage" ? 0.8 : 0.82;
-      // Hard cap on the encoded size so the save never times out (HTTP 504),
-      // even from a huge phone photo. ~525KB banner / ~410KB cover / ~150KB logo.
-      const cap = key === "logo" ? 200_000 : key === "coverImage" ? 550_000 : 700_000;
-      const dataUrl = await compressImage(file, maxW, quality, cap);
-      // Upload to object storage (Supabase) and persist only the URL, so the
-      // save payload stays tiny and can never time out (HTTP 504). If storage
-      // isn't configured or the upload fails, fall back to the inline base64
-      // image — the save still works, just heavier. Existing base64 images on
-      // the platform are left untouched; the img routes already redirect URLs.
-      let value = dataUrl;
-      if (isStorageConfigured()) {
-        try {
-          const blob = await (await fetch(dataUrl)).blob();
-          const ext = blob.type === "image/png" ? "png" : "jpg";
-          const ns = (profile as any).slug || (profile as any).id || "biz";
-          const path = `${ns}/${key}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-          value = await uploadToStorage(blob, path);
-        } catch (e) {
-          console.error("Storage upload failed; using inline image instead:", e);
-        }
-      }
+      // Compress + offload to object storage and persist only the URL, so the
+      // save payload stays tiny and can never time out (HTTP 504). Shared with
+      // the classic editor so both stay in lock-step. See lib/image-upload.
+      const ns = (profile as any).slug || (profile as any).id || "biz";
+      const value = await compressAndUploadImage(file, key, ns);
       setColDraft((d) => ({ ...d, [key]: value }));
     } catch (err: any) {
       // iPhone photos are often HEIC, which most browsers can't decode to a

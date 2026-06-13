@@ -291,11 +291,38 @@ export function setUser(user: User): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(KEYS.USER, JSON.stringify(user));
 
-  // Background sync to API
+  // Background sync to API. The whole-user sync must NEVER carry an image
+  // blob: brand images (logo/banner/cover) persist via their own upload
+  // path (a tiny Supabase Storage URL) and the lightweight GET hands back
+  // placeholder /api/... URLs for them. Shipping a raw base64 data URL here
+  // is exactly what produced the HTTP 504 — a multi-MB PUT that blew past
+  // the serverless timeout — so strip any data: URL before sending.
+  // http(s) URLs (real uploads) and /api/... placeholders pass through; the
+  // server-side PUT already drops the placeholders.
+  const payload: Record<string, unknown> = { ...user };
+  for (const k of ["logo", "bannerImage", "coverImage"] as const) {
+    const v = (payload as any)[k];
+    if (typeof v === "string" && v.startsWith("data:")) {
+      delete (payload as any)[k];
+    }
+  }
   apiFire("/api/user", {
     method: "PUT",
-    body: JSON.stringify(user),
+    body: JSON.stringify(payload),
   });
+}
+
+/**
+ * Cache-only write — update the locally stored user WITHOUT firing a
+ * background PUT. Use this after the caller has already persisted the
+ * change with its own targeted request (e.g. the booking-page design
+ * picker PUTs `{ bookingPageLayout }` itself). Mirrors `setPackagesLocal`:
+ * avoids re-sending the whole user object (and any heavy fields) just to
+ * keep localStorage in step.
+ */
+export function setUserLocal(user: User): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(KEYS.USER, JSON.stringify(user));
 }
 
 // ---------------------------------------------------------------------------
