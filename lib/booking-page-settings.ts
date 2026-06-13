@@ -130,11 +130,17 @@ export async function fetchBookingPageSettings(): Promise<BookingPageSettings | 
 export async function saveBookingPageSettings(
   patch: Record<string, unknown>,
 ): Promise<SaveResult> {
+  const layoutOnly =
+    Object.keys(patch).length === 1 &&
+    (patch.bookingPageLayout === "classic" || patch.bookingPageLayout === "modern");
+  const endpoint = layoutOnly ? "/api/user/layout" : "/api/booking-page";
+  const method = layoutOnly ? "PUT" : "PATCH";
+
   let lastError = "Couldn't save. Please try again.";
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const res = await fetch("/api/booking-page", {
-        method: "PATCH",
+      const res = await fetch(endpoint, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
         cache: "no-store",
