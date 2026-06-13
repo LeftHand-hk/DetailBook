@@ -201,10 +201,16 @@ function DesignCard({
             <button onClick={onEdit} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition-colors">Edit this page →</button>
           ) : (
             <>
-              <button onClick={onChoose} disabled={saving} className="flex-1 bg-gray-900 hover:bg-gray-800 disabled:opacity-50 text-white font-bold py-2.5 rounded-xl text-sm transition-colors">
+              <button onClick={onChoose} disabled={saving} className="flex-1 inline-flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-800 disabled:opacity-60 text-white font-bold py-2.5 rounded-xl text-sm transition-colors">
+                {saving && (
+                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                )}
                 {saving ? "Switching…" : "Use this design"}
               </button>
-              <button onClick={onEdit} className="px-4 py-2.5 border border-gray-200 text-gray-700 font-semibold rounded-xl text-sm hover:bg-gray-50 transition-colors">Edit</button>
+              <button onClick={onEdit} disabled={saving} className="px-4 py-2.5 border border-gray-200 text-gray-700 font-semibold rounded-xl text-sm hover:bg-gray-50 disabled:opacity-50 transition-colors">Edit</button>
             </>
           )}
         </div>

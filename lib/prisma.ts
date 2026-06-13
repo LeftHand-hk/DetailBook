@@ -17,7 +17,13 @@ function tunedDatabaseUrl(): string | undefined {
     const url = new URL(raw);
     const p = url.searchParams;
     if (!p.has("pgbouncer")) p.set("pgbouncer", "true");
-    p.set("connection_limit", process.env.DB_CONNECTION_LIMIT ?? "3");
+    // We talk to Supabase's TRANSACTION pooler (port 6543), which multiplexes
+    // many client connections onto a small Postgres pool — so a generous
+    // per-instance limit is safe and is what stops concurrent dashboard
+    // requests from queueing behind each other until they 504. A low limit
+    // (1-3) meant the ~5 requests the dashboard fires on load fought over a
+    // couple of connections, each of which costs ~800ms to establish.
+    p.set("connection_limit", process.env.DB_CONNECTION_LIMIT ?? "10");
     p.set("pool_timeout", process.env.DB_POOL_TIMEOUT ?? "8");
     if (!p.has("connect_timeout")) p.set("connect_timeout", "8");
     return url.toString();

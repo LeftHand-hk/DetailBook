@@ -110,9 +110,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         .then((list: any[]) => setCustomerCount(Array.isArray(list) ? list.length : 0))
         .catch(() => {});
     };
-    refresh();
+    // The customer-count badge is cosmetic — defer it so it doesn't compete
+    // with the critical user sync for a DB connection on first paint (that
+    // contention is what made writes like the design switch time out).
+    const t = window.setTimeout(refresh, 2500);
     window.addEventListener("detailbook:customers-changed", refresh);
-    return () => window.removeEventListener("detailbook:customers-changed", refresh);
+    return () => { window.clearTimeout(t); window.removeEventListener("detailbook:customers-changed", refresh); };
   }, []);
   const [checked, setChecked] = useState(false);
   const [upgradeDismissed, setUpgradeDismissed] = useState(false);
@@ -226,9 +229,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     if (typeof window === "undefined") return;
     const ping = () => { fetch("/api/auth/me", { cache: "no-store" }).catch(() => {}); };
-    ping();
+    // Defer the first heartbeat off the first-paint burst — it's just a
+    // "last active" timestamp, nothing renders from it.
+    const first = window.setTimeout(ping, 4000);
     const id = window.setInterval(ping, 5 * 60 * 1000);
-    return () => window.clearInterval(id);
+    return () => { window.clearTimeout(first); window.clearInterval(id); };
   }, []);
 
   // Reset the main scroll area to top on every *real* route change.
