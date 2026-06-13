@@ -117,19 +117,24 @@ export async function GET(request: NextRequest) {
       const u: any = booking.user;
       let smsResult: string | undefined;
       let emailResult: string | undefined;
+      let deliveryAttempted = false;
+      let deliverySucceeded = false;
 
       // SMS reminder — Pro plan + smsRemindersEnabled + customer phone present
       if (u.plan === "pro" && u.smsRemindersEnabled && booking.customerPhone) {
+        deliveryAttempted = true;
         const tpl = u.smsTemplates?.reminder24h || DEFAULT_SMS_REMINDER;
         const body = render(tpl);
         const r = await sendSms(booking.customerPhone, body).catch((err) => ({ success: false, error: String(err) }));
         smsResult = r.success ? "sent" : `failed: ${r.error}`;
+        deliverySucceeded ||= r.success;
       } else {
         smsResult = "skipped";
       }
 
       // Email reminder — emailRemindersEnabled + customer email present (no plan gate)
       if (u.emailRemindersEnabled !== false && booking.customerEmail) {
+        deliveryAttempted = true;
         const tpl = u.emailTemplates?.reminder24h || DEFAULT_EMAIL_REMINDER;
         const text = render(tpl);
         const html = `<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f9fafb;border-radius:8px;color:#111827;font-size:14px;line-height:1.6;white-space:pre-wrap;">${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`;
@@ -140,12 +145,21 @@ export async function GET(request: NextRequest) {
           text,
         }).catch((err) => ({ success: false, error: String(err) }));
         emailResult = r.success ? "sent" : `failed: ${(r as any).error}`;
+        deliverySucceeded ||= r.success;
       } else {
         emailResult = "skipped";
       }
 
-      // Mark sent so we don't retry — even if both were skipped (toggle off),
-      // we don't want to keep polling this row forever.
+      // Release the concurrency claim if every attempted channel failed so
+      // a later cron tick can retry instead of losing the reminder forever.
+      // Keep the claim when all channels were intentionally skipped.
+      if (deliveryAttempted && !deliverySucceeded) {
+        await prisma.booking.updateMany({
+          where: { id: booking.id, reminderSentAt: { not: null } },
+          data: { reminderSentAt: null },
+        });
+      }
+
       results.push({ id: booking.id, sms: smsResult, email: emailResult });
     }
 
