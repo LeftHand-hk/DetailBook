@@ -6,70 +6,99 @@ import { getUser, setUserLocal } from "@/lib/storage";
 import type { User } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
 
+// ──────────────────────────────────────────────────────────────────────────
 // Booking-page DESIGN PICKER.
 //
-// Businesses choose between two public booking-page designs:
-//   • Classic — the original card-based booking flow (default for
-//     everyone, so no active client is ever switched without opting in).
-//   • Modern  — the v2 editorial / website-style layout, edited inline
-//     in the standalone WYSIWYG.
-// Picking a card sets user.bookingPageLayout (PUT /api/user); the public
-// /book/[slug] page renders whichever is selected. "Edit" opens the
-// matching editor.
+// Two public designs: "classic" (the original card flow) and "modern" (the v2
+// editorial WYSIWYG). Picking one writes user.bookingPageLayout; the public
+// /book/[slug] renders whichever is selected. "Edit" opens the matching editor.
+//
+// Reliability notes (this page was rewritten to stop the "Failed to switch
+// (504)" problem):
+//   • Reads the current design from the local cache on mount — fires NO
+//     request of its own. The dashboard layout already syncs the user, so a
+//     second GET here only added to the request storm that was saturating the
+//     DB pool and making the switch itself time out.
+//   • The switch hits a tiny dedicated endpoint (PUT /api/user/layout) and
+//     RETRIES transient failures (504 / 5xx / network) a few times with
+//     backoff. A 504 here is almost always the pool being momentarily busy,
+//     so a retry a beat later succeeds instead of dumping an error on the user.
+// ──────────────────────────────────────────────────────────────────────────
 
 type Layout = "classic" | "modern";
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Persist the chosen layout. Retries transient errors (504/5xx/network) so a
+// momentarily busy connection pool doesn't surface as a hard failure.
+async function persistLayout(next: Layout): Promise<{ ok: boolean; error?: string }> {
+  let lastError = "Couldn't switch design. Please try again.";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch("/api/user/layout", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingPageLayout: next }),
+        cache: "no-store",
+      });
+      if (res.ok) return { ok: true };
+      // 4xx is a real, non-retryable rejection; 5xx/504 are transient.
+      if (res.status < 500) {
+        const data = await res.json().catch(() => null);
+        return { ok: false, error: data?.error || `Couldn't switch design (HTTP ${res.status}).` };
+      }
+      lastError = `Server busy (HTTP ${res.status}).`;
+    } catch {
+      lastError = "Network error.";
+    }
+    await sleep(500 * (attempt + 1)); // 500ms, 1000ms backoff between retries
+  }
+  return { ok: false, error: `${lastError} Please try again.` };
+}
+
 export default function BookingPageDesignPicker() {
   const router = useRouter();
-  const [user, setUserState] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [layout, setLayout] = useState<Layout>("classic");
   const [saving, setSaving] = useState<Layout | null>(null);
   const [loaded, setLoaded] = useState(false);
-  // Surfaced when a switch fails to persist — so a failed save shows a clear
-  // reason instead of the card silently snapping back with no explanation.
   const [saveError, setSaveError] = useState("");
 
+  // Read straight from the local cache — no network call from this page.
   useEffect(() => {
-    // Dashboard layout already calls syncFromServer() on every navigation,
-    // so by the time this page mounts the localStorage data is already fresh.
-    // A second syncFromServer() here was firing a redundant GET /api/user
-    // concurrently with the picker's own PUT — that race caused P2024
-    // connection timeouts that made the switch appear to do nothing.
     const u = getUser();
     if (u) {
-      setUserState(u);
+      setUser(u);
       setLayout(((u as any).bookingPageLayout as Layout) || "classic");
     }
     setLoaded(true);
   }, []);
 
   const choose = async (next: Layout) => {
-    if (next === layout || saving) { return; }
+    if (next === layout || saving) return;
+    const prev = layout;
     setSaving(next);
     setSaveError("");
-    const prev = layout;
-    setLayout(next);
-    try {
-      const res = await fetch("/api/user", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingPageLayout: next }),
-        cache: "no-store",
-      });
-      const data = await res.json().catch(() => null as any);
-      if (!res.ok) {
-        setLayout(prev);
-        setSaveError(data?.error || `Failed to switch (${res.status}). Try again.`);
-        return;
-      }
-      const base = getUser() || user;
-      if (base) setUserLocal({ ...base, bookingPageLayout: next } as any);
-    } catch {
+    setLayout(next); // optimistic
+
+    const result = await persistLayout(next);
+
+    if (!result.ok) {
       setLayout(prev);
-      setSaveError("Network error — couldn't switch design. Try again.");
-    } finally {
+      setSaveError(result.error || "Couldn't switch design. Please try again.");
       setSaving(null);
+      return;
     }
+
+    // Keep the local cache in step so the editors + public page see the new
+    // design immediately, without firing a whole-user PUT.
+    const base = getUser() || user;
+    if (base) {
+      const updated = { ...base, bookingPageLayout: next } as User;
+      setUser(updated);
+      setUserLocal(updated);
+    }
+    setSaving(null);
   };
 
   const slug = (user as any)?.slug || "";
@@ -153,7 +182,6 @@ function DesignCard({
           <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> Current
         </span>
       )}
-      {/* Mockup preview */}
       <div className="h-44 bg-gradient-to-br from-gray-50 to-gray-100 border-b border-gray-100 overflow-hidden flex items-center justify-center p-4">
         {preview}
       </div>
@@ -185,11 +213,11 @@ function DesignCard({
   );
 }
 
-// Lightweight CSS mockups — give a feel of each design without shipping
-// a real screenshot image.
+// Lightweight CSS mockups — give a feel of each design without shipping a
+// real screenshot.
 function ClassicPreview() {
   return (
-    <div className="w-full max-w-[220px] bg-white rounded-lg shadow-sm border border-gray-200 p-2.5 scale-100">
+    <div className="w-full max-w-[220px] bg-white rounded-lg shadow-sm border border-gray-200 p-2.5">
       <div className="h-2 w-16 bg-gray-300 rounded mb-2" />
       <div className="grid grid-cols-2 gap-1.5 mb-2">
         {[0, 1, 2, 3].map((i) => (
