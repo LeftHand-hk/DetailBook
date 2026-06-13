@@ -39,13 +39,16 @@ export async function GET() {
 
     // Refresh lastLoginAt at most once every 5 minutes so the admin's
     // "active in last X" indicator stays accurate without writing to the
-    // DB on every dashboard mount.
+    // DB on every dashboard mount. This write must finish before returning:
+    // Netlify can freeze an unawaited UPDATE before COMMIT and lock the row.
     const now = Date.now();
     const last = user.lastLoginAt ? user.lastLoginAt.getTime() : 0;
     if (now - last > 5 * 60 * 1000) {
-      prisma.user
-        .update({ where: { id: user.id }, data: { lastLoginAt: new Date(now) } })
-        .catch((e) => console.error("Failed to refresh lastLoginAt:", e));
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date(now) },
+        select: { id: true },
+      });
     }
 
     return NextResponse.json({ user });
