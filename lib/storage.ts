@@ -459,8 +459,24 @@ export function isLoggedIn(): boolean {
  * The actual API POST /api/auth/login is performed by the login page via fetch;
  * this function only sets the local flag.
  */
-export function login(): void {
+export function login(userId?: string): void {
   if (typeof window === "undefined") return;
+
+  // Never show a previous account's cached dashboard while fresh data loads.
+  if (userId) {
+    let cachedUserId: string | undefined;
+    try {
+      cachedUserId = JSON.parse(localStorage.getItem(KEYS.USER) || "null")?.id;
+    } catch {
+      cachedUserId = undefined;
+    }
+    if (cachedUserId !== userId) {
+      localStorage.removeItem(KEYS.USER);
+      localStorage.removeItem(KEYS.PACKAGES);
+      localStorage.removeItem(KEYS.BOOKINGS);
+    }
+  }
+
   localStorage.setItem(KEYS.IS_LOGGED_IN, "true");
 }
 
@@ -470,6 +486,9 @@ export function login(): void {
 export function logout(): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(KEYS.IS_LOGGED_IN, "false");
+  localStorage.removeItem(KEYS.USER);
+  localStorage.removeItem(KEYS.PACKAGES);
+  localStorage.removeItem(KEYS.BOOKINGS);
 
   // Clear server-side session / cookie
   apiFire("/api/auth/logout", { method: "POST" });
@@ -545,11 +564,15 @@ function transformBooking(b: any): Booking {
  * If the user endpoint doesn't include packages/bookings, we fetch them
  * separately from GET /api/packages and GET /api/bookings.
  */
-export async function syncFromServer(): Promise<void> {
+async function syncFromServerOnce(): Promise<void> {
   if (typeof window === "undefined") return;
 
-  // Fetch the full user record (may include packages & bookings)
-  const data = await apiCall<SyncUserResponse>("/api/user");
+  // User/profile data and bookings are independent reads. Fetch them together
+  // so the dashboard loader waits for the slower request, not their sum.
+  const [data, prefetchedBookings] = await Promise.all([
+    apiCall<SyncUserResponse>("/api/user"),
+    apiCall<any[]>("/api/bookings"),
+  ]);
 
   if (data?.user) {
     const { packages: userPackages, bookings: userBookings, ...userFields } = data.user;
@@ -569,23 +592,17 @@ export async function syncFromServer(): Promise<void> {
 
     if (userBookings && Array.isArray(userBookings)) {
       localStorage.setItem(KEYS.BOOKINGS, JSON.stringify(userBookings.map(transformBooking)));
-    } else {
-      const bks = await apiCall<any[]>("/api/bookings");
-      if (bks && Array.isArray(bks)) {
-        localStorage.setItem(KEYS.BOOKINGS, JSON.stringify(bks.map(transformBooking)));
-      }
+    } else if (prefetchedBookings && Array.isArray(prefetchedBookings)) {
+      localStorage.setItem(KEYS.BOOKINGS, JSON.stringify(prefetchedBookings.map(transformBooking)));
     }
   } else {
-    const [pkgs, bks] = await Promise.all([
-      apiCall<Package[]>("/api/packages"),
-      apiCall<any[]>("/api/bookings"),
-    ]);
+    const pkgs = await apiCall<Package[]>("/api/packages");
 
     if (pkgs && Array.isArray(pkgs)) {
       localStorage.setItem(KEYS.PACKAGES, JSON.stringify(pkgs));
     }
-    if (bks && Array.isArray(bks)) {
-      localStorage.setItem(KEYS.BOOKINGS, JSON.stringify(bks.map(transformBooking)));
+    if (prefetchedBookings && Array.isArray(prefetchedBookings)) {
+      localStorage.setItem(KEYS.BOOKINGS, JSON.stringify(prefetchedBookings.map(transformBooking)));
     }
   }
 }
@@ -599,6 +616,18 @@ export async function syncFromServer(): Promise<void> {
  * Useful for migrating from a localStorage-only setup to a real DB.
  * Sends PUT /api/user, then creates/updates every package and booking.
  */
+let syncFromServerInFlight: Promise<void> | null = null;
+
+export function syncFromServer(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (syncFromServerInFlight) return syncFromServerInFlight;
+
+  syncFromServerInFlight = syncFromServerOnce().finally(() => {
+    syncFromServerInFlight = null;
+  });
+  return syncFromServerInFlight;
+}
+
 export async function syncToServer(): Promise<{ success: boolean; errors: string[] }> {
   const errors: string[] = [];
 

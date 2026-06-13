@@ -80,7 +80,7 @@ export default function SignupPage() {
         setLoading(false);
         return;
       }
-      login();
+      login(data.user?.id);
       // Navigate immediately; warm the cache in the background instead
       // of blocking on a full sync.
       syncFromServer().catch(() => {});

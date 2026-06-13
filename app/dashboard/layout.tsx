@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { isLoggedIn, logout, getUser, initializeDemo, syncFromServer } from "@/lib/storage";
+import { isLoggedIn, logout, getUser, syncFromServer } from "@/lib/storage";
 import type { User } from "@/types";
 import { LogoIcon, LogoWordmark } from "@/components/Logo";
 import SetupExperience from "@/components/SetupExperience";
@@ -164,7 +164,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       router.push("/login");
       return;
     }
-    initializeDemo();
     const u = getUser();
     setUserState(u);
     // Only release the loading screen if we already have cached user

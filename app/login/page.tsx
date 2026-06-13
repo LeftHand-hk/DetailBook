@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { login, syncFromServer } from "@/lib/storage";
+import { login } from "@/lib/storage";
 import Logo from "@/components/Logo";
 
 export default function LoginPage() {
@@ -47,7 +47,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, remember: form.remember }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -66,13 +66,11 @@ export default function LoginPage() {
         router.push("/staff/dashboard");
         return;
       }
-      login();
+      login(data.user?.id);
       // Navigate immediately — don't block the login button on a full
       // data sync (/api/user pulls the whole user + bookings + packages
       // and was making login feel frozen for seconds). The dashboard
-      // layout runs its own sync on mount; we just warm the cache here
-      // in the background.
-      syncFromServer().catch(() => {});
+      // layout owns the single initial sync after navigation.
       router.push("/dashboard");
     } catch {
       setError("Something went wrong. Please try again.");
@@ -94,8 +92,7 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
-      login();
-      syncFromServer().catch(() => {});
+      login(data.user?.id);
       router.push("/dashboard");
     } catch {
       setError("Something went wrong. Please try again.");

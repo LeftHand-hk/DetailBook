@@ -6,9 +6,9 @@ import { isValidEmail } from "@/lib/validation";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password } = body;
+    const { email, password, remember } = body;
 
-    if (!email || !password) {
+    if (typeof email !== "string" || typeof password !== "string" || !email.trim() || !password) {
       return NextResponse.json(
         { error: "Email and password are required" },
         { status: 400 }
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
         secure: cookieSecure(request),
         sameSite: "lax",
         path: "/",
-        maxAge: 60 * 60 * 24 * 30,
+        ...(remember === true ? { maxAge: 60 * 60 * 24 * 30 } : {}),
       });
 
       return response;
