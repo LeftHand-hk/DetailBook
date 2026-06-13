@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getUser, setUserLocal, syncFromServer } from "@/lib/storage";
+import { getUser, setUserLocal } from "@/lib/storage";
 import type { User } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
 
@@ -28,65 +28,45 @@ export default function BookingPageDesignPicker() {
   // Surfaced when a switch fails to persist — so a failed save shows a clear
   // reason instead of the card silently snapping back with no explanation.
   const [saveError, setSaveError] = useState("");
-  // Once the user picks a design, the in-flight background sync below must
-  // not stomp their choice. The sync's GET is issued on mount — BEFORE the
-  // pick is saved — so when it resolves it carries the OLD layout. Writing
-  // that back was the "I click the other design and it snaps back" bug
-  // (most visible switching v2 → classic). After a pick, we trust local
-  // state, which the targeted PUT has already persisted server-side.
-  const userTouched = useRef(false);
 
   useEffect(() => {
+    // Dashboard layout already calls syncFromServer() on every navigation,
+    // so by the time this page mounts the localStorage data is already fresh.
+    // A second syncFromServer() here was firing a redundant GET /api/user
+    // concurrently with the picker's own PUT — that race caused P2024
+    // connection timeouts that made the switch appear to do nothing.
     const u = getUser();
-    if (u) { setUserState(u); if (!userTouched.current) setLayout(((u as any).bookingPageLayout as Layout) || "classic"); setLoaded(true); }
-    syncFromServer().then(() => {
-      const fresh = getUser();
-      if (fresh) { setUserState(fresh); if (!userTouched.current) setLayout(((fresh as any).bookingPageLayout as Layout) || "classic"); }
-      setLoaded(true);
-    }).catch(() => setLoaded(true));
+    if (u) {
+      setUserState(u);
+      setLayout(((u as any).bookingPageLayout as Layout) || "classic");
+    }
+    setLoaded(true);
   }, []);
 
   const choose = async (next: Layout) => {
     if (next === layout || saving) { return; }
-    userTouched.current = true;
     setSaving(next);
     setSaveError("");
     const prev = layout;
-    setLayout(next); // optimistic
+    setLayout(next);
     try {
       const res = await fetch("/api/user", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bookingPageLayout: next }),
-        // Never let a cached response stand in for a real write.
         cache: "no-store",
       });
       const data = await res.json().catch(() => null as any);
       if (!res.ok) {
         setLayout(prev);
-        userTouched.current = false;
-        setSaveError(data?.error || `Couldn't switch design (HTTP ${res.status}). Please try again.`);
+        setSaveError(data?.error || `Failed to switch (${res.status}). Try again.`);
         return;
       }
-      // Confirm the server actually stored the new layout — a 200 with the
-      // wrong value means the write silently didn't take, which is exactly
-      // the "it doesn't switch" symptom. Treat a mismatch as a failure.
-      const savedLayout = data?.user?.bookingPageLayout as Layout | undefined;
-      if (savedLayout && savedLayout !== next) {
-        setLayout(prev);
-        userTouched.current = false;
-        setSaveError("The server didn't save the new design. Please try again.");
-        return;
-      }
-      // Persisted by the PUT above — just keep localStorage in step, without
-      // firing another (whole-user) PUT. Read the freshest cached user so we
-      // don't write a stale snapshot back over a concurrent sync.
       const base = getUser() || user;
       if (base) setUserLocal({ ...base, bookingPageLayout: next } as any);
     } catch {
       setLayout(prev);
-      userTouched.current = false;
-      setSaveError("Network error — couldn't switch design. Please try again.");
+      setSaveError("Network error — couldn't switch design. Try again.");
     } finally {
       setSaving(null);
     }
