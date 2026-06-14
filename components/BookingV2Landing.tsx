@@ -5,6 +5,7 @@ import { VEHICLE_TYPES, type VehicleTypeId, surchargeForVehicleType, packageSupp
 import { VehicleIcon } from "@/components/VehicleIcon";
 import ImageFrameModal, { type FrameValue } from "@/components/ImageFrameModal";
 import { compressAndUploadImage } from "@/lib/image-upload";
+import { saveBookingPageSettings } from "@/lib/booking-page-settings";
 
 // Editorial booking page (v2). Two modes, one component:
 //   • Public (editable=false) — pure display on /book/[slug].
@@ -29,13 +30,14 @@ export type V2Profile = {
   coverImage?: string | null;
   bookingPageTitle?: string | null; bookingPageSubtitle?: string | null;
   accentColor?: string | null; galleryTitle?: string | null;
+  termsText?: string | null;
   pageContent?: Record<string, string> | null;
 };
 
 // Real user columns that have inline-editable slots on this page.
 const REAL_COLS = new Set([
   "businessName", "bookingPageTitle", "bookingPageSubtitle", "bio",
-  "city", "phone", "address", "instagram", "facebook", "website", "galleryTitle",
+  "city", "phone", "address", "instagram", "facebook", "website", "galleryTitle", "termsText",
 ]);
 
 // Default copy for every content-key slot (no DB column). Dynamic ones
@@ -116,6 +118,7 @@ export default function BookingV2Landing({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [savedFlash, setSavedFlash] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const aboutImgInputRef = useRef<HTMLInputElement>(null);
@@ -177,12 +180,9 @@ export default function BookingV2Landing({
         payload.yearsInBusiness = parseInt(payload.yearsInBusiness, 10) || 0;
       }
       if (Object.keys(contentDraft).length) payload.pageContent = { ...pc, ...contentDraft };
-      // Use the established user update path for Modern inline edits. It
-      // already whitelists these fields and omits heavy images in its response.
-      const res = await fetch("/api/user", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setSaveError(data.error || `Could not save (HTTP ${res.status}).`); return;
+      const result = await saveBookingPageSettings(payload);
+      if (!result.ok) {
+        setSaveError(result.error || "Could not save."); return;
       }
       onSaved?.(payload);
       setColDraft({}); setContentDraft({});
@@ -886,11 +886,37 @@ export default function BookingV2Landing({
             )}
           </div>
         </div>
+        {editable && (
+          <div className="max-w-6xl mx-auto mt-10 pt-8 border-t border-stone-200">
+            <label className="block text-xs font-bold uppercase tracking-[0.2em] text-stone-500 mb-3">Terms of service</label>
+            <Field k="termsText" multiline rows={5} editClassName="max-w-3xl text-sm" />
+            <p className="text-xs text-stone-500 mt-2">Customers can open these terms from the bottom of your live booking page.</p>
+          </div>
+        )}
         <div className="max-w-6xl mx-auto pt-10 mt-10 border-t border-stone-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-stone-500">
           <p>© {new Date().getFullYear()} {businessName}. All rights reserved.</p>
-          <p>Booking powered by <span className="text-stone-900 font-semibold">DetailBook</span></p>
+          <div className="flex items-center gap-4">
+            {!editable && textValue("termsText").trim() && (
+              <button type="button" onClick={() => setTermsOpen(true)} className="hover:text-stone-900 underline underline-offset-2">Terms of service</button>
+            )}
+            <p>Booking powered by <span className="text-stone-900 font-semibold">DetailBook</span></p>
+          </div>
         </div>
       </footer>
+
+      {termsOpen && (
+        <div className="fixed inset-0 z-[80] bg-black/60 p-4 flex items-end sm:items-center justify-center" onClick={() => setTermsOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-4 px-5 sm:px-6 py-4 border-b border-stone-200">
+              <h2 className="text-lg font-black text-stone-900">Terms of service</h2>
+              <button type="button" onClick={() => setTermsOpen(false)} className="text-stone-400 hover:text-stone-800 text-2xl leading-none" aria-label="Close terms">&times;</button>
+            </div>
+            <div className="px-5 sm:px-6 py-5 overflow-y-auto max-h-[70vh]">
+              <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">{textValue("termsText")}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

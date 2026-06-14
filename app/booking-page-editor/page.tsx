@@ -134,6 +134,7 @@ export default function BookingPageEditorStandalone() {
           bookingPageSubtitle: u.bookingPageSubtitle,
           accentColor: u.accentColor,
           galleryTitle,
+          termsText: u.termsText,
           pageContent: u.pageContent ?? null,
         }}
         packages={packages}

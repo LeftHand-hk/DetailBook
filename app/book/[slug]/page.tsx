@@ -154,6 +154,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   // into the existing step-based booking flow. Default true so every
   // visitor lands on the marketing page; flipped to false on Book Now.
   const [showLanding, setShowLanding] = useState(true);
+  const [termsOpen, setTermsOpen] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   // True when the logged-in viewer is the owner of this booking page.
   // We use slug equality from the local storage cache — same machine
@@ -844,6 +845,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
           bookingPageSubtitle: u.bookingPageSubtitle,
           accentColor: u.accentColor,
           galleryTitle: u.galleryTitle,
+          termsText: u.termsText,
           pageContent: u.pageContent ?? null,
         }}
         packages={allDisplayPackages as any}
@@ -2818,6 +2820,11 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       {/* Enhancement 7: Powered by badge for Starter only (white-label for Pro) */}
       {!isPro ? (
         <div className="border-t border-gray-100 mt-8 py-6 text-center bg-white">
+          {(user as any)?.termsText && (
+            <button type="button" onClick={() => setTermsOpen(true)} className="block mx-auto mb-3 text-xs font-semibold text-gray-500 hover:text-gray-800 underline underline-offset-2">
+              Terms of service
+            </button>
+          )}
           <p className="text-xs text-gray-400">
             Booking powered by{" "}
             <a href="/" className="font-bold text-blue-600 hover:text-blue-700 transition-colors">
@@ -2826,10 +2833,30 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
           </p>
         </div>
       ) : (
-        <div className="mt-8 py-6" />
+        <div className="mt-8 py-6 text-center">
+          {(user as any)?.termsText && (
+            <button type="button" onClick={() => setTermsOpen(true)} className="text-xs font-semibold text-gray-500 hover:text-gray-800 underline underline-offset-2">
+              Terms of service
+            </button>
+          )}
+        </div>
       )}
 
       {/* Stripe embedded payment modal — booking is created only after success */}
+      {termsOpen && (user as any)?.termsText && (
+        <div className="fixed inset-0 z-[80] bg-black/60 p-4 flex items-end sm:items-center justify-center" onClick={() => setTermsOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-4 px-5 sm:px-6 py-4 border-b border-gray-100">
+              <h2 className="text-lg font-extrabold text-gray-900">Terms of service</h2>
+              <button type="button" onClick={() => setTermsOpen(false)} className="text-gray-400 hover:text-gray-800 text-2xl leading-none" aria-label="Close terms">&times;</button>
+            </div>
+            <div className="px-5 sm:px-6 py-5 overflow-y-auto max-h-[70vh]">
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{(user as any).termsText}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {stripeModalOpen && selectedPackage && pendingStripeBookingData && (
         <StripeDepositModal
           open
