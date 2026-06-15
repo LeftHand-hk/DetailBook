@@ -335,6 +335,7 @@ export async function POST(request: NextRequest) {
     // customer doesn't get a fresh row on every booking. Empty inputs
     // skip the lookup so we don't merge on "no contact info" matches.
     let customerLinkId: string | null = null;
+    let createdCustomerId: string | null = null;
     const normEmail = (customerEmail || "").trim().toLowerCase();
     const normPhone = (customerPhone || "").trim();
     const digitsPhone = normalizePhone(normPhone);
@@ -385,11 +386,67 @@ export async function POST(request: NextRequest) {
           },
         });
         customerLinkId = created.id;
+        createdCustomerId = created.id;
       }
     }
 
-    const booking = await prisma.booking.create({
-      data: {
+    const slotLockKey = `${userId}|${date}|${time}`;
+    let result;
+    try {
+      result = await prisma.$transaction(async (tx) => {
+      const lockRows = await tx.$queryRaw<Array<{ locked: boolean }>>`
+        SELECT pg_try_advisory_xact_lock(hashtext(${slotLockKey})) AS locked
+      `;
+      if (!lockRows[0]?.locked) {
+        if (createdCustomerId) await tx.customer.delete({ where: { id: createdCustomerId } });
+        return {
+          booking: null,
+          duplicate: false,
+          conflict: "That time is being booked right now. Please try another time.",
+        };
+      }
+      const duplicate = await tx.booking.findFirst({
+        where: {
+          userId,
+          customerEmail,
+          date,
+          time,
+          serviceName: finalServiceName,
+          createdAt: { gte: dedupWindow },
+        },
+      });
+      if (duplicate) {
+        if (createdCustomerId) await tx.customer.delete({ where: { id: createdCustomerId } });
+        return { booking: duplicate, duplicate: true, conflict: null };
+      }
+      let transactionStaffId = finalStaffId;
+      if (!isOwnerRequest) {
+        const lockedSlotBookings = await tx.booking.findMany({
+          where: { userId, date, time, status: { in: ["pending", "confirmed", "in_progress"] } },
+          select: { staffId: true },
+        });
+        const slotTaken = transactionStaffId
+          ? lockedSlotBookings.some((locked) => locked.staffId === transactionStaffId)
+          : lockedSlotBookings.length > 0;
+        if (slotTaken && body.staffAutoAssigned === true) {
+          const busyStaff = new Set(lockedSlotBookings.map((locked) => locked.staffId).filter(Boolean));
+          transactionStaffId = (await tx.staff.findMany({
+            where: { userId, active: true },
+            select: { id: true },
+          })).find((member) => !busyStaff.has(member.id))?.id || null;
+        }
+        if (slotTaken && (body.staffAutoAssigned !== true || !transactionStaffId)) {
+          if (createdCustomerId) await tx.customer.delete({ where: { id: createdCustomerId } });
+          return {
+            booking: null,
+            duplicate: false,
+            conflict: "That time was just booked. Please choose another time.",
+          };
+        }
+      }
+
+      const booking = await tx.booking.create({
+        data: {
         userId,
         customerId: customerLinkId,
         customerName,
@@ -412,7 +469,7 @@ export async function POST(request: NextRequest) {
         notes: notes || null,
         address: address || null,
         status: finalStatus,
-        staffId: finalStaffId,
+        staffId: transactionStaffId,
         paymentMethod: body.paymentMethod || "",
         paymentProof: safeProof,
         // Customer-supplied identifier for non-card payments (e.g. their
@@ -424,21 +481,31 @@ export async function POST(request: NextRequest) {
           : null,
         selectedAddons: storedSelectedAddons === null ? undefined : (storedSelectedAddons as any),
         addonsTotal: computedAddonsTotal,
-      },
-    });
-
-    // Finish the notification write before returning so the serverless
-    // runtime cannot freeze its transaction before COMMIT.
-    await prisma.notification.create({
-      data: {
-        userId,
-        type: "booking_new",
-        title: "New booking",
-        message: `${customerName} booked ${booking.serviceName} for ${date} at ${time}`,
-        bookingId: booking.id,
-      },
-      select: { id: true },
-    });
+        },
+      });
+      await tx.notification.create({
+        data: {
+          userId,
+          type: "booking_new",
+          title: "New booking",
+          message: `${customerName} booked ${booking.serviceName} for ${date} at ${time}`,
+          bookingId: booking.id,
+        },
+        select: { id: true },
+      });
+      return { booking, duplicate: false, conflict: null };
+      }, { maxWait: 20_000, timeout: 30_000 });
+    } catch (error) {
+      if (createdCustomerId) {
+        await prisma.customer.deleteMany({
+          where: { id: createdCustomerId, bookings: { none: {} } },
+        }).catch(() => {});
+      }
+      throw error;
+    }
+    if (result.conflict) return NextResponse.json({ error: result.conflict }, { status: 409 });
+    if (result.duplicate) return NextResponse.json(result.booking, { status: 200 });
+    const booking = result.booking!;
 
     // Auto-sync to Google Calendar (non-blocking)
     syncBookingToGoogleCalendar(booking).catch(() => {});

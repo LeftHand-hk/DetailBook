@@ -481,6 +481,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
       address: bookingAddress,
       staffId: assignedStaffId,
       staffName: assignedStaffName,
+      staffAutoAssigned: !selectedStaff && !!assignedStaffId,
       // Only relevant for non-card methods (Cash App today). The server
       // strips a leading $ and trims; empty string is fine for other
       // methods and gets stored as null.
