@@ -165,6 +165,7 @@ model User {
   welcomeEmailLastSentAt  DateTime?
   welcomeEmailsPaused     Boolean   @default(false)
   welcomeUnsubToken       String?   @unique
+  activationRecoveryEmailAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

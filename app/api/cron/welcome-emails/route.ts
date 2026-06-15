@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runWelcomeSequenceTick } from "@/lib/welcome-emails";
+import { runActivationRecoveryTick } from "@/lib/activation-recovery-email";
 
 // Hourly cron — called by cron-job.org. For every user signed up in the
 // last 30 days, dispatches the next welcome email if one is due.
@@ -15,8 +16,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const result = await runWelcomeSequenceTick();
-    return NextResponse.json(result);
+    const [welcomeSequence, activationRecovery] = await Promise.all([
+      runWelcomeSequenceTick(),
+      runActivationRecoveryTick(),
+    ]);
+    return NextResponse.json({ welcomeSequence, activationRecovery });
   } catch (err) {
     console.error("[cron/welcome-emails] error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
