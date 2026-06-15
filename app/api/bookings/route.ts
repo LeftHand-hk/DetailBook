@@ -6,6 +6,7 @@ import { syncBookingToGoogleCalendar } from "@/lib/google-calendar";
 import { sendEmail } from "@/lib/email";
 import { sendSms } from "@/lib/twilio";
 import { normalizePhone } from "@/lib/phone";
+import { verifyBookingPayment } from "@/lib/booking-payment";
 
 export async function GET(request: NextRequest) {
   try {
@@ -93,11 +94,13 @@ export async function POST(request: NextRequest) {
       status,
     } = body;
 
-    // userId can come from body (public booking) or from session (dashboard)
-    let userId = body.userId;
-    if (!userId) {
-      const session = await getSessionUser();
-      if (session) userId = session.id;
+    // Public bookings supply userId. Dashboard bookings use the authenticated
+    // owner session and are allowed to set administrative fields.
+    const session = await getSessionUser();
+    let userId = body.userId || session?.id;
+    const isOwnerRequest = !!session && session.id === userId;
+    if (session && body.userId && body.userId !== session.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     if (!userId || !customerName || !customerEmail || !serviceName || !date || !time) {
@@ -113,16 +116,20 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date)) || !String(time).trim()) {
+      return NextResponse.json({ error: "Enter a valid booking date and time" }, { status: 400 });
+    }
 
-    // Check if business owner's trial/subscription is active
-    const owner = await prisma.user.findUnique({ where: { id: userId }, select: { trialEndsAt: true, subscriptionStatus: true, suspended: true } });
-    if (!owner) {
+    // Load the business once for availability, subscription, deposit, and
+    // notification settings used throughout the booking hot path.
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
       return NextResponse.json({ error: "Business not found" }, { status: 404 });
     }
-    if (owner.suspended) {
+    if (user.suspended) {
       return NextResponse.json({ error: "This business is currently unavailable" }, { status: 403 });
     }
-    if (isTrialExpired(owner)) {
+    if (isTrialExpired(user)) {
       return NextResponse.json({ error: "This business's subscription is inactive" }, { status: 403 });
     }
 
@@ -130,15 +137,6 @@ export async function POST(request: NextRequest) {
     const today = new Date().toISOString().split("T")[0];
     if (date < today) {
       return NextResponse.json({ error: "Cannot book a date in the past" }, { status: 400 });
-    }
-
-    // Verify the target user exists and is not suspended
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-    if (user.suspended) {
-      return NextResponse.json({ error: "This business is not accepting bookings" }, { status: 403 });
     }
 
     // Enforce advance booking window
@@ -165,11 +163,11 @@ export async function POST(request: NextRequest) {
     // base price + vehicle surcharge server-side. We already needed the
     // package to validate add-ons; folding both into a single read keeps
     // the booking write to one DB round-trip on the hot path.
-    let pkgRow: { price: number; addons: unknown; vehiclePricing: unknown; userId: string } | null = null;
+    let pkgRow: { name: string; price: number; addons: unknown; vehiclePricing: unknown; userId: string } | null = null;
     if (serviceId) {
       pkgRow = await prisma.package.findUnique({
         where: { id: serviceId },
-        select: { price: true, addons: true, vehiclePricing: true, userId: true },
+        select: { name: true, price: true, addons: true, vehiclePricing: true, userId: true },
       });
       if (pkgRow && pkgRow.userId !== userId) pkgRow = null; // owner mismatch — ignore
     }
@@ -221,7 +219,15 @@ export async function POST(request: NextRequest) {
       }
       finalServicePrice = pkgRow.price + surchargeForVehicleType(pkgRow.vehiclePricing, vType);
       finalServicePrice = Math.round(finalServicePrice * 100) / 100;
+    } else if (!isOwnerRequest) {
+      return NextResponse.json({ error: "This service is no longer available. Please choose it again." }, { status: 400 });
     }
+
+    const bookingTotal = Math.round((finalServicePrice + computedAddonsTotal) * 100) / 100;
+    const finalServiceName = pkgRow?.name || serviceName;
+    const authoritativeDeposit = user.requireDeposit
+      ? Math.round((bookingTotal * (Number(user.depositPercentage) || 0) / 100) * 100) / 100
+      : 0;
 
     // paymentProof is either a "stripe:<payment_intent_id>" / "square:<payment_id>"
     // reference (set by the embedded card modals after a successful charge) or
@@ -247,6 +253,12 @@ export async function POST(request: NextRequest) {
       safeProof = rawProof;
     }
 
+    let finalStatus = isOwnerRequest && ["pending", "confirmed", "completed", "cancelled"].includes(status)
+      ? status
+      : "pending";
+    let finalDepositPaid = isOwnerRequest
+      ? Math.max(0, Number.parseFloat(String(depositPaid ?? 0)) || 0)
+      : 0;
     // Idempotency guard: if the same customer just submitted the same slot
     // (double-click, network retry, refresh during slow request), return the
     // existing booking instead of creating a duplicate.
@@ -257,12 +269,64 @@ export async function POST(request: NextRequest) {
         customerEmail,
         date,
         time,
-        serviceName,
+        serviceName: finalServiceName,
         createdAt: { gte: dedupWindow },
       },
     });
     if (recentDuplicate) {
       return NextResponse.json(recentDuplicate, { status: 200 });
+    }
+
+    // Re-check the selected slot at write time. The public page's availability
+    // data can become stale while a customer fills out the form.
+    let finalStaffId = typeof body.staffId === "string" && body.staffId ? body.staffId : null;
+    if (!isOwnerRequest) {
+      const activeStaff = await prisma.staff.findMany({
+        where: { userId, active: true },
+        select: { id: true },
+      });
+      if (finalStaffId && !activeStaff.some((member) => member.id === finalStaffId)) {
+        return NextResponse.json({ error: "The selected staff member is no longer available" }, { status: 400 });
+      }
+      const slotBookings = await prisma.booking.findMany({
+        where: {
+          userId,
+          date,
+          time,
+          status: { in: ["pending", "confirmed", "in_progress"] },
+        },
+        select: { staffId: true },
+      });
+      if (activeStaff.length === 0) {
+        if (slotBookings.length > 0) {
+          return NextResponse.json({ error: "That time was just booked. Please choose another time." }, { status: 409 });
+        }
+      } else {
+        const busyStaff = new Set(slotBookings.map((booking) => booking.staffId).filter(Boolean));
+        if (finalStaffId && busyStaff.has(finalStaffId)) {
+          return NextResponse.json({ error: "That staff member was just booked. Please choose another time." }, { status: 409 });
+        }
+        if (!finalStaffId) {
+          finalStaffId = activeStaff.find((member) => !busyStaff.has(member.id))?.id || null;
+          if (!finalStaffId) {
+            return NextResponse.json({ error: "That time was just booked. Please choose another time." }, { status: 409 });
+          }
+        }
+      }
+    }
+
+    // Do the inexpensive availability check before the external processor
+    // verification so stale submissions fail quickly.
+    if (!isOwnerRequest && safeProof && (safeProof.startsWith("stripe:") || safeProof.startsWith("square:"))) {
+      const verification = await verifyBookingPayment(userId, safeProof, authoritativeDeposit);
+      if (!verification.paid) {
+        return NextResponse.json(
+          { error: verification.reason || "Card payment could not be verified" },
+          { status: 402 },
+        );
+      }
+      finalStatus = "confirmed";
+      finalDepositPaid = verification.amount;
     }
 
     // Brief #16: link or auto-create the matching Customer row for
@@ -337,16 +401,18 @@ export async function POST(request: NextRequest) {
         vehicleColor: vColor,
         vehicleType: vType,
         serviceId: serviceId || "",
-        serviceName,
+        serviceName: finalServiceName,
         servicePrice: finalServicePrice,
         date,
         time,
-        depositPaid: depositPaid != null ? parseFloat(String(depositPaid)) : 0,
-        depositRequired: depositRequired != null ? parseFloat(String(depositRequired)) : 0,
+        depositPaid: finalDepositPaid,
+        depositRequired: isOwnerRequest
+          ? Math.max(0, Number.parseFloat(String(depositRequired ?? 0)) || 0)
+          : authoritativeDeposit,
         notes: notes || null,
         address: address || null,
-        status: status || "pending",
-        staffId: body.staffId || null,
+        status: finalStatus,
+        staffId: finalStaffId,
         paymentMethod: body.paymentMethod || "",
         paymentProof: safeProof,
         // Customer-supplied identifier for non-card payments (e.g. their
@@ -368,7 +434,7 @@ export async function POST(request: NextRequest) {
         userId,
         type: "booking_new",
         title: "New booking",
-        message: `${customerName} booked ${serviceName} for ${date} at ${time}`,
+        message: `${customerName} booked ${booking.serviceName} for ${date} at ${time}`,
         bookingId: booking.id,
       },
       select: { id: true },
@@ -386,7 +452,7 @@ export async function POST(request: NextRequest) {
     const eCustomerName = escapeHtml(customerName);
     const eCustomerEmail = escapeHtml(customerEmail);
     const eCustomerPhone = escapeHtml(customerPhone || "");
-    const eServiceName = escapeHtml(serviceName);
+    const eServiceName = escapeHtml(booking.serviceName);
     const eTime = escapeHtml(time);
     const eVYear = escapeHtml(String(vYear));
     const eVMake = escapeHtml(String(vMake));
@@ -404,7 +470,7 @@ export async function POST(request: NextRequest) {
     const addonRowsHtml = (storedSelectedAddons || [])
       .map((a) => `<tr><td style="padding:6px 0;color:#6b7280;">+ ${escapeHtml(a.name)}</td><td style="padding:6px 0;font-weight:600;color:#111827;">$${a.price}</td></tr>`)
       .join("");
-    const grandTotal = (parseFloat(servicePrice) || 0) + computedAddonsTotal;
+    const grandTotal = bookingTotal;
 
     // Collect all email/SMS sends and await them at the end. On Netlify (and
     // any serverless host) the Node runtime is frozen the moment we return
@@ -450,7 +516,7 @@ export async function POST(request: NextRequest) {
           </div>
         </div>`;
       pendingSends.push(
-        sendEmail({ to: user.email, subject: `New Booking: ${customerName} - ${serviceName} on ${formattedDate}`, html: ownerHtml })
+        sendEmail({ to: user.email, subject: `New Booking: ${customerName} - ${booking.serviceName} on ${formattedDate}`, html: ownerHtml })
           .catch((err) => console.error("[booking owner email] threw:", err)),
       );
     }

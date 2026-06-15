@@ -62,8 +62,19 @@ export async function PUT(
     // Handle nested vehicle object from frontend
     const vehicle = body.vehicle;
     const data: Record<string, unknown> = {};
-    if (body.status !== undefined) data.status = body.status;
-    if (body.depositPaid !== undefined) data.depositPaid = parseFloat(body.depositPaid);
+    if (body.status !== undefined) {
+      if (!["pending", "confirmed", "in_progress", "completed", "cancelled"].includes(body.status)) {
+        return NextResponse.json({ error: "Invalid booking status" }, { status: 400 });
+      }
+      data.status = body.status;
+    }
+    if (body.depositPaid !== undefined) {
+      const depositPaid = Number.parseFloat(String(body.depositPaid));
+      if (!Number.isFinite(depositPaid) || depositPaid < 0) {
+        return NextResponse.json({ error: "Deposit paid must be a positive number" }, { status: 400 });
+      }
+      data.depositPaid = depositPaid;
+    }
     if (body.customerName !== undefined) data.customerName = String(body.customerName).trim();
     if (body.customerEmail !== undefined) {
       const customerEmail = String(body.customerEmail).trim().toLowerCase();
@@ -73,8 +84,17 @@ export async function PUT(
       data.customerEmail = customerEmail;
     }
     if (body.customerPhone !== undefined) data.customerPhone = String(body.customerPhone).trim();
-    if (body.date !== undefined) data.date = body.date;
-    if (body.time !== undefined) data.time = body.time;
+    if (body.date !== undefined) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.date))) {
+        return NextResponse.json({ error: "Invalid booking date" }, { status: 400 });
+      }
+      data.date = body.date;
+    }
+    if (body.time !== undefined) {
+      const time = String(body.time).trim();
+      if (!time) return NextResponse.json({ error: "Booking time is required" }, { status: 400 });
+      data.time = time;
+    }
     if (body.notes !== undefined) data.notes = body.notes;
     if (body.address !== undefined) data.address = body.address;
     // Final-invoice line items. The owner can add extra charges after the
@@ -97,7 +117,16 @@ export async function PUT(
     if (body.vehicleModel !== undefined) data.vehicleModel = body.vehicleModel;
     if (body.vehicleYear !== undefined) data.vehicleYear = body.vehicleYear;
     if (body.vehicleColor !== undefined) data.vehicleColor = body.vehicleColor;
-    if (body.staffId !== undefined) data.staffId = body.staffId || null;
+    if (body.staffId !== undefined) {
+      if (body.staffId) {
+        const staff = await prisma.staff.findFirst({
+          where: { id: body.staffId, userId: session.id, active: true },
+          select: { id: true },
+        });
+        if (!staff) return NextResponse.json({ error: "Invalid staff member" }, { status: 400 });
+      }
+      data.staffId = body.staffId || null;
+    }
 
     // Atomic status-transition guard: if we're moving to "confirmed",
     // only one concurrent request should "win" the transition. updateMany

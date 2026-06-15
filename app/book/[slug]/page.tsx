@@ -2057,6 +2057,16 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                 ? `Continue \u2192 ${selectedTime}`
                 : "Select a date and time"}
             </button>
+            <button
+              type="button"
+              onClick={() => setStep(0)}
+              className="w-full mt-2 text-gray-500 hover:text-gray-800 text-sm font-semibold py-3 transition-colors flex items-center justify-center gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to services
+            </button>
           </div>
         )}
 
@@ -2481,6 +2491,17 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
               </button>
                 );
               })()}
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                disabled={submitting}
+                className="w-full text-gray-500 hover:text-gray-800 disabled:opacity-50 text-sm font-semibold py-3 transition-colors flex items-center justify-center gap-1.5"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back to date and time
+              </button>
 
               <p className="text-center text-gray-400 text-xs leading-relaxed">
                 By booking, you agree to our cancellation policy. Deposits are fully refundable up to 24 hours before your appointment.

@@ -40,9 +40,13 @@ export async function POST(request: NextRequest) {
       if (!stripe) return NextResponse.json({ paid: false, reason: "Stripe not configured" });
       try {
         const intent = await stripe.paymentIntents.retrieve(refId);
-        if (intent.status === "succeeded") {
+        if (
+          intent.status === "succeeded"
+          && intent.metadata?.userId === booking.userId
+          && intent.amount_received / 100 + 0.001 >= booking.depositRequired
+        ) {
           paid = true;
-          paidAmount = intent.amount > 0 ? intent.amount / 100 : booking.depositRequired;
+          paidAmount = intent.amount_received > 0 ? intent.amount_received / 100 : booking.depositRequired;
         }
       } catch (e) {
         console.error("[verify] Stripe retrieve failed:", e);
@@ -52,7 +56,7 @@ export async function POST(request: NextRequest) {
       if (!cfg?.accessToken) return NextResponse.json({ paid: false, reason: "Square not configured" });
       // Look up payments tied to this order — Square pays the order via one or more payments.
       const r = await fetch(
-        `${squareApiBase(!!cfg.sandbox)}/v2/payments?order_id=${refId}&limit=10`,
+        `${squareApiBase(!!cfg.sandbox)}/v2/payments/${encodeURIComponent(refId)}`,
         {
           headers: {
             Authorization: `Bearer ${cfg.accessToken}`,
@@ -63,10 +67,11 @@ export async function POST(request: NextRequest) {
       );
       if (r.ok) {
         const j = await r.json();
-        const payments: any[] = j?.payments || [];
-        const completed = payments.find(
-          (p) => p.status === "COMPLETED" || p.status === "APPROVED" || p.status === "CAPTURED"
-        );
+        const payment = j?.payment;
+        const completed = ["COMPLETED", "APPROVED", "CAPTURED"].includes(payment?.status)
+          && Number(payment?.total_money?.amount || 0) / 100 + 0.001 >= booking.depositRequired
+          ? payment
+          : null;
         if (completed) {
           const cents = completed?.total_money?.amount || 0;
           paid = true;
