@@ -72,7 +72,7 @@ export async function GET(
             lte: futureDate.toISOString().split("T")[0],
           },
         },
-        select: { date: true, time: true, staffId: true },
+        select: { date: true, time: true, staffId: true, serviceId: true },
       }),
       prisma.$queryRaw<Array<{ hasLogo: boolean; hasBanner: boolean; hasCover: boolean }>>`
         SELECT (logo IS NOT NULL AND logo <> '' AND logo NOT LIKE '/api/%') AS "hasLogo",
@@ -146,7 +146,10 @@ export async function GET(
       reviewsShowStars: (user as any).reviewsShowStars ?? true,
       reviewsShowAvatars: (user as any).reviewsShowAvatars ?? true,
       reviewsShowDates: (user as any).reviewsShowDates ?? true,
-      bookedSlots,
+      bookedSlots: bookedSlots.map((slot) => ({
+        ...slot,
+        duration: user.packages.find((pkg) => pkg.id === slot.serviceId)?.duration || 60,
+      })),
       // Expose payment methods (strip secret keys for security)
       paymentMethods: (() => {
         const pm = user.paymentMethods as any;

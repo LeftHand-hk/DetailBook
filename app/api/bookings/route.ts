@@ -7,6 +7,7 @@ import { sendEmail } from "@/lib/email";
 import { sendSms } from "@/lib/twilio";
 import { normalizePhone } from "@/lib/phone";
 import { verifyBookingPayment } from "@/lib/booking-payment";
+import { bookingTimesOverlap } from "@/lib/booking-overlap";
 
 export async function GET(request: NextRequest) {
   try {
@@ -163,11 +164,11 @@ export async function POST(request: NextRequest) {
     // base price + vehicle surcharge server-side. We already needed the
     // package to validate add-ons; folding both into a single read keeps
     // the booking write to one DB round-trip on the hot path.
-    let pkgRow: { name: string; price: number; addons: unknown; vehiclePricing: unknown; userId: string } | null = null;
+    let pkgRow: { name: string; price: number; duration: number; addons: unknown; vehiclePricing: unknown; userId: string } | null = null;
     if (serviceId) {
       pkgRow = await prisma.package.findUnique({
         where: { id: serviceId },
-        select: { name: true, price: true, addons: true, vehiclePricing: true, userId: true },
+        select: { name: true, price: true, duration: true, addons: true, vehiclePricing: true, userId: true },
       });
       if (pkgRow && pkgRow.userId !== userId) pkgRow = null; // owner mismatch — ignore
     }
@@ -225,6 +226,7 @@ export async function POST(request: NextRequest) {
 
     const bookingTotal = Math.round((finalServicePrice + computedAddonsTotal) * 100) / 100;
     const finalServiceName = pkgRow?.name || serviceName;
+    const finalDuration = pkgRow?.duration || 60;
     const authoritativeDeposit = user.requireDeposit
       ? Math.round((bookingTotal * (Number(user.depositPercentage) || 0) / 100) * 100) / 100
       : 0;
@@ -390,7 +392,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const slotLockKey = `${userId}|${date}|${time}`;
+    const slotLockKey = `${userId}|${date}`;
     let result;
     try {
       result = await prisma.$transaction(async (tx) => {
@@ -422,14 +424,22 @@ export async function POST(request: NextRequest) {
       let transactionStaffId = finalStaffId;
       if (!isOwnerRequest) {
         const lockedSlotBookings = await tx.booking.findMany({
-          where: { userId, date, time, status: { in: ["pending", "confirmed", "in_progress"] } },
-          select: { staffId: true },
+          where: { userId, date, status: { in: ["pending", "confirmed", "in_progress"] } },
+          select: { staffId: true, time: true, serviceId: true },
         });
+        const packageIds = Array.from(new Set(lockedSlotBookings.map((booking) => booking.serviceId).filter(Boolean)));
+        const durations = new Map((await tx.package.findMany({
+          where: { id: { in: packageIds }, userId },
+          select: { id: true, duration: true },
+        })).map((pkg) => [pkg.id, pkg.duration]));
+        const overlappingBookings = lockedSlotBookings.filter((booking) =>
+          bookingTimesOverlap(time, finalDuration, booking.time, durations.get(booking.serviceId) || 60)
+        );
         const slotTaken = transactionStaffId
-          ? lockedSlotBookings.some((locked) => locked.staffId === transactionStaffId)
-          : lockedSlotBookings.length > 0;
+          ? overlappingBookings.some((locked) => locked.staffId === transactionStaffId)
+          : overlappingBookings.length > 0;
         if (slotTaken && body.staffAutoAssigned === true) {
-          const busyStaff = new Set(lockedSlotBookings.map((locked) => locked.staffId).filter(Boolean));
+          const busyStaff = new Set(overlappingBookings.map((locked) => locked.staffId).filter(Boolean));
           transactionStaffId = (await tx.staff.findMany({
             where: { userId, active: true },
             select: { id: true },

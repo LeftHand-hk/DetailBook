@@ -11,6 +11,7 @@ import PublicReviews, { type PublicReview } from "@/components/PublicReviews";
 import { VEHICLE_TYPES, type VehicleTypeId, surchargeForVehicleType, packageSupportsVehicleType } from "@/lib/vehicle-pricing";
 import { VehicleIcon } from "@/components/VehicleIcon";
 import BookingV2Landing from "@/components/BookingV2Landing";
+import { bookingTimesOverlap } from "@/lib/booking-overlap";
 
 const TIMES = [
   "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM",
@@ -191,7 +192,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   const [serviceType, setServiceType] = useState<"mobile" | "shop" | "both">("mobile");
   const [customerAddress, setCustomerAddress] = useState("");
   const [selectedServiceMode, setSelectedServiceMode] = useState<"mobile" | "shop" | null>(null);
-  const [bookedSlots, setBookedSlots] = useState<{ date: string; time: string; staffId: string | null }[]>([]);
+  const [bookedSlots, setBookedSlots] = useState<{ date: string; time: string; staffId: string | null; duration: number }[]>([]);
   const [photos, setPhotos] = useState<PublicPhoto[]>([]);
   const [reviews, setReviews] = useState<PublicReview[]>([]);
   // Customer-chosen vehicle size. Only shown when at least one of the
@@ -340,16 +341,16 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   // Check if a time slot is available for the selected date + staff
   const isTimeBooked = (time: string): boolean => {
     if (!selectedDate) return false;
+    const overlaps = (slot: typeof bookedSlots[number]) =>
+      slot.date === selectedDate
+      && bookingTimesOverlap(time, selectedPackage?.duration || 60, slot.time, slot.duration || 60);
     if (selectedStaff) {
-      // Specific staff selected — blocked if that staff has a booking
-      return bookedSlots.some((s) => s.date === selectedDate && s.time === time && s.staffId === selectedStaff.id);
+      return bookedSlots.some((slot) => overlaps(slot) && slot.staffId === selectedStaff.id);
     }
     if (staffList.length === 0) {
-      // No staff — just check if any booking exists at that time for this business
-      return bookedSlots.some((s) => s.date === selectedDate && s.time === time);
+      return bookedSlots.some(overlaps);
     }
-    // "Any available" — blocked only if ALL staff members are booked at that time
-    const staffWithBooking = bookedSlots.filter((s) => s.date === selectedDate && s.time === time).map((s) => s.staffId);
+    const staffWithBooking = bookedSlots.filter(overlaps).map((slot) => slot.staffId);
     return staffList.every((st) => staffWithBooking.includes(st.id));
   };
 
@@ -359,7 +360,12 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     if (selectedStaff) return selectedStaff.id;
     // Find staff not booked at this time
     const bookedAtTime = bookedSlots
-      .filter((s) => s.date === selectedDate && s.time === selectedTime)
+      .filter((slot) => slot.date === selectedDate && bookingTimesOverlap(
+        selectedTime,
+        selectedPackage?.duration || 60,
+        slot.time,
+        slot.duration || 60,
+      ))
       .map((s) => s.staffId);
     const available = staffList.filter((st) => !bookedAtTime.includes(st.id));
     if (available.length === 0) return undefined;
@@ -2250,7 +2256,11 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
                     {staffList.filter((member) => {
                       // Hide staff who are booked at the selected date+time
                       if (!selectedDate || !selectedTime) return true;
-                      return !bookedSlots.some((s) => s.date === selectedDate && s.time === selectedTime && s.staffId === member.id);
+                      return !bookedSlots.some((slot) =>
+                        slot.date === selectedDate
+                        && slot.staffId === member.id
+                        && bookingTimesOverlap(selectedTime, selectedPackage?.duration || 60, slot.time, slot.duration || 60)
+                      );
                     }).map((member) => (
                       <button
                         key={member.id}
