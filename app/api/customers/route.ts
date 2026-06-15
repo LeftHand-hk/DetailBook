@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
-import { linkOrphanBookings } from "@/lib/customer-linking";
-import { normalizePhone } from "@/lib/phone";
+import { findMatchingCustomer, linkOrphanBookings } from "@/lib/customer-linking";
+import { buildCustomerMetrics } from "@/lib/customer-metrics";
+import { isValidEmail } from "@/lib/validation";
 
 // GET  /api/customers              — list customers for the logged-in
 //                                    business with optional ?search=
@@ -48,36 +49,10 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  const byCustomerId = new Map<string, typeof allBookings>();
-  const byEmail = new Map<string, typeof allBookings>();
-  const byPhone = new Map<string, typeof allBookings>();
-  const addToIndex = (index: Map<string, typeof allBookings>, key: string, booking: typeof allBookings[number]) => {
-    if (!key) return;
-    const current = index.get(key);
-    if (current) current.push(booking);
-    else index.set(key, [booking]);
-  };
-  for (const booking of allBookings) {
-    if (booking.customerId) addToIndex(byCustomerId, booking.customerId, booking);
-    addToIndex(byEmail, (booking.customerEmail || "").toLowerCase(), booking);
-    addToIndex(byPhone, normalizePhone(booking.customerPhone), booking);
-  }
+  const metrics = buildCustomerMetrics(rows, allBookings);
 
   const list = rows.map((c) => {
-    const matchEmail = (c.email || "").toLowerCase();
-    const matchPhone = normalizePhone(c.phone);
-    const matches = Array.from(new Map([
-      ...(byCustomerId.get(c.id) || []),
-      ...(matchEmail ? byEmail.get(matchEmail) || [] : []),
-      ...(matchPhone ? byPhone.get(matchPhone) || [] : []),
-    ].map((booking) => [booking.id, booking])).values());
-    const latest = matches.sort((a, b) =>
-      (b.date || "").localeCompare(a.date || "")
-      || b.createdAt.getTime() - a.createdAt.getTime()
-    )[0];
-    const totalSpent = matches
-      .filter((b) => b.status === "completed")
-      .reduce((sum, b) => sum + (b.servicePrice || 0) + (b.addonsTotal || 0), 0);
+    const metric = metrics.get(c.id)!;
     return {
       id: c.id,
       firstName: c.firstName,
@@ -89,10 +64,7 @@ export async function GET(request: NextRequest) {
       vehicleModel: c.vehicleModel,
       vehicleYear: c.vehicleYear,
       vehicleColor: c.vehicleColor,
-      totalBookings: matches.length,
-      totalSpent,
-      lastBookingDate: latest?.date || null,
-      lastService: latest?.serviceName || null,
+      ...metric,
       createdAt: c.createdAt,
     };
   });
@@ -122,6 +94,12 @@ export async function POST(request: NextRequest) {
   const phone = String(body.phone || "").trim() || null;
   if (!email && !phone) {
     return NextResponse.json({ error: "Email or phone is required" }, { status: 400 });
+  }
+  if (email && !isValidEmail(email)) {
+    return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });
+  }
+  if (await findMatchingCustomer(session.id, email, phone)) {
+    return NextResponse.json({ error: "A customer with this email or phone already exists" }, { status: 409 });
   }
 
   const created = await prisma.customer.create({

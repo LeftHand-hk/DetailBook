@@ -3,6 +3,8 @@ import prisma from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { sendEmail } from "@/lib/email";
 import { sendSms } from "@/lib/twilio";
+import { syncBookingCustomer } from "@/lib/customer-linking";
+import { isValidEmail } from "@/lib/validation";
 
 export async function GET(
   request: NextRequest,
@@ -62,9 +64,15 @@ export async function PUT(
     const data: Record<string, unknown> = {};
     if (body.status !== undefined) data.status = body.status;
     if (body.depositPaid !== undefined) data.depositPaid = parseFloat(body.depositPaid);
-    if (body.customerName !== undefined) data.customerName = body.customerName;
-    if (body.customerEmail !== undefined) data.customerEmail = body.customerEmail;
-    if (body.customerPhone !== undefined) data.customerPhone = body.customerPhone;
+    if (body.customerName !== undefined) data.customerName = String(body.customerName).trim();
+    if (body.customerEmail !== undefined) {
+      const customerEmail = String(body.customerEmail).trim().toLowerCase();
+      if (customerEmail && !isValidEmail(customerEmail)) {
+        return NextResponse.json({ error: "Enter a valid customer email address" }, { status: 400 });
+      }
+      data.customerEmail = customerEmail;
+    }
+    if (body.customerPhone !== undefined) data.customerPhone = String(body.customerPhone).trim();
     if (body.date !== undefined) data.date = body.date;
     if (body.time !== undefined) data.time = body.time;
     if (body.notes !== undefined) data.notes = body.notes;
@@ -120,6 +128,15 @@ export async function PUT(
     });
     if (!updated) {
       return NextResponse.json({ error: "Booking disappeared" }, { status: 500 });
+    }
+    const customerFieldsChanged = [
+      "customerName", "customerEmail", "customerPhone",
+      "vehicleMake", "vehicleModel", "vehicleYear", "vehicleColor", "vehicle",
+    ].some((field) => body[field] !== undefined);
+    if (customerFieldsChanged) {
+      await syncBookingCustomer(session.id, updated).catch((error) => {
+        console.error("Failed to sync booking customer:", error);
+      });
     }
 
     // Send confirmation email + SMS when status changes to "confirmed".

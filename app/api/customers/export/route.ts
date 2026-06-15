@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
+import { buildCustomerMetrics } from "@/lib/customer-metrics";
 
 // GET /api/customers/export — full customer list as CSV. Columns:
 // First Name, Last Name, Email, Phone, Total Bookings, Total Spent,
@@ -19,30 +20,31 @@ export async function GET() {
 
   const rows = await prisma.customer.findMany({
     where: { userId: session.id },
-    include: {
-      _count: { select: { bookings: true } },
-      bookings: {
-        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-        select: { date: true, serviceName: true, servicePrice: true, addonsTotal: true, status: true },
-      },
-    },
     orderBy: { firstName: "asc" },
   });
+  const bookings = await prisma.booking.findMany({
+    where: { userId: session.id },
+    select: {
+      id: true, customerId: true, customerEmail: true, customerPhone: true,
+      date: true, serviceName: true, servicePrice: true, addonsTotal: true,
+      status: true, createdAt: true,
+    },
+  });
+  const metrics = buildCustomerMetrics(rows, bookings);
 
   const header = ["First Name", "Last Name", "Email", "Phone", "Total Bookings", "Total Spent", "Last Booking Date", "Last Service"];
   const lines = [header.map(csvField).join(",")];
   for (const c of rows) {
+    const metric = metrics.get(c.id)!;
     lines.push([
       c.firstName,
       c.lastName || "",
       c.email || "",
       c.phone || "",
-      c._count.bookings,
-      c.bookings
-        .filter((b) => b.status === "completed")
-        .reduce((sum, b) => sum + (b.servicePrice || 0) + (b.addonsTotal || 0), 0),
-      c.bookings[0]?.date || "",
-      c.bookings[0]?.serviceName || "",
+      metric.totalBookings,
+      metric.totalSpent,
+      metric.lastBookingDate || "",
+      metric.lastService || "",
     ].map(csvField).join(","));
   }
   const csv = lines.join("\r\n");

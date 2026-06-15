@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { normalizePhone } from "@/lib/phone";
-import { linkOrphanBookings } from "@/lib/customer-linking";
+import { findMatchingCustomer, linkOrphanBookings } from "@/lib/customer-linking";
+import { isValidEmail } from "@/lib/validation";
 
 // GET   /api/customers/[id]  — single customer + booking history + total spent
 // PATCH /api/customers/[id]  — update any editable field
@@ -94,17 +95,31 @@ export async function PATCH(
       const cleaned = v.trim();
       if (k === "email") data.email = cleaned ? cleaned.toLowerCase() : null;
       else if (k === "firstName") {
-        if (!cleaned) continue; // required — don't blank it
+        if (!cleaned) return NextResponse.json({ error: "First name is required" }, { status: 400 });
         data.firstName = cleaned;
       } else {
         data[k] = cleaned || null;
       }
     } else if (v === null) {
+      if (k === "firstName") {
+        return NextResponse.json({ error: "First name is required" }, { status: 400 });
+      }
       data[k] = null;
     }
   }
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+  }
+  const nextEmail = data.email !== undefined ? data.email as string | null : owned.email;
+  const nextPhone = data.phone !== undefined ? data.phone as string | null : owned.phone;
+  if (!nextEmail && !nextPhone) {
+    return NextResponse.json({ error: "Email or phone is required" }, { status: 400 });
+  }
+  if (nextEmail && !isValidEmail(nextEmail)) {
+    return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });
+  }
+  if (await findMatchingCustomer(session.id, nextEmail, nextPhone, id)) {
+    return NextResponse.json({ error: "A customer with this email or phone already exists" }, { status: 409 });
   }
   const updated = await prisma.customer.update({ where: { id }, data });
   await linkOrphanBookings(session.id, updated.id, updated.email, updated.phone).catch(() => 0);

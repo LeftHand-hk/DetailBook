@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { linkOrphanBookings } from "@/lib/customer-linking";
 import { normalizePhone } from "@/lib/phone";
+import { isValidEmail } from "@/lib/validation";
 
 // POST /api/customers/import
 // Body: { rows: Array<{ firstName, lastName?, email?, phone?, ... }> }
@@ -99,6 +100,7 @@ export async function POST(request: NextRequest) {
     if (!firstName && !email && !phone) { skipped++; continue; }
     if (!firstName) { failures.push({ row: i + 1, reason: "missing first name" }); continue; }
     if (!email && !phone) { failures.push({ row: i + 1, reason: "needs email or phone" }); continue; }
+    if (email && !isValidEmail(email)) { failures.push({ row: i + 1, reason: "invalid email" }); continue; }
 
     // Dedup against existing rows AND earlier rows in this same batch.
     if (email && emailSet.has(email))   { skipped++; continue; }

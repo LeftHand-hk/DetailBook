@@ -96,6 +96,7 @@ function money(n: number): string {
 export default function CustomersPage() {
   const [rows, setRows] = useState<CustomerRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortKey>("name");
   const [page, setPage] = useState(0);
@@ -107,17 +108,23 @@ export default function CustomersPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [showImport, setShowImport] = useState(false);
 
   const fetchRows = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
       if (sort)   params.set("sort", sort);
       const r = await fetch(`/api/customers?${params.toString()}`, { cache: "no-store" });
-      const data = r.ok ? await r.json() : [];
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || "Could not load customers");
       setRows(Array.isArray(data) ? data : []);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Could not load customers");
     } finally {
       setLoading(false);
     }
@@ -197,15 +204,38 @@ export default function CustomersPage() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    await fetch(`/api/customers/${deleteId}`, { method: "DELETE" });
-    setDeleteId(null);
-    await fetchRows();
-    emit("detailbook:customers-changed");
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const response = await fetch(`/api/customers/${deleteId}`, { method: "DELETE" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setDeleteError(data.error || "Delete failed");
+        return;
+      }
+      setDeleteId(null);
+      await fetchRows();
+      emit("detailbook:customers-changed");
+    } catch {
+      setDeleteError("Network error.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleExport = () => {
     window.location.href = "/api/customers/export";
   };
+
+  if (!loading && loadError) {
+    return (
+      <div className="p-4 sm:p-8 max-w-3xl mx-auto">
+        <h1 className="text-3xl font-black tracking-tight text-gray-900">Customers</h1>
+        <div className="mt-6 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">{loadError}</div>
+        <button onClick={fetchRows} className="mt-4 px-4 py-2 bg-gray-900 text-white text-sm font-bold rounded-xl">Try again</button>
+      </div>
+    );
+  }
 
   if (!loading && rows.length === 0 && !search) {
     return (
@@ -451,9 +481,10 @@ export default function CustomersPage() {
           <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
             <h3 className="text-base font-extrabold text-gray-900 mb-2">Delete this customer?</h3>
             <p className="text-sm text-gray-500 mb-5">Their bookings stay — the link to this customer record is just removed.</p>
+            {deleteError && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">{deleteError}</div>}
             <div className="flex justify-end gap-2">
-              <button onClick={() => setDeleteId(null)} className="px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 rounded-xl">Cancel</button>
-              <button onClick={handleDelete} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-xl">Delete</button>
+              <button onClick={() => { setDeleteId(null); setDeleteError(null); }} disabled={deleting} className="px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 rounded-xl disabled:opacity-50">Cancel</button>
+              <button onClick={handleDelete} disabled={deleting} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-xl disabled:opacity-50">{deleting ? "Deleting..." : "Delete"}</button>
             </div>
           </div>
         </div>
