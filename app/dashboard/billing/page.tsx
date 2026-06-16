@@ -11,6 +11,7 @@ interface UserData {
   subscriptionStatus?: string;
   trialEndsAt?: string;
   suspended?: boolean;
+  paddleSubscriptionId?: string | null;
 }
 
 interface CardInfo {
@@ -300,8 +301,9 @@ export default function BillingPage() {
       // (correctly) reject the request, so first-time subscribers must
       // go through Paddle Checkout.
       const localStatus = (user.subscriptionStatus || "").toLowerCase();
-      const hasLinkedSub = Boolean((user as any).paddleSubscriptionId)
-        && !["canceled", "expired"].includes(localStatus);
+      const hasPaddleSub = Boolean(user.paddleSubscriptionId);
+      const hasLinkedSub = hasPaddleSub
+        && !["canceled", "expired", "past_due"].includes(localStatus);
 
       const trimmedCode = discountCode.trim();
 
@@ -324,6 +326,45 @@ export default function BillingPage() {
 
       // No active sub — open Paddle Checkout for first-time purchase
       // or for canceled/suspended users reactivating.
+      // Expired/past-due accounts may still have a Paddle subscription
+      // with a saved payment method or an overdue transaction. Try that
+      // recovery path before opening a brand-new checkout.
+      if (hasPaddleSub) {
+        const res = await fetch("/api/subscription/reactivate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan, discountCode: trimmedCode || undefined }),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          setChangePlanError(data.error || "Could not retry your payment. Please contact support.");
+          return;
+        }
+
+        if (data.action === "activated") {
+          if (data.user) setUser(data.user);
+          setActivateSuccess(true);
+          if (typeof window !== "undefined") {
+            setTimeout(() => window.location.reload(), 500);
+          }
+          return;
+        }
+
+        if (data.action === "checkout_transaction" && data.transactionId) {
+          if (!paddle) {
+            setChangePlanError("Payment system is still loading. Please wait a moment and try again.");
+            return;
+          }
+          pendingPlanRef.current = plan;
+          checkoutIntentRef.current = "subscribe";
+          setWaitTimedOut(false);
+          setActivateSuccess(false);
+          paddle.Checkout.open({ transactionId: data.transactionId });
+          return;
+        }
+      }
+
       const priceId = plan === "pro"
         ? process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID
         : process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
