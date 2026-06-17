@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import { VEHICLE_TYPES, type VehicleTypeId } from "@/lib/vehicle-pricing";
@@ -11,7 +11,7 @@ import type { PackageVehiclePricing, User } from "@/types";
 const STEPS = [
   { label: "Business", title: "Set up your business", note: "What customers see first." },
   { label: "Package", title: "Create your first package", note: "One service is enough to go live." },
-  { label: "Link", title: "Your booking page is ready", note: "Share it or customize it later." },
+  { label: "Go live", title: "Your booking page is ready", note: "Share it or customize it later." },
 ];
 
 const US_STATES = [
@@ -51,7 +51,7 @@ const defaultVehiclePricing = (): PackageVehiclePricing[] => (
   VEHICLE_TYPES.map((vehicle) => ({ type: vehicle.id, surcharge: 0 }))
 );
 
-const INPUT_CLASS = "w-full h-11 px-3.5 bg-white border border-gray-200 rounded-xl text-gray-950 text-sm placeholder-gray-400 outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
+const INPUT_CLASS = "w-full h-12 px-4 bg-white border border-gray-200 rounded-2xl text-gray-950 text-[15px] placeholder-gray-400 outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -288,78 +288,81 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f7fb] text-gray-950">
-      <header className="bg-white/85 backdrop-blur border-b border-gray-200 px-4 py-3 sticky top-0 z-20">
-        <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
+    <div className="relative isolate min-h-screen overflow-x-hidden bg-gradient-to-b from-slate-50 via-[#f4f7fb] to-blue-50 text-gray-950">
+      {/* Soft decorative background */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <div className="absolute -top-24 -left-20 h-72 w-72 rounded-full bg-blue-300/30 blur-3xl" />
+        <div className="absolute top-1/3 -right-24 h-80 w-80 rounded-full bg-indigo-300/25 blur-3xl" />
+        <div className="absolute bottom-0 left-1/4 h-72 w-72 rounded-full bg-cyan-200/25 blur-3xl" />
+      </div>
+
+      <header className="sticky top-0 z-20 border-b border-white/60 bg-white/70 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-2xl items-center justify-between gap-4 px-4 py-3">
           <Logo size="sm" href="/" darkText />
-          <div className="flex items-center gap-2 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-3 py-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
-            Quick setup
-          </div>
+          <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50/80 px-3 py-1.5 text-xs font-bold text-blue-700">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-600" />
+            Step {Math.min(step + 1, STEPS.length)} of {STEPS.length}
+          </span>
         </div>
       </header>
 
-      <main className="px-4 py-6 sm:py-8">
-        <div className="max-w-2xl mx-auto">
-          <div className="mb-4 grid grid-cols-3 gap-2 animate-fadeIn">
-            {STEPS.map((item, index) => (
-              <div
-                key={item.label}
-                className={`rounded-2xl px-3 py-2.5 border transition-all ${
-                  index === step
-                    ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100"
-                    : index < step
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-                    : "bg-white text-gray-400 border-gray-200"
-                }`}
-              >
-                <p className="text-[10px] font-black">0{index + 1}</p>
-                <p className="text-xs font-bold">{item.label}</p>
-              </div>
-            ))}
-          </div>
-          <section className="rounded-3xl bg-white border border-gray-200 shadow-xl shadow-blue-950/5 overflow-hidden animate-fadeInUp">
-            <div className="px-5 sm:px-6 py-5 border-b border-gray-100">
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-blue-600">{currentStep.label}</p>
-              <div className="mt-2 flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-black leading-tight">{currentStep.title}</h2>
-                  <p className="mt-1 text-sm text-gray-500">{currentStep.note}</p>
-                </div>
-                <span className="hidden sm:flex w-10 h-10 rounded-2xl bg-blue-50 text-blue-700 items-center justify-center text-sm font-black">
-                  0{step + 1}
+      <main className="px-4 pb-16 pt-5 sm:pt-8">
+        <div className="mx-auto max-w-2xl">
+          <Stepper step={step} />
+
+          <section className="mt-5 animate-fadeInUp overflow-hidden rounded-3xl border border-white/80 bg-white shadow-xl shadow-blue-950/[0.06]">
+            {/* Card header with gradient accent */}
+            <div className="relative border-b border-gray-100 bg-gradient-to-br from-blue-50 via-white to-white px-5 py-5 sm:px-7 sm:py-6">
+              <div className="flex items-center gap-3.5">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-300/50">
+                  <StepIcon step={step} />
                 </span>
+                <div className="min-w-0">
+                  <h1 className="text-xl font-black leading-tight sm:text-2xl">{currentStep.title}</h1>
+                  <p className="mt-0.5 text-sm text-gray-500">{currentStep.note}</p>
+                </div>
               </div>
             </div>
 
             {step === 0 && (
-              <form onSubmit={handleBusinessSubmit} className="p-5 sm:p-6 space-y-5 animate-fadeIn">
+              <form onSubmit={handleBusinessSubmit} className="animate-fadeIn space-y-6 p-5 sm:p-7">
                 <div>
-                  <p className="text-sm font-black mb-2">How do you operate?</p>
-                  <div className="grid sm:grid-cols-3 gap-2.5">
+                  <SectionLabel>How do you operate?</SectionLabel>
+                  <div className="grid gap-2.5 sm:grid-cols-3">
                     {([
                       { value: "mobile", label: "Mobile", desc: "I go to customers" },
                       { value: "shop", label: "Shop", desc: "Customers come in" },
                       { value: "both", label: "Both", desc: "Mobile and shop" },
-                    ] as const).map((item) => (
-                      <button
-                        key={item.value}
-                        type="button"
-                        onClick={() => setBizForm({ ...bizForm, serviceType: item.value })}
-                        className={`group min-h-[74px] rounded-2xl border-2 p-3 text-left transition-all hover:-translate-y-0.5 ${
-                          bizForm.serviceType === item.value
-                            ? "border-blue-600 bg-blue-50 shadow-md shadow-blue-100"
-                            : "border-gray-200 bg-gray-50 hover:bg-white hover:border-blue-200"
-                        }`}
-                      >
-                        <p className="text-sm font-black">{item.label}</p>
-                        <p className="text-xs text-gray-500">{item.desc}</p>
-                      </button>
-                    ))}
+                    ] as const).map((item) => {
+                      const active = bizForm.serviceType === item.value;
+                      return (
+                        <button
+                          key={item.value}
+                          type="button"
+                          onClick={() => setBizForm({ ...bizForm, serviceType: item.value })}
+                          aria-pressed={active}
+                          className={`group flex items-center gap-3 rounded-2xl border-2 p-3.5 text-left transition-all active:scale-[0.98] sm:flex-col sm:items-start sm:gap-2.5 ${
+                            active
+                              ? "border-blue-600 bg-blue-50 shadow-md shadow-blue-100"
+                              : "border-gray-200 bg-gray-50 hover:border-blue-200 hover:bg-white"
+                          }`}
+                        >
+                          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                            active ? "bg-blue-600 text-white" : "bg-white text-gray-400 group-hover:text-blue-500"
+                          }`}>
+                            <ServiceTypeIcon type={item.value} />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-sm font-black">{item.label}</span>
+                            <span className="block text-xs text-gray-500">{item.desc}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
-                <div className="grid sm:grid-cols-2 gap-3">
+                <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Business name" required>
                     <input
                       type="text"
@@ -396,7 +399,7 @@ export default function OnboardingPage() {
                 )}
 
                 {bizForm.serviceType === "mobile" && (
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-4">
                     <Field label="City">
                       <input
                         type="text"
@@ -424,7 +427,7 @@ export default function OnboardingPage() {
                         className={INPUT_CLASS}
                       />
                     </Field>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                       <Field label="City" required>
                         <input
                           type="text"
@@ -453,39 +456,49 @@ export default function OnboardingPage() {
                 )}
 
                 <PrimaryButton disabled={savingBusiness}>
-                  {savingBusiness ? <SpinnerText label="Saving..." /> : "Continue"}
+                  {savingBusiness ? <SpinnerText label="Saving..." /> : <>Continue <ArrowIcon /></>}
                 </PrimaryButton>
               </form>
             )}
 
             {step === 1 && (
-              <div className="p-5 sm:p-6 animate-fadeIn">
+              <div className="animate-fadeIn p-5 sm:p-7">
                 {!packageSaved ? (
-                  <form onSubmit={savePackage} className="space-y-5">
+                  <form onSubmit={savePackage} className="space-y-6">
                     {packageError && (
-                      <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      <div className="flex items-start gap-2.5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        <svg className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m0 3.75h.007M11.25 4.5h1.5l7.5 13a.75.75 0 01-.65 1.125H4.4a.75.75 0 01-.65-1.125l7.5-13z" />
+                        </svg>
                         {packageError}
                       </div>
                     )}
 
                     <div>
-                      <p className="text-sm font-black mb-2">Quick starters</p>
-                      <div className="grid sm:grid-cols-3 gap-2.5">
-                        {PACKAGE_STARTERS.map((starter) => (
-                          <button
-                            key={starter.name}
-                            type="button"
-                            onClick={() => setPackageForm(starter)}
-                            className="rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 text-left transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50"
-                          >
-                            <p className="text-sm font-black">{starter.name}</p>
-                            <p className="text-xs text-gray-500">from ${starter.price}</p>
-                          </button>
-                        ))}
+                      <SectionLabel hint="Tap to autofill">Quick starters</SectionLabel>
+                      <div className="grid gap-2.5 sm:grid-cols-3">
+                        {PACKAGE_STARTERS.map((starter) => {
+                          const active = packageForm.name === starter.name && packageForm.price === starter.price;
+                          return (
+                            <button
+                              key={starter.name}
+                              type="button"
+                              onClick={() => setPackageForm(starter)}
+                              className={`rounded-2xl border-2 px-3.5 py-3 text-left transition-all active:scale-[0.98] ${
+                                active
+                                  ? "border-blue-600 bg-blue-50 shadow-md shadow-blue-100"
+                                  : "border-gray-200 bg-gray-50 hover:border-blue-200 hover:bg-white"
+                              }`}
+                            >
+                              <p className="text-sm font-black">{starter.name}</p>
+                              <p className="text-xs text-gray-500">from ${starter.price}</p>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 
-                    <div className="grid sm:grid-cols-[1fr_130px] gap-3">
+                    <div className="grid gap-4 sm:grid-cols-[1fr_140px]">
                       <Field label="Package name" required>
                         <input
                           type="text"
@@ -512,18 +525,14 @@ export default function OnboardingPage() {
                         value={packageForm.description}
                         onChange={(e) => setPackageForm({ ...packageForm, description: e.target.value })}
                         placeholder="What is included?"
-                        className={`${INPUT_CLASS} h-auto min-h-[88px] resize-none py-3`}
+                        className={`${INPUT_CLASS} h-auto min-h-[92px] resize-none py-3 leading-relaxed`}
                       />
                     </Field>
 
                     <div>
-                      <div className="mb-2 flex items-end justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-black">Vehicle pricing</p>
-                          <p className="text-xs text-gray-500">Select vehicle types and add extra price if needed.</p>
-                        </div>
-                      </div>
-                      <div className="grid sm:grid-cols-2 gap-2.5">
+                      <SectionLabel hint="Optional">Vehicle pricing</SectionLabel>
+                      <p className="-mt-1 mb-2.5 text-xs text-gray-500">Pick the vehicle types you serve and add extra price for bigger ones.</p>
+                      <div className="grid gap-2.5 sm:grid-cols-2">
                         {VEHICLE_TYPES.map((vehicle) => {
                           const selected = selectedVehicleIds.has(vehicle.id);
                           const entry = vehiclePricing.find((item) => item.type === vehicle.id);
@@ -542,34 +551,37 @@ export default function OnboardingPage() {
                     </div>
 
                     <PrimaryButton disabled={savingPackage}>
-                      {savingPackage ? <SpinnerText label="Saving package..." /> : "Save package"}
+                      {savingPackage ? <SpinnerText label="Saving package..." /> : <>Save package <ArrowIcon /></>}
                     </PrimaryButton>
                   </form>
                 ) : (
-                  <div className="py-5 text-center animate-fadeIn">
-                    <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
-                      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="animate-fadeIn py-4 text-center">
+                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-emerald-400 to-green-500 text-white shadow-lg shadow-emerald-200">
+                      <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                       </svg>
                     </div>
-                    <h3 className="text-2xl font-black">Package added</h3>
-                    <p className="mx-auto mt-1 max-w-sm text-sm text-gray-500">
+                    <h2 className="text-2xl font-black">Package added</h2>
+                    <p className="mx-auto mt-1.5 max-w-sm text-sm text-gray-500">
                       Your booking page now has {createdPackageCount === 1 ? "one service customers can book" : `${createdPackageCount} services customers can book`}.
                     </p>
-                    <div className="mt-6 grid sm:grid-cols-2 gap-3">
+                    <div className="mt-7 grid gap-3 sm:grid-cols-2">
                       <button
                         type="button"
                         onClick={resetPackageBuilder}
-                        className="h-12 rounded-2xl border border-gray-200 bg-white text-sm font-black text-gray-800 transition-colors hover:bg-gray-50"
+                        className="flex h-12 items-center justify-center gap-2 rounded-2xl border-2 border-gray-200 bg-white text-sm font-black text-gray-800 transition-colors hover:bg-gray-50 active:scale-[0.98]"
                       >
-                        Add another package
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                        Add another
                       </button>
                       <button
                         type="button"
                         onClick={finishOnboarding}
-                        className="h-12 rounded-2xl bg-blue-600 text-sm font-black text-white shadow-lg shadow-blue-200 transition-colors hover:bg-blue-700"
+                        className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-blue-600 text-sm font-black text-white shadow-lg shadow-blue-200 transition-all hover:bg-blue-700 active:scale-[0.98]"
                       >
-                        Continue
+                        Continue <ArrowIcon />
                       </button>
                     </div>
                   </div>
@@ -578,35 +590,45 @@ export default function OnboardingPage() {
             )}
 
             {step === 2 && (
-              <div className="p-5 sm:p-6 animate-fadeIn">
-                <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                  <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-gray-400">Your booking link</p>
-                  <div className="flex items-center gap-2">
-                    <code className="min-w-0 flex-1 truncate font-mono text-sm text-blue-700">{bookingUrl}</code>
+              <div className="animate-fadeIn p-5 sm:p-7">
+                <div className="rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50 p-4 sm:p-5">
+                  <div className="mb-2.5 flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-black uppercase tracking-wide text-emerald-700">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                      Live
+                    </span>
+                    <p className="text-[11px] font-black uppercase tracking-wider text-gray-400">Your booking link</p>
+                  </div>
+                  <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+                    <code className="min-w-0 flex-1 truncate rounded-xl border border-blue-100 bg-white/80 px-3.5 py-3 font-mono text-sm text-blue-700">{bookingUrl}</code>
                     <button
                       type="button"
                       onClick={handleCopy}
-                      className={`rounded-xl border px-3 py-2 text-xs font-black transition-colors ${
+                      className={`flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-4 text-sm font-black transition-all active:scale-[0.98] ${
                         copied
-                          ? "border-emerald-200 bg-emerald-100 text-emerald-700"
-                          : "border-blue-200 bg-blue-100 text-blue-700 hover:bg-blue-200"
+                          ? "bg-emerald-500 text-white"
+                          : "bg-blue-600 text-white hover:bg-blue-700"
                       }`}
                     >
-                      {copied ? "Copied" : "Copy"}
+                      {copied ? (
+                        <><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg> Copied</>
+                      ) : (
+                        <><svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg> Copy</>
+                      )}
                     </button>
                   </div>
                 </div>
 
-                <div className="mt-4 grid sm:grid-cols-2 gap-3">
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <Link
                     href="/dashboard/booking-page"
-                    className="flex h-12 items-center justify-center rounded-2xl bg-blue-600 text-sm font-black text-white shadow-lg shadow-blue-200 transition-colors hover:bg-blue-700"
+                    className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-blue-600 text-sm font-black text-white shadow-lg shadow-blue-200 transition-all hover:bg-blue-700 active:scale-[0.98]"
                   >
                     Edit booking page
                   </Link>
                   <Link
                     href="/dashboard"
-                    className="flex h-12 items-center justify-center rounded-2xl border border-gray-200 bg-white text-sm font-black text-gray-800 transition-colors hover:bg-gray-50"
+                    className="flex h-12 items-center justify-center gap-2 rounded-2xl border-2 border-gray-200 bg-white text-sm font-black text-gray-800 transition-colors hover:bg-gray-50 active:scale-[0.98]"
                   >
                     Go to dashboard
                   </Link>
@@ -615,22 +637,140 @@ export default function OnboardingPage() {
                 <Link
                   href={user?.slug ? `/book/${user.slug}` : "/dashboard"}
                   target={user?.slug ? "_blank" : undefined}
-                  className="mt-4 flex items-center justify-center text-sm font-black text-blue-700 hover:text-blue-800"
+                  className="mt-4 flex items-center justify-center gap-1.5 text-sm font-black text-blue-700 transition-colors hover:text-blue-800"
                 >
                   Preview public booking page
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                  </svg>
                 </Link>
 
-                <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4">
-                  <p className="font-black text-blue-950">Customize later from the dashboard</p>
-                  <p className="mt-1 text-sm text-blue-900/70">
-                    Edit text, add your logo, upload images, change the page, and add more packages anytime.
-                  </p>
+                <div className="mt-5 flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+                  <svg className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.456-2.456L14.25 6l1.035-.259a3.375 3.375 0 002.456-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-black text-blue-950">Customize anytime</p>
+                    <p className="mt-0.5 text-sm text-blue-900/70">
+                      Edit text, add your logo, upload images, change the page, and add more packages from the dashboard.
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
           </section>
+
+          <p className="mt-5 text-center text-xs text-gray-400">
+            Takes about 2 minutes · You can change everything later
+          </p>
         </div>
       </main>
+    </div>
+  );
+}
+
+function Stepper({ step }: { step: number }) {
+  return (
+    <div className="flex items-center">
+      {STEPS.map((item, index) => {
+        const done = index < step;
+        const active = index === step;
+        return (
+          <Fragment key={item.label}>
+            {index > 0 && (
+              <div className="-mx-1 mb-5 h-0.5 flex-1 rounded-full bg-gray-200">
+                <div
+                  className="h-full rounded-full bg-blue-600 transition-all duration-500"
+                  style={{ width: index <= step ? "100%" : "0%" }}
+                />
+              </div>
+            )}
+            <div className="flex flex-col items-center gap-1.5">
+              <span
+                className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-black transition-all ${
+                  done
+                    ? "bg-emerald-500 text-white shadow-md shadow-emerald-200"
+                    : active
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-200 ring-4 ring-blue-100"
+                    : "border-2 border-gray-200 bg-white text-gray-400"
+                }`}
+              >
+                {done ? (
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  index + 1
+                )}
+              </span>
+              <span className={`text-[11px] font-black transition-colors sm:text-xs ${active ? "text-blue-700" : done ? "text-emerald-600" : "text-gray-400"}`}>
+                {item.label}
+              </span>
+            </div>
+          </Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+function StepIcon({ step }: { step: number }) {
+  if (step === 0) {
+    return (
+      <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.015a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72l1.189-1.19A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
+      </svg>
+    );
+  }
+  if (step === 1) {
+    return (
+      <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+      </svg>
+    );
+  }
+  return (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+    </svg>
+  );
+}
+
+function ServiceTypeIcon({ type }: { type: ServiceType }) {
+  if (type === "shop") {
+    return (
+      <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21M3 3h18M4.5 3v18m15-18v18M9 6.75h1.5m-1.5 3h1.5m3-3H15m-1.5 3H15M6.75 21v-3.75a.75.75 0 01.75-.75h.75a.75.75 0 01.75.75V21" />
+      </svg>
+    );
+  }
+  if (type === "both") {
+    return (
+      <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+      </svg>
+    );
+  }
+  return (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
+    </svg>
+  );
+}
+
+function ArrowIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+    </svg>
+  );
+}
+
+function SectionLabel({ children, hint }: { children: ReactNode; hint?: string }) {
+  return (
+    <div className="mb-2.5 flex items-center justify-between gap-3">
+      <p className="text-sm font-black">{children}</p>
+      {hint && <span className="text-[11px] font-bold uppercase tracking-wide text-gray-400">{hint}</span>}
     </div>
   );
 }
@@ -675,7 +815,7 @@ function CurrencyInput({
 }) {
   return (
     <div className="relative">
-      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-black text-gray-400">$</span>
+      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[15px] font-black text-gray-400">$</span>
       <input
         type="number"
         min="0"
@@ -684,7 +824,7 @@ function CurrencyInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className={`${INPUT_CLASS} pl-8`}
+        className={`${INPUT_CLASS} pl-9`}
       />
     </div>
   );
@@ -695,7 +835,7 @@ function PrimaryButton({ children, disabled }: { children: ReactNode; disabled?:
     <button
       type="submit"
       disabled={disabled}
-      className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 text-sm font-black text-white shadow-lg shadow-blue-200 transition-all hover:-translate-y-0.5 hover:bg-blue-700 disabled:translate-y-0 disabled:bg-blue-400"
+      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-4 text-sm font-black text-white shadow-lg shadow-blue-200 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-200 active:translate-y-0 active:scale-[0.99] disabled:translate-y-0 disabled:from-blue-400 disabled:to-indigo-400 disabled:shadow-none"
     >
       {children}
     </button>
@@ -716,15 +856,20 @@ function VehiclePriceTile({
   onSurcharge: (value: string) => void;
 }) {
   return (
-    <div className={`rounded-2xl border p-3 transition-all ${
-      selected ? "border-blue-300 bg-blue-50 shadow-sm" : "border-gray-200 bg-gray-50"
+    <div className={`rounded-2xl border-2 p-3 transition-all ${
+      selected ? "border-blue-500 bg-blue-50 shadow-sm" : "border-gray-200 bg-gray-50"
     }`}>
       <button type="button" onClick={onToggle} className="flex w-full items-center gap-3 text-left">
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg transition-colors ${
+          selected ? "bg-white" : "bg-white/70"
+        }`}>
+          {vehicle.emoji}
+        </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-black">{vehicle.label}</span>
-          <span className="block text-xs text-gray-500">{selected ? "Available" : "Hidden"}</span>
+          <span className={`block text-xs ${selected ? "text-blue-600" : "text-gray-400"}`}>{selected ? "Available" : "Tap to add"}</span>
         </span>
-        <span className={`flex h-5 w-5 items-center justify-center rounded-md border ${
+        <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
           selected ? "border-blue-600 bg-blue-600 text-white" : "border-gray-300 bg-white"
         }`}>
           {selected && (
@@ -736,7 +881,7 @@ function VehiclePriceTile({
       </button>
 
       {selected && (
-        <label className="mt-3 flex items-center justify-between gap-3 text-xs font-black text-gray-500">
+        <label className="mt-3 flex items-center justify-between gap-3 border-t border-blue-100 pt-3 text-xs font-black text-gray-500">
           Extra price
           <span className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
@@ -746,7 +891,7 @@ function VehiclePriceTile({
               step="1"
               value={surcharge}
               onChange={(e) => onSurcharge(e.target.value)}
-              className="h-9 w-24 rounded-xl border border-gray-200 bg-white pl-7 pr-2 text-sm text-gray-950 outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+              className="h-10 w-24 rounded-xl border border-gray-200 bg-white pl-7 pr-2 text-sm text-gray-950 outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
             />
           </span>
         </label>
