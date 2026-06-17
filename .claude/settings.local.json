@@ -38,7 +38,12 @@
       "Bash(curl -s -X POST https://detailbookapp.com/api/bookings -H 'Content-Type: application/json' -d '{ *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(node test-booking-e2e.mjs)",
+      "Bash(BASE_URL=https://detailbookapp.com node test-launch-audit.mjs)",
+      "Bash(node scripts/test-signup-flow.mjs)",
+      "PowerShell(Get-Process node -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2; Write-Output \"node remaining: $\\(@\\(Get-Process node -ErrorAction SilentlyContinue\\).Count\\)\")"
     ]
   }
 }

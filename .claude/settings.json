@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat \"/c/Users/maila/AppData/Local/Temp/claude/c--Users-maila-OneDrive-Desktop-new/7013e497-cdfd-452b-9872-c3e15dcc8cc4/tasks/byfq61fv7.output\" | head -50)",
+      "Read(//c/Users/maila/AppData/Local/Temp/claude/c--Users-maila-OneDrive-Desktop-new/7013e497-cdfd-452b-9872-c3e15dcc8cc4/tasks/**)",
+      "PowerShell(npx prisma generate 2>&1)",
+      "Bash(grep -nE \"^\\\\.env|^/\\\\.env|env\" .gitignore)"
+    ]
+  }
+}
