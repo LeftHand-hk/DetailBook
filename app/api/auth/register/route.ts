@@ -3,9 +3,8 @@ import prisma from "@/lib/prisma";
 import { hashPassword, signToken, cookieSecure } from "@/lib/auth";
 import { isValidEmail, validatePassword } from "@/lib/validation";
 import { getClientIp, getClientCountry } from "@/lib/geo";
-// Welcome sequence is now triggered from the Paddle subscription.created
-// webhook (Brief #15) — fires when the user actually saves a card and
-// the trial activates, not at signup. So no welcome email here.
+// The app-owned trial begins at signup. The hourly email cron delivers the
+// onboarding sequence without making registration wait on SMTP.
 
 function generateSlug(businessName: string): string {
   return businessName
@@ -38,7 +37,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate promo code if provided
-    let promoData: { code: string; discountValue: number; discountType: string; appliesTo: string } | null = null;
+    let promoData: {
+      id: string;
+      code: string;
+      discountValue: number;
+      discountType: string;
+      appliesTo: string;
+      maxUses: number | null;
+    } | null = null;
     if (promoCode) {
       const promo = await prisma.promoCode.findUnique({
         where: { code: promoCode.toUpperCase().trim() },
@@ -50,15 +56,13 @@ export async function POST(request: NextRequest) {
         (promo.maxUses === null || promo.usedCount < promo.maxUses)
       ) {
         promoData = {
+          id: promo.id,
           code: promo.code,
           discountValue: promo.discountValue,
           discountType: promo.discountType,
           appliesTo: promo.appliesTo,
+          maxUses: promo.maxUses,
         };
-        await prisma.promoCode.update({
-          where: { id: promo.id },
-          data: { usedCount: { increment: 1 } },
-        });
       }
     }
 
@@ -110,39 +114,55 @@ export async function POST(request: NextRequest) {
     const signupIp = getClientIp(request);
     const signupCountry = getClientCountry(request);
 
-    const user = await prisma.user.create({
-      data: {
-        email: normalizedEmail,
-        password: hashedPassword,
-        businessName,
-        name,
-        phone: phone || "",
-        city: city || "",
-        slug,
-        plan,
-        trialEndsAt: trialEndsAt.toISOString(),
-        promoCodeUsed: promoData?.code || null,
-        promoDiscount: promoData?.discountValue || null,
-        signupIp,
-        signupCountry,
-        // New accounts ship on the modern (v2) booking page. The schema
-        // default is still "classic" so existing accounts aren't migrated
-        // out from under their preference; only fresh signups land on v2.
-        bookingPageLayout: "modern",
-        ...(safeTimezone ? { timezone: safeTimezone } : {}),
-      },
+    const user = await prisma.$transaction(async (tx) => {
+      if (promoData) {
+        const claimed = await tx.promoCode.updateMany({
+          where: {
+            id: promoData.id,
+            active: true,
+            OR: [
+              { expiresAt: null },
+              { expiresAt: { gt: new Date() } },
+            ],
+            ...(promoData.maxUses === null
+              ? {}
+              : { usedCount: { lt: promoData.maxUses } }),
+          },
+          data: { usedCount: { increment: 1 } },
+        });
+        if (claimed.count === 0) {
+          throw new Error("PROMO_NO_LONGER_AVAILABLE");
+        }
+      }
+
+      return tx.user.create({
+        data: {
+          email: normalizedEmail,
+          password: hashedPassword,
+          businessName,
+          name,
+          phone: phone || "",
+          city: city || "",
+          slug,
+          plan,
+          trialEndsAt: trialEndsAt.toISOString(),
+          promoCodeUsed: promoData?.code || null,
+          promoDiscount: promoData?.discountValue || null,
+          signupIp,
+          signupCountry,
+          // New accounts ship on the modern (v2) booking page. The schema
+          // default is still "classic" so existing accounts aren't migrated
+          // out from under their preference; only fresh signups land on v2.
+          bookingPageLayout: "modern",
+          ...(safeTimezone ? { timezone: safeTimezone } : {}),
+        },
+      });
     });
 
     const token = signToken({ id: user.id, email: user.email });
 
-    // Day 0 welcome email — fire and forget. Awaiting it here used to
-    // make sense for retry reliability, but with 3 attempts × ~10s SMTP
-    // timeouts the worst case (~30s) blew past Netlify's 10s function
-    // timeout and signup itself started failing for new users. Two
-    // No welcome email fired here anymore — the 4-email trial sequence
-    // (Brief #15) is anchored on trial activation, not signup. The Paddle
-    // subscription.created webhook sends day-1 when the user actually
-    // saves a card; the hourly cron handles day-3/5/7 after that.
+    // Email delivery stays out of this request so SMTP retries cannot make
+    // signup time out. The hourly cron sends the day 1/3/5/7 sequence.
 
     const { password: _, ...userWithoutPassword } = user;
 
@@ -161,6 +181,12 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error) {
+    if (error instanceof Error && error.message === "PROMO_NO_LONGER_AVAILABLE") {
+      return NextResponse.json(
+        { error: "This promo code is no longer available." },
+        { status: 400 }
+      );
+    }
     console.error("Register error:", error);
     return NextResponse.json(
       { error: "Internal server error" },

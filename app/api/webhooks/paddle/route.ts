@@ -135,32 +135,14 @@ export async function POST(req: NextRequest) {
       case "subscription.activated": {
         const customData = data.custom_data || {};
         const userId = customData.userId;
-        const fromOnboarding = customData.source === "onboarding";
         const plan = getPlanFromItems(data.items);
         const isPaddleTrial = data.status === "trialing";
 
-        // Resolve the user first so we can branch on whether they're
-        // already mid in-app-trial vs reactivating after a cancel.
-        //
-        // `hadPriorSubscription` is the only reliable "is this the user's
-        // first subscription" signal we have. It comes from a server-side
-        // column we control; the client-passed `customData.source` flag
-        // can vanish (a customer refreshes mid-checkout, a Paddle quirk
-        // strips it, etc.) and we used to fall through to "no trial -
-        // charge immediately" in that case. Now the trial decision rides
-        // on whether the user has ever been linked to a Paddle sub before,
-        // which is exactly what distinguishes a first-time signup from a
-        // re-subscribe.
-        let resolvedUser: { id: string; suspended: boolean; trialEndsAt: string | null; hadPriorSubscription: boolean } | null = null;
+        let resolvedUser: { id: string } | null = null;
 
         if (userId) {
           const u = await prisma.user.findUnique({ where: { id: userId } });
-          if (u) resolvedUser = {
-            id: u.id,
-            suspended: u.suspended === true,
-            trialEndsAt: (u as any).trialEndsAt || null,
-            hadPriorSubscription: Boolean((u as any).paddleSubscriptionId),
-          };
+          if (u) resolvedUser = { id: u.id };
         }
 
         if (!resolvedUser && data.customer_id) {
@@ -177,12 +159,7 @@ export async function POST(req: NextRequest) {
             }
           }
           if (existingUser) {
-            resolvedUser = {
-              id: existingUser.id,
-              suspended: existingUser.suspended === true,
-              trialEndsAt: (existingUser as any).trialEndsAt || null,
-              hadPriorSubscription: Boolean((existingUser as any).paddleSubscriptionId),
-            };
+            resolvedUser = { id: existingUser.id };
           }
         }
 
@@ -198,24 +175,12 @@ export async function POST(req: NextRequest) {
           break;
         }
 
-        const inAppTrialEnds = resolvedUser.trialEndsAt ? Date.parse(resolvedUser.trialEndsAt) : NaN;
-        const inAppTrialActive = !Number.isNaN(inAppTrialEnds) && inAppTrialEnds > Date.now();
-
-        // Only the user's FIRST subscription rides Paddle's trial. Every
-        // resubscribe path (after expiry, reactivation from billing,
-        // plan switch) hits the /activate call below and is charged on
-        // the spot. We DON'T gate this on `fromOnboarding` anymore: that
-        // flag is set in customData by the onboarding checkout, and we
-        // had at least one fresh signup land in the wrong branch because
-        // customData didn't reach the webhook (likely a mid-checkout
-        // refresh) — the user was charged on day 0 instead of getting
-        // their 7-day trial. `hadPriorSubscription` is server-side state
-        // we control, so it can't be lost by a client quirk: false on
-        // the first signup, true on every re-subscribe afterwards.
-        const letPaddleTrialRun = isPaddleTrial && inAppTrialActive && !resolvedUser.hadPriorSubscription;
-
         let effectiveStatus = data.status;
-        if (isPaddleTrial && !letPaddleTrialRun) {
+        // DetailBook owns the seven-day trial in our database. Paddle has
+        // no product trial in the current flow and is opened only when the
+        // owner chooses to pay, so any unexpected Paddle trial is ended
+        // immediately.
+        if (isPaddleTrial) {
           try {
             const apiKey = process.env.PADDLE_API_KEY?.replace(/^["']|["']$/g, "")?.trim();
             if (apiKey) {
@@ -242,19 +207,7 @@ export async function POST(req: NextRequest) {
         };
         if (plan) updateData.plan = plan;
 
-        if (effectiveStatus === "trialing" && letPaddleTrialRun) {
-          updateData.suspended = false;
-          updateData.subscriptionStatus = "trialing";
-          // Align the in-app trial end with Paddle's ACTUAL first-charge
-          // date so the two can never drift. The Paddle trial length is set
-          // on the price and may differ from our default 7 days; if we kept
-          // our own date, the app would lock the user out (or expect a
-          // charge) on a different day than Paddle actually bills. Paddle's
-          // `next_billed_at` is exactly when it auto-charges the saved card
-          // and flips the subscription to active.
-          const paddleTrialEnd = data.next_billed_at || data.current_billing_period?.ends_at;
-          if (paddleTrialEnd) updateData.trialEndsAt = new Date(paddleTrialEnd).toISOString();
-        } else if (effectiveStatus === "active") {
+        if (effectiveStatus === "active") {
           updateData.suspended = false;
           updateData.subscriptionStatus = "active";
           updateData.trialEndsAt = "";
@@ -269,23 +222,35 @@ export async function POST(req: NextRequest) {
             userId: resolvedUser.id,
             plan: plan || "(unchanged)",
             paddleStatus: data.status,
-            mode: letPaddleTrialRun ? "let_paddle_trial_run" : "activate_immediately",
-            inAppTrialActive,
-            hadPriorSubscription: resolvedUser.hadPriorSubscription,
-            fromOnboarding, // logged for diagnostics; not used as a gate
+            mode: "activate_immediately",
           })
         );
 
-        // The hourly cron sends day 1 after Paddle can confirm the subscription
-        // is trialing. Keeping SMTP work out of the webhook prevents Paddle
-        // retries and duplicate delivery when a serverless request is cut off.
+        // Welcome email timing is owned by the signup-based cron, not Paddle.
 
         break;
       }
 
-      case "subscription.updated": {
+      case "subscription.updated":
+      case "subscription.past_due": {
         const subId = data.id;
-        const status = data.status;
+        let status = data.status;
+
+        if (status === "trialing") {
+          const apiKey = process.env.PADDLE_API_KEY?.replace(/^["']|["']$/g, "")?.trim();
+          if (apiKey) {
+            const activateRes = await fetch(`${paddleApiBase()}/subscriptions/${subId}/activate`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${apiKey}` },
+            });
+            if (activateRes.ok) {
+              status = "active";
+            } else {
+              const error = await activateRes.json().catch(() => ({}));
+              console.warn("[Paddle webhook] could not activate unexpected trialing subscription:", activateRes.status, error);
+            }
+          }
+        }
 
         // When a plan switch is made on a trialing sub, Paddle uses
         // proration_billing_mode: "do_not_bill" which SCHEDULES the
@@ -323,17 +288,16 @@ export async function POST(req: NextRequest) {
             } else if (status === "past_due" || status === "paused" || status === "canceled") {
               updateData.suspended = true;
             }
-            // Keep the in-app trial window aligned with Paddle through the
-            // whole lifecycle: once Paddle charges and the sub goes active,
-            // clear the trial; while still trialing, mirror Paddle's
-            // next-charge date (it can shift if the trial is extended).
             if (status === "active") {
               updateData.trialEndsAt = "";
-            } else if (status === "trialing") {
-              const end = data.next_billed_at || data.current_billing_period?.ends_at;
-              if (end) updateData.trialEndsAt = new Date(end).toISOString();
             }
             await prisma.user.update({ where: { id: user.id }, data: updateData });
+            if (status === "past_due") {
+              const failedEmail = await sendPaymentFailedEmail(user.id);
+              if (!failedEmail.success && failedEmail.error !== "already_sent") {
+                console.error("[Paddle webhook] payment-failed email send failed:", failedEmail.error);
+              }
+            }
             console.log(
               "[Paddle webhook] subscription.updated applied",
               JSON.stringify({
@@ -343,6 +307,27 @@ export async function POST(req: NextRequest) {
                 source: scheduledItems.length > 0 ? "scheduled_change" : "items",
               })
             );
+          }
+        }
+        break;
+      }
+
+      case "transaction.payment_failed": {
+        const subId = data.subscription_id;
+        if (subId) {
+          const user = await prisma.user.findFirst({
+            where: { paddleSubscriptionId: subId },
+          });
+          if (user) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { subscriptionStatus: "past_due", suspended: true },
+              select: { id: true },
+            });
+            const failedEmail = await sendPaymentFailedEmail(user.id);
+            if (!failedEmail.success && failedEmail.error !== "already_sent") {
+              console.error("[Paddle webhook] payment-failed email send failed:", failedEmail.error);
+            }
           }
         }
         break;

@@ -55,7 +55,11 @@ export default function BillingPage() {
           fetch("/api/subscription/sync", { method: "POST" })
             .then((r) => (r.ok ? fetch("/api/user", { cache: "no-store" }) : null))
             .then((r) => r && r.ok ? r.json() : null)
-            .then((d) => { if (d?.user?.subscriptionStatus === "active") setUser(d.user); })
+            .then((d) => {
+              if (["active", "trialing"].includes(d?.user?.subscriptionStatus)) {
+                setUser(d.user);
+              }
+            })
             .catch(() => { /* silent */ });
         }
       }
@@ -232,7 +236,9 @@ export default function BillingPage() {
         const res = await fetch("/api/user", { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
-          if (data.user?.subscriptionStatus === "active") return succeed(data.user);
+          if (["active", "trialing"].includes(data.user?.subscriptionStatus)) {
+            return succeed(data.user);
+          }
         }
       } catch { /* ignore */ }
 
@@ -245,7 +251,9 @@ export default function BillingPage() {
             const userRes = await fetch("/api/user", { cache: "no-store" });
             if (userRes.ok) {
               const data = await userRes.json();
-              if (data.user?.subscriptionStatus === "active") return succeed(data.user);
+              if (["active", "trialing"].includes(data.user?.subscriptionStatus)) {
+                return succeed(data.user);
+              }
             }
           } else {
             const body = await syncRes.json().catch(() => ({}));

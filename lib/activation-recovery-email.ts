@@ -81,6 +81,9 @@ export async function runActivationRecoveryTick(): Promise<{
       AND "paddleCustomerId" IS NULL
       AND "paddleSubscriptionId" IS NULL
       AND ("subscriptionStatus" IS NULL OR "subscriptionStatus" = '')
+      AND NOT EXISTS (
+        SELECT 1 FROM "Package" p WHERE p."userId" = "User".id
+      )
   `;
 
   const sent: string[] = [];
@@ -103,6 +106,9 @@ export async function runActivationRecoveryTick(): Promise<{
         AND "paddleSubscriptionId" IS NULL
         AND "welcomeEmailsPaused" = false
         AND suspended = false
+        AND NOT EXISTS (
+          SELECT 1 FROM "Package" p WHERE p."userId" = "User".id
+        )
     `;
     if (claimed === 0) {
       skipped.push({ email: user.email, reason: "no_longer_eligible" });
@@ -119,6 +125,7 @@ export async function runActivationRecoveryTick(): Promise<{
           subscriptionStatus: true,
           welcomeEmailsPaused: true,
           suspended: true,
+          _count: { select: { packages: true } },
         },
       });
     } catch (err) {
@@ -137,6 +144,7 @@ export async function runActivationRecoveryTick(): Promise<{
       latest.paddleSubscriptionId ||
       latest.welcomeEmailsPaused ||
       latest.suspended ||
+      latest._count.packages > 0 ||
       (latest.subscriptionStatus && latest.subscriptionStatus !== "")
     ) {
       skipped.push({ email: user.email, reason: "no_longer_eligible" });
@@ -149,9 +157,9 @@ export async function runActivationRecoveryTick(): Promise<{
     const subject = "Your DetailBook setup is almost finished";
     const text = `Hi ${firstName},
 
-You created your DetailBook account, but your booking page is not live yet.
+You created your DetailBook account, but your booking page setup is not finished yet.
 
-Finish activating your 7-day trial to start taking bookings. You will not be charged today, and you can cancel before the trial ends.
+Your 7-day trial is already running. Finish adding your first service package so customers can start booking with you.
 
 Continue setup: ${onboardingUrl}
 
@@ -167,8 +175,8 @@ Don't want these emails? Unsubscribe: ${unsubUrl}`;
 <body style="margin:0;padding:0;background:#fff;">
   <div style="max-width:560px;margin:0 auto;padding:24px 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.65;color:#111;">
     <p>Hi ${firstName.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")},</p>
-    <p>You created your DetailBook account, but your booking page is not live yet.</p>
-    <p>Finish activating your 7-day trial to start taking bookings. <strong>You will not be charged today</strong>, and you can cancel before the trial ends.</p>
+    <p>You created your DetailBook account, but your booking page setup is not finished yet.</p>
+    <p>Your 7-day trial is already running. Finish adding your first service package so customers can start booking with you.</p>
     <p style="margin:24px 0;"><a href="${onboardingUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 22px;border-radius:9px;text-decoration:none;font-weight:700;">Finish setting up DetailBook</a></p>
     <p>If you have any questions, reply to this email and I&rsquo;ll help you personally.</p>
     <p>Ardit<br><span style="color:#6b7280;">DetailBook</span></p>

@@ -5,7 +5,7 @@ import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import { VEHICLE_TYPES, type VehicleTypeId } from "@/lib/vehicle-pricing";
-import { getPackages, getUser, isLoggedIn, setUser, syncFromServer } from "@/lib/storage";
+import { getPackages, getUser, isLoggedIn, syncFromServer } from "@/lib/storage";
 import type { PackageVehiclePricing, User } from "@/types";
 
 const STEPS = [
@@ -59,6 +59,7 @@ export default function OnboardingPage() {
   const [user, setUserState] = useState<User | null>(null);
   const [copied, setCopied] = useState(false);
   const [savingBusiness, setSavingBusiness] = useState(false);
+  const [businessError, setBusinessError] = useState("");
   const [savingPackage, setSavingPackage] = useState(false);
   const [packageSaved, setPackageSaved] = useState(false);
   const [packageError, setPackageError] = useState("");
@@ -112,7 +113,7 @@ export default function OnboardingPage() {
       return;
     }
 
-    const applyUser = (u: User | null) => {
+    const applyUser = (u: User | null, authoritative = false) => {
       if (!u) return;
       setUserState(u);
       setBizForm((prev) => ({
@@ -126,7 +127,7 @@ export default function OnboardingPage() {
         serviceType: (u.serviceType as ServiceType) || prev.serviceType,
       }));
 
-      if (!stepResolved.current) {
+      if (authoritative || !stepResolved.current) {
         stepResolved.current = true;
         if (getPackages().length > 0) {
           setStep(2);
@@ -142,11 +143,9 @@ export default function OnboardingPage() {
     const cached = getUser();
     applyUser(cached);
 
-    if (!cached?.businessName) {
-      syncFromServer()
-        .then(() => applyUser(getUser()))
-        .catch(() => { /* form falls back to manual entry */ });
-    }
+    syncFromServer()
+      .then(() => applyUser(getUser(), true))
+      .catch(() => { /* cached data remains available as fallback */ });
   }, [router]);
 
   const showShopFields = bizForm.serviceType === "shop" || bizForm.serviceType === "both";
@@ -180,6 +179,7 @@ export default function OnboardingPage() {
 
   const handleBusinessSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setBusinessError("");
     setSavingBusiness(true);
 
     const slug = bizForm.businessName
@@ -207,21 +207,22 @@ export default function OnboardingPage() {
         }),
       });
 
-      if (res.ok) {
-        await syncFromServer();
-        const freshUser = getUser();
-        if (freshUser) setUserState(freshUser);
-      } else if (user) {
-        const updated = { ...user, ...bizForm, address: fullAddress, slug };
-        setUser(updated);
-        setUserState(updated);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Could not save your business details.");
       }
-    } catch {
-      if (user) {
-        const updated = { ...user, ...bizForm, address: fullAddress, slug };
-        setUser(updated);
-        setUserState(updated);
-      }
+
+      await syncFromServer();
+      const freshUser = getUser();
+      if (freshUser) setUserState(freshUser);
+    } catch (error) {
+      setBusinessError(
+        error instanceof Error
+          ? error.message
+          : "Could not save your business details. Please try again."
+      );
+      setSavingBusiness(false);
+      return;
     }
 
     setSavingBusiness(false);
@@ -351,6 +352,11 @@ export default function OnboardingPage() {
 
             {step === 0 && (
               <form onSubmit={handleBusinessSubmit} className="animate-fadeIn space-y-6 p-5 sm:p-7">
+                {businessError && (
+                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                    {businessError}
+                  </div>
+                )}
                 <div>
                   <SectionLabel>How do you operate?</SectionLabel>
                   <div className="grid gap-2.5 sm:grid-cols-3">

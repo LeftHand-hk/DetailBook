@@ -6,7 +6,6 @@ import { useState, useEffect, useRef } from "react";
 import { isLoggedIn, logout, getUser, getPackages, syncFromServer } from "@/lib/storage";
 import type { User } from "@/types";
 import { LogoIcon, LogoWordmark } from "@/components/Logo";
-import TrialBanner from "@/components/TrialBanner";
 import TrialEndedModal from "@/components/TrialEndedModal";
 import { getTrialPhase } from "@/lib/trial";
 
@@ -299,7 +298,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const trialLocked =
     (user as any)?.suspended === true ||
     ["expired", "canceled"].includes(String((user as any)?.subscriptionStatus || "").toLowerCase());
-  const showTrialBanner = !trialLocked && trialPhase === "trial_active" && trialDaysLeft !== null && pathname !== "/dashboard/billing";
   const showTrialEndedModal = !trialLocked && trialPhase === "paused" && pathname !== "/dashboard/billing";
 
   const NavLink = ({ item }: { item: NavItem }) => {
@@ -592,8 +590,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Trial banner — non-blocking, pinned above the scrolling content
             so it stays visible for the whole 7-day trial. */}
-        {showTrialBanner && <TrialBanner daysLeft={trialDaysLeft ?? 0} />}
-
         {/* Page Content. iOS safe-area padding so content at the very
             bottom isn't hidden behind the home indicator on devices
             with a gesture bar. */}
