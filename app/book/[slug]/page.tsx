@@ -12,6 +12,7 @@ import { VEHICLE_TYPES, type VehicleTypeId, surchargeForVehicleType, packageSupp
 import { VehicleIcon } from "@/components/VehicleIcon";
 import BookingV2Landing from "@/components/BookingV2Landing";
 import { bookingTimesOverlap } from "@/lib/booking-overlap";
+import { calculateRequiredDeposit } from "@/lib/booking-deposit";
 
 const TIMES = [
   "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM",
@@ -384,19 +385,14 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   // behaviour silently dropped the deposit to 0 when a package had no
   // per-row amount, letting customers sneak through without paying.
   const requireDeposit = (user as any)?.requireDeposit ?? false;
-  const depositAmount = (() => {
-    if (!selectedPackage || !requireDeposit) return 0;
-    const perPackage = Number((selectedPackage as any).deposit || 0);
-    if (perPackage > 0) return perPackage;
-    const pct = Number((user as any)?.depositPercentage || 0);
-    // Use just the package base price here — the vehicle surcharge is
-    // declared further down, and depositing on the surcharge is an
-    // optional polish we can revisit if owners ask.
-    const base = selectedPackage.price;
-    if (pct > 0 && pct <= 100) return Math.max(1, Math.round((base * pct) / 100));
-    // Final fallback so requireDeposit is never silently 0.
-    return Math.max(1, Math.round(base * 0.2));
-  })();
+  const depositAmount = selectedPackage
+    ? calculateRequiredDeposit({
+        requireDeposit,
+        packageDeposit: selectedPackage.deposit,
+        depositPercentage: (user as any)?.depositPercentage,
+        basePrice: selectedPackage.price,
+      })
+    : 0;
 
   // Reset ticked add-ons whenever the customer switches packages so they
   // don't carry options from the prior package into the new one.

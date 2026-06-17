@@ -8,6 +8,7 @@ import { sendSms } from "@/lib/twilio";
 import { normalizePhone } from "@/lib/phone";
 import { verifyBookingPayment } from "@/lib/booking-payment";
 import { bookingTimesOverlap } from "@/lib/booking-overlap";
+import { calculateRequiredDeposit } from "@/lib/booking-deposit";
 
 export async function GET(request: NextRequest) {
   try {
@@ -164,11 +165,11 @@ export async function POST(request: NextRequest) {
     // base price + vehicle surcharge server-side. We already needed the
     // package to validate add-ons; folding both into a single read keeps
     // the booking write to one DB round-trip on the hot path.
-    let pkgRow: { name: string; price: number; duration: number; addons: unknown; vehiclePricing: unknown; userId: string } | null = null;
+    let pkgRow: { name: string; price: number; deposit: number | null; duration: number; addons: unknown; vehiclePricing: unknown; userId: string } | null = null;
     if (serviceId) {
       pkgRow = await prisma.package.findUnique({
         where: { id: serviceId },
-        select: { name: true, price: true, duration: true, addons: true, vehiclePricing: true, userId: true },
+        select: { name: true, price: true, deposit: true, duration: true, addons: true, vehiclePricing: true, userId: true },
       });
       if (pkgRow && pkgRow.userId !== userId) pkgRow = null; // owner mismatch — ignore
     }
@@ -227,9 +228,12 @@ export async function POST(request: NextRequest) {
     const bookingTotal = Math.round((finalServicePrice + computedAddonsTotal) * 100) / 100;
     const finalServiceName = pkgRow?.name || serviceName;
     const finalDuration = pkgRow?.duration || 60;
-    const authoritativeDeposit = user.requireDeposit
-      ? Math.round((bookingTotal * (Number(user.depositPercentage) || 0) / 100) * 100) / 100
-      : 0;
+    const authoritativeDeposit = calculateRequiredDeposit({
+      requireDeposit: user.requireDeposit,
+      packageDeposit: pkgRow?.deposit,
+      depositPercentage: user.depositPercentage,
+      basePrice: pkgRow?.price ?? finalServicePrice,
+    });
 
     // paymentProof is either a "stripe:<payment_intent_id>" / "square:<payment_id>"
     // reference (set by the embedded card modals after a successful charge) or

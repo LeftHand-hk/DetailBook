@@ -5,18 +5,11 @@ import { getBusinessStripe } from "@/lib/stripe";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, bookingId, amount, customerEmail, serviceName } = body;
+    const { userId, bookingId } = body;
 
-    if (!userId || !bookingId || !amount || !customerEmail || !serviceName) {
+    if (!userId || !bookingId) {
       return NextResponse.json(
-        { error: "Missing required fields: userId, bookingId, amount, customerEmail, serviceName" },
-        { status: 400 }
-      );
-    }
-
-    if (typeof amount !== "number" || amount <= 0) {
-      return NextResponse.json(
-        { error: "Amount must be a positive number" },
+        { error: "Missing required fields: userId, bookingId" },
         { status: 400 }
       );
     }
@@ -54,19 +47,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const amountInCents = Math.round(amount * 100);
+    if (booking.depositRequired <= 0) {
+      return NextResponse.json({ error: "This booking does not require a deposit" }, { status: 400 });
+    }
+    if (booking.depositPaid >= booking.depositRequired) {
+      return NextResponse.json({ error: "This booking deposit is already paid" }, { status: 409 });
+    }
+
+    const amountInCents = Math.round(booking.depositRequired * 100);
 
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
-      customer_email: customerEmail,
+      customer_email: booking.customerEmail,
       line_items: [
         {
           price_data: {
             currency: "usd",
             product_data: {
-              name: `Deposit for ${serviceName}`,
-              description: `Booking deposit for ${serviceName}`,
+              name: `Deposit for ${booking.serviceName}`,
+              description: `Booking deposit for ${booking.serviceName}`,
             },
             unit_amount: amountInCents,
           },

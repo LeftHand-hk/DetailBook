@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
+import { getSessionUser } from "@/lib/auth";
+import { escapeHtml } from "@/lib/validation";
 
 export async function POST(
   request: NextRequest,
@@ -8,10 +10,17 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+    const session = await getSessionUser();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const booking = await prisma.booking.findUnique({ where: { id } });
-    if (!booking) {
+    if (!booking || booking.userId !== session.id) {
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+    }
+    if (booking.paymentProof?.startsWith("stripe:") || booking.paymentProof?.startsWith("square:")) {
+      return NextResponse.json({ error: "Verified card payment proof cannot be replaced" }, { status: 409 });
     }
 
     const body = await request.json();
@@ -58,23 +67,23 @@ export async function POST(
             <h1 style="margin:8px 0 0;font-size:22px;">Payment Proof Submitted</h1>
           </div>
           <div style="background:#f9fafb;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
-            <p style="font-size:14px;color:#374151;"><strong>${updated.customerName}</strong> uploaded a deposit payment proof. Review it and confirm the booking in your dashboard.</p>
+            <p style="font-size:14px;color:#374151;"><strong>${escapeHtml(updated.customerName)}</strong> uploaded a deposit payment proof. Review it and confirm the booking in your dashboard.</p>
             <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0;">
               <table style="width:100%;font-size:14px;border-collapse:collapse;">
-                <tr><td style="padding:6px 0;color:#6b7280;width:40%;">Service</td><td style="padding:6px 0;font-weight:600;color:#111827;">${updated.serviceName}</td></tr>
+                <tr><td style="padding:6px 0;color:#6b7280;width:40%;">Service</td><td style="padding:6px 0;font-weight:600;color:#111827;">${escapeHtml(updated.serviceName)}</td></tr>
                 <tr><td style="padding:6px 0;color:#6b7280;">Date</td><td style="padding:6px 0;font-weight:600;color:#111827;">${formattedDate}</td></tr>
-                <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;font-weight:600;color:#111827;">${updated.time}</td></tr>
+                <tr><td style="padding:6px 0;color:#6b7280;">Time</td><td style="padding:6px 0;font-weight:600;color:#111827;">${escapeHtml(updated.time)}</td></tr>
                 <tr><td style="padding:6px 0;color:#6b7280;">Deposit</td><td style="padding:6px 0;font-weight:600;color:#111827;">$${updated.depositRequired}</td></tr>
               </table>
             </div>
             <a href="https://detailbookapp.com/dashboard/bookings" style="display:inline-block;background:#F59E0B;color:white;font-weight:600;font-size:14px;padding:10px 20px;border-radius:8px;text-decoration:none;">Review & Confirm</a>
           </div>
         </div>`;
-      sendEmail({
+      await sendEmail({
         to: user.email,
         subject: `Payment Proof – ${updated.customerName} (${updated.serviceName})`,
         html: ownerHtml,
-      }).catch(() => {});
+      }).catch((error) => console.error("[payment proof email] failed:", error));
     }
 
     return NextResponse.json({ success: true, status: updated.status });

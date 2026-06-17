@@ -317,7 +317,11 @@ export default function BookingsPage() {
   const toggleDeposit = async (id: string) => {
     const booking = bookings.find((b) => b.id === id);
     if (!booking) return;
-    const newDepositPaid = booking.depositPaid > 0 ? 0 : (booking.depositRequired || booking.depositPaid || 50);
+    if (booking.depositPaid <= 0 && booking.depositRequired <= 0) {
+      setActionError("This booking does not require a deposit.");
+      return;
+    }
+    const newDepositPaid = booking.depositPaid > 0 ? 0 : booking.depositRequired;
     const updated = bookings.map((b) =>
       b.id === id ? { ...b, depositPaid: newDepositPaid } : b
     );
@@ -671,7 +675,7 @@ export default function BookingsPage() {
         const ownerCharges = allAddons.filter((a) => a.owner);
         const addonsTotal = allAddons.reduce((s, a) => s + (Number(a.price) || 0), 0);
         const invoiceTotal = selected.servicePrice + addonsTotal;
-        const balance = invoiceTotal - selected.depositPaid;
+        const balance = Math.max(0, invoiceTotal - selected.depositPaid);
         const initials = selected.customerName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
         const member = selected.staffId ? staffList.find((s) => s.id === selected.staffId) : null;
         const dateTag =
@@ -893,10 +897,11 @@ export default function BookingsPage() {
                     <p className="text-xs font-bold text-blue-700 uppercase tracking-wider">Deposit</p>
                     <button
                       onClick={() => toggleDeposit(selected.id)}
+                      disabled={selected.depositPaid <= 0 && selected.depositRequired <= 0}
                       className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${
                         selected.depositPaid > 0
                           ? "bg-white text-red-600 border border-red-200 hover:bg-red-50"
-                          : "bg-blue-600 text-white hover:bg-blue-700"
+                          : "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
                       }`}
                     >
                       {selected.depositPaid > 0 ? "Mark Unpaid" : "Mark Paid"}
