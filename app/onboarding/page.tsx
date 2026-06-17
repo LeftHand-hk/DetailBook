@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
-import { VehicleIcon } from "@/components/VehicleIcon";
 import { VEHICLE_TYPES, type VehicleTypeId } from "@/lib/vehicle-pricing";
 import { getUser, isLoggedIn, setUser, syncFromServer } from "@/lib/storage";
 import type { PackageVehiclePricing, User } from "@/types";
@@ -154,11 +153,6 @@ export default function OnboardingPage() {
     ? `${typeof window !== "undefined" ? window.location.origin : "https://detailbookapp.com"}/book/${user.slug}`
     : "";
 
-  const businessPreview = bizForm.businessName || "Your Detailing Business";
-  const locationPreview = bizForm.serviceArea || bizForm.city || "Your service area";
-  const packagePreview = packageForm.name || "Full Detail";
-  const pricePreview = packageForm.price || "149";
-
   const handleCopy = async () => {
     if (!bookingUrl) return;
     try {
@@ -306,74 +300,24 @@ export default function OnboardingPage() {
       </header>
 
       <main className="px-4 py-6 sm:py-8">
-        <div className="max-w-5xl mx-auto grid lg:grid-cols-[360px_1fr] gap-5 items-start">
-          <aside className="animate-fadeInUp">
-            <div className="rounded-3xl bg-gray-950 text-white p-5 shadow-xl overflow-hidden">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-200">Preview</p>
-                  <h1 className="mt-1 text-xl font-black leading-tight">Your page taking shape</h1>
-                </div>
-                <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center">
-                  <OperationIcon type={bizForm.serviceType} className="w-6 h-6 text-cyan-200" />
-                </div>
+        <div className="max-w-2xl mx-auto">
+          <div className="mb-4 grid grid-cols-3 gap-2 animate-fadeIn">
+            {STEPS.map((item, index) => (
+              <div
+                key={item.label}
+                className={`rounded-2xl px-3 py-2.5 border transition-all ${
+                  index === step
+                    ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100"
+                    : index < step
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                    : "bg-white text-gray-400 border-gray-200"
+                }`}
+              >
+                <p className="text-[10px] font-black">0{index + 1}</p>
+                <p className="text-xs font-bold">{item.label}</p>
               </div>
-
-              <div className="mt-5 rounded-2xl bg-white text-gray-950 p-3 shadow-2xl">
-                <div className="rounded-xl bg-gradient-to-br from-blue-700 to-cyan-500 p-4 min-h-[112px] flex flex-col justify-end">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-white/75">{locationPreview}</p>
-                  <p className="text-lg font-black text-white truncate">{businessPreview}</p>
-                </div>
-                <div className="pt-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-black uppercase tracking-wider text-blue-600">Package</p>
-                      <p className="text-base font-black truncate">{packagePreview}</p>
-                      <p className="text-xs text-gray-500 line-clamp-2">
-                        {packageForm.description || "Add a short description customers can understand fast."}
-                      </p>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-[10px] text-gray-400 font-bold">from</p>
-                      <p className="text-xl font-black">${pricePreview}</p>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {vehiclePricing.slice(0, 4).map((entry) => {
-                      const vehicle = VEHICLE_TYPES.find((item) => item.id === entry.type);
-                      if (!vehicle) return null;
-                      return (
-                        <span key={entry.type} className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-[10px] font-bold text-gray-700">
-                          <VehicleIcon type={vehicle.id} className="w-3 h-3" />
-                          {vehicle.label.split(" ")[0]}
-                          {entry.surcharge > 0 ? ` +$${entry.surcharge}` : ""}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-5 grid grid-cols-3 gap-2">
-                {STEPS.map((item, index) => (
-                  <div
-                    key={item.label}
-                    className={`rounded-2xl px-3 py-2.5 border transition-all ${
-                      index === step
-                        ? "bg-white text-gray-950 border-white"
-                        : index < step
-                        ? "bg-emerald-400/15 text-emerald-100 border-emerald-300/20"
-                        : "bg-white/5 text-white/55 border-white/10"
-                    }`}
-                  >
-                    <p className="text-[10px] font-black">0{index + 1}</p>
-                    <p className="text-xs font-bold">{item.label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </aside>
-
+            ))}
+          </div>
           <section className="rounded-3xl bg-white border border-gray-200 shadow-xl shadow-blue-950/5 overflow-hidden animate-fadeInUp">
             <div className="px-5 sm:px-6 py-5 border-b border-gray-100">
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-blue-600">{currentStep.label}</p>
@@ -402,18 +346,13 @@ export default function OnboardingPage() {
                         key={item.value}
                         type="button"
                         onClick={() => setBizForm({ ...bizForm, serviceType: item.value })}
-                        className={`group h-[94px] rounded-2xl border-2 p-3 text-left transition-all hover:-translate-y-0.5 ${
+                        className={`group min-h-[74px] rounded-2xl border-2 p-3 text-left transition-all hover:-translate-y-0.5 ${
                           bizForm.serviceType === item.value
                             ? "border-blue-600 bg-blue-50 shadow-md shadow-blue-100"
                             : "border-gray-200 bg-gray-50 hover:bg-white hover:border-blue-200"
                         }`}
                       >
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                          bizForm.serviceType === item.value ? "bg-blue-600 text-white" : "bg-white text-gray-600 border border-gray-200 group-hover:text-blue-700"
-                        }`}>
-                          <OperationIcon type={item.value} className="w-5 h-5" />
-                        </div>
-                        <p className="mt-2 text-sm font-black">{item.label}</p>
+                        <p className="text-sm font-black">{item.label}</p>
                         <p className="text-xs text-gray-500">{item.desc}</p>
                       </button>
                     ))}
@@ -781,11 +720,6 @@ function VehiclePriceTile({
       selected ? "border-blue-300 bg-blue-50 shadow-sm" : "border-gray-200 bg-gray-50"
     }`}>
       <button type="button" onClick={onToggle} className="flex w-full items-center gap-3 text-left">
-        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-          selected ? "bg-blue-600 text-white" : "border border-gray-200 bg-white text-gray-500"
-        }`}>
-          <VehicleIcon type={vehicle.id} className="h-6 w-6" />
-        </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-black">{vehicle.label}</span>
           <span className="block text-xs text-gray-500">{selected ? "Available" : "Hidden"}</span>
@@ -830,29 +764,5 @@ function SpinnerText({ label }: { label: string }) {
       </svg>
       {label}
     </>
-  );
-}
-
-function OperationIcon({ type, className = "h-5 w-5" }: { type: ServiceType; className?: string }) {
-  if (type === "shop") {
-    return (
-      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 10h16M6 10l1.2-4h9.6L18 10M6 10v9h12v-9M9 19v-5h6v5" />
-      </svg>
-    );
-  }
-
-  if (type === "both") {
-    return (
-      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 11h7M5 11l1-3h5l1 3M4 15h9M6 15a1.5 1.5 0 103 0M15 10h5M16 10l.8-3h2.4L20 10M15 10v7h5v-7M16.5 17h2" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 14h2l2-4h8l2 4h2M5 14h14v3H5v-3M7 17a1.5 1.5 0 103 0M14 17a1.5 1.5 0 103 0M9 10l1-3h4l1 3" />
-    </svg>
   );
 }
