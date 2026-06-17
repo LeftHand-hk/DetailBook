@@ -446,7 +446,7 @@ export default function DashboardPage() {
                 <h3 className="text-white font-extrabold text-lg">Unlock Pro Features</h3>
               </div>
               <p className="text-blue-100 text-sm mb-3">Get powerful tools to grow your business faster — analytics, SMS reminders, multi-staff calendars, and more.</p>
-              <p className="text-blue-200 text-xs">Currently on Starter ($29/mo)</p>
+              <p className="text-blue-200 text-xs">Currently on Starter ($24/mo)</p>
             </div>
             <Link
               href="/dashboard/billing"

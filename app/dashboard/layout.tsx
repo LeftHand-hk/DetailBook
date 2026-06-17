@@ -355,7 +355,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   ) : (
                     <span className="text-[10px] font-bold bg-slate-700 text-slate-400 px-2 py-0.5 rounded-full uppercase tracking-wider">Starter</span>
                   )}
-                  <span className="text-[11px] text-slate-500">${isPro ? "50" : "29"}/mo</span>
+                  <span className="text-[11px] text-slate-500">${isPro ? "50" : "24"}/mo</span>
                 </div>
               </div>
             </div>
@@ -565,7 +565,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <div className="flex-shrink-0 flex items-center justify-center gap-2 px-4 py-1.5 text-xs bg-gray-50 border-b border-gray-100 text-gray-500">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                 <span>
-                  <strong className="text-gray-700">Day {dayN} of 7</strong> · Your card will be charged $29 on day 8 unless you cancel.
+                  <strong className="text-gray-700">Day {dayN} of 7</strong> · Your card will be charged $24 on day 8 unless you cancel.
                 </span>
               </div>
             );

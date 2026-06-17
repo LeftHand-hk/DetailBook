@@ -102,12 +102,12 @@ export async function GET(request: NextRequest) {
               </a>
             </p>
             <p style="color:#6b7280;font-size:13px;line-height:1.55">
-              Plans start at $29/mo. Your data is preserved either way.
+              Plans start at $24/mo. Your data is preserved either way.
             </p>
             <p style="color:#9ca3af;font-size:12px;margin-top:32px">— The DetailBook team</p>
           </div>
         `,
-        text: `Your 7-day DetailBook trial for ${u.businessName} ends tomorrow.\n\nIf you don't cancel, your card will be charged for the first month and your subscription will start automatically.\n\nManage subscription: ${baseUrl}/dashboard/billing\n\nPlans start at $29/mo. Your data is preserved either way.\n\n— The DetailBook team`,
+        text: `Your 7-day DetailBook trial for ${u.businessName} ends tomorrow.\n\nIf you don't cancel, your card will be charged for the first month and your subscription will start automatically.\n\nManage subscription: ${baseUrl}/dashboard/billing\n\nPlans start at $24/mo. Your data is preserved either way.\n\n— The DetailBook team`,
       });
 
       if (result.success) {

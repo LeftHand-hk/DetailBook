@@ -147,7 +147,7 @@ export default function BillingPage() {
             if (checkoutIntentRef.current === "update-card") {
               await fetchCard({ retry: true });
             } else {
-              const planValue = pendingPlanRef.current === "pro" ? 50 : 29;
+              const planValue = pendingPlanRef.current === "pro" ? 50 : 24;
               // predicted_ltv: rough ~10-month retention estimate, used by
               // Meta value-optimised campaigns as a bid signal. Tune as we
               // see real cohort data.
@@ -415,7 +415,7 @@ export default function BillingPage() {
     {
       id: "starter" as const,
       name: "Starter",
-      price: 29,
+      price: 24,
       features: [
         "Online booking page",
         "Payment & deposit collection",
@@ -546,7 +546,7 @@ export default function BillingPage() {
               </span>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-black text-gray-900">${isPro ? 50 : 29}</span>
+              <span className="text-3xl font-black text-gray-900">${isPro ? 50 : 24}</span>
               <span className="text-sm text-gray-500">/month</span>
             </div>
             {nextBilledAt && isSubscribed && (
@@ -561,7 +561,7 @@ export default function BillingPage() {
                 Your free trial is active.{" "}
                 {nextBilledAt ? (
                   <>
-                    You&apos;ll be charged <strong className="text-gray-700">${isPro ? 50 : 29}</strong> on{" "}
+                    You&apos;ll be charged <strong className="text-gray-700">${isPro ? 50 : 24}</strong> on{" "}
                     <strong className="text-gray-700">{new Date(nextBilledAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</strong>{" "}
                     unless you cancel.
                   </>

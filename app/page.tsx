@@ -452,7 +452,7 @@ export default function LandingPage() {
               },
               {
                 icon: "💸",
-                title: "Starts at $29/month",
+                title: "Starts at $24/month",
                 desc: "Detailing-specific software starts at one of the lowest entry prices in the category. No setup fees, no per-booking cuts.",
               },
               {
@@ -548,7 +548,7 @@ export default function LandingPage() {
               { feature: "Shop + mobile scheduling in one calendar", us: true, them: false },
               { feature: "Detailing service-package builder", us: true, them: false },
               { feature: "No per-booking commission", us: true, them: "Some take a cut" },
-              { feature: "Starts at $29/month", us: true, them: "$30+ and up" },
+              { feature: "Starts at $24/month", us: true, them: "$30+ and up" },
             ].map((row, i) => (
               <div key={i} className={`grid grid-cols-3 ${i % 2 === 0 ? "bg-white" : "bg-gray-50/50"} border-b border-gray-100 last:border-0`}>
                 <div className="px-4 sm:px-6 py-4 text-sm text-gray-700">{row.feature}</div>
@@ -612,7 +612,7 @@ export default function LandingPage() {
                 <p className="text-gray-400 text-sm">Perfect for solo detailers just getting started.</p>
               </div>
               <div className="mb-6">
-                <span className="text-5xl font-black text-white">$29</span>
+                <span className="text-5xl font-black text-white">$24</span>
                 <span className="text-gray-400 ml-1">/month</span>
               </div>
               <ul className="space-y-3 mb-6 flex-1">

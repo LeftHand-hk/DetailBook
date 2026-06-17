@@ -63,7 +63,7 @@ We spent weeks testing every major option. Here's the honest breakdown.
 
 **DetailBook**
 
-Built specifically for mobile auto detailers. Includes online booking, deposit collection, SMS reminders, package builder, Google Calendar sync, and a clean mobile dashboard. Starts at $29/month with a 30-day free trial.
+Built specifically for mobile auto detailers. Includes online booking, deposit collection, SMS reminders, package builder, Google Calendar sync, and a clean mobile dashboard. Starts at $24/month with a 30-day free trial.
 
 *Best for:* Detailers who want something purpose-built and don't want to configure a generic tool. ★★★★★
 
