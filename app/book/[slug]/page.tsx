@@ -151,6 +151,11 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
   const [user, setUser] = useState<User | null>(null);
   const [packages, setPackages] = useState<Package[]>([]);
   const [loading, setLoading] = useState(true);
+  // True when the API returns 403 — the owner's trial lapsed or their
+  // account is paused. We show a clean "temporarily unavailable" screen
+  // instead of falling back to cached data (which could wrongly render
+  // the page as live for the owner). No data is deleted server-side.
+  const [unavailable, setUnavailable] = useState(false);
   const [step, setStep] = useState(0);
   // v2: the editorial landing shows first; "Book Now" drops the visitor
   // into the existing step-based booking flow. Default true so every
@@ -245,9 +250,17 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     // a design switch (classic ↔ modern) or any other edit shows immediately
     // instead of serving a stale cached response.
     fetch(`/api/book/${slug}`, { cache: "no-store" })
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => {
+        // 403 = paused / trial expired. Flag it so we render the dedicated
+        // "temporarily unavailable" screen and skip the localStorage
+        // fallback below (which would otherwise show stale cached data).
+        if (r.status === 403) return { __unavailable: true } as const;
+        return r.ok ? r.json() : null;
+      })
       .then((data) => {
-        if (data) {
+        if (data && (data as any).__unavailable) {
+          setUnavailable(true);
+        } else if (data) {
           if (data.staff && Array.isArray(data.staff)) setStaffList(data.staff);
           if (data.serviceType) setServiceType(data.serviceType);
           if (data.packages) setPackages(data.packages.filter((p: any) => p.active));
@@ -801,6 +814,18 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           <p className="text-white/60 text-sm">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (unavailable) {
+    return (
+      <div className="min-h-screen bg-mesh flex items-center justify-center p-4">
+        <div className="glass rounded-3xl p-10 text-center max-w-sm">
+          <div className="text-5xl mb-4">{"\u{1F552}"}</div>
+          <h1 className="text-2xl font-bold text-white mb-2">Temporarily unavailable</h1>
+          <p className="text-white/60">This booking page is paused right now. Please check back soon.</p>
         </div>
       </div>
     );

@@ -6,6 +6,9 @@ import { useState, useEffect, useRef } from "react";
 import { isLoggedIn, logout, getUser, getPackages, syncFromServer } from "@/lib/storage";
 import type { User } from "@/types";
 import { LogoIcon, LogoWordmark } from "@/components/Logo";
+import TrialBanner from "@/components/TrialBanner";
+import TrialEndedModal from "@/components/TrialEndedModal";
+import { getTrialPhase } from "@/lib/trial";
 
 interface NavItem {
   label: string;
@@ -288,6 +291,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       : "Trial ended"
     : null;
   const trialDays = trialDaysLeft ?? 0;
+
+  // Top-of-dashboard trial UX. Locked accounts (suspended / admin-expired /
+  // canceled) are already confined to /billing by the redirects above, so
+  // the banner + modal only drive the no-card trial → paid conversion.
+  const trialPhase = getTrialPhase(user as any);
+  const trialLocked =
+    (user as any)?.suspended === true ||
+    ["expired", "canceled"].includes(String((user as any)?.subscriptionStatus || "").toLowerCase());
+  const showTrialBanner = !trialLocked && trialPhase === "trial_active" && trialDaysLeft !== null && pathname !== "/dashboard/billing";
+  const showTrialEndedModal = !trialLocked && trialPhase === "paused" && pathname !== "/dashboard/billing";
 
   const NavLink = ({ item }: { item: NavItem }) => {
     const active = pathname === item.href;
@@ -577,6 +590,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         )}
 
 
+        {/* Trial banner — non-blocking, pinned above the scrolling content
+            so it stays visible for the whole 7-day trial. */}
+        {showTrialBanner && <TrialBanner daysLeft={trialDaysLeft ?? 0} />}
+
         {/* Page Content. iOS safe-area padding so content at the very
             bottom isn't hidden behind the home indicator on devices
             with a gesture bar. */}
@@ -588,6 +605,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {children}
         </main>
       </div>
+
+      {/* Trial-ended blocking modal — the only hard gate; appears once the
+          trial lapses unpaid, on every dashboard page except /billing. */}
+      {showTrialEndedModal && <TrialEndedModal />}
     </div>
   );
 }

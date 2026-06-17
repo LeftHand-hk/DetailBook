@@ -396,6 +396,21 @@ export default function BillingPage() {
     }
   };
 
+  // Deep link from the trial banner / "trial ended" modal:
+  // /dashboard/billing?checkout=starter|pro auto-opens that plan's Paddle
+  // checkout once the user + Paddle SDK are ready. Fires once, then strips
+  // the param so a refresh doesn't reopen the overlay.
+  const autoCheckoutFired = useRef(false);
+  useEffect(() => {
+    if (autoCheckoutFired.current || !user || !paddle) return;
+    const param = new URLSearchParams(window.location.search).get("checkout");
+    if (param !== "starter" && param !== "pro") return;
+    autoCheckoutFired.current = true;
+    window.history.replaceState(null, "", "/dashboard/billing");
+    handlePlanAction(param);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, paddle]);
+
   const isPro = user?.plan === "pro";
   const isSubscribed = user?.subscriptionStatus === "active";
   const isTrialing = user?.subscriptionStatus === "trialing";

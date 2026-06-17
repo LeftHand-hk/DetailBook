@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
-import { fetchPaddleSubscriptionStatus } from "@/lib/paddle";
 
 // Daily cron — called once per 24h by cron-job.org.
-// Sends a "your trial ends tomorrow" email to users in the precise
-// 24h window (0d < remaining ≤ 1d) — i.e. Day 6 of the 7-day trial.
-// Daily cadence + 24h window means each user is hit exactly once
-// during their trial. No DB flag needed.
+// Sends a "your trial ends tomorrow" email to no-card trial users in the
+// precise 24h window (0d < remaining ≤ 1d) — i.e. Day 6 of the 7-day
+// trial. The trial is tracked on our platform (trialEndsAt), NOT in
+// Paddle, so there's no card on file and no Paddle subscription yet —
+// the email nudges them to subscribe to keep their page live. Daily
+// cadence + 24h window means each user is hit exactly once. No DB flag.
 export async function GET(request: NextRequest) {
   const secret = request.headers.get("x-cron-secret") || new URL(request.url).searchParams.get("secret");
   if (secret !== process.env.CRON_SECRET) {
@@ -24,13 +25,14 @@ export async function GET(request: NextRequest) {
     const candidates = await prisma.user.findMany({
       where: {
         suspended: false,
+        // No-card trials only: not yet paid (active is excluded). These
+        // users have no Paddle subscription, so we don't filter on one.
         OR: [
           { subscriptionStatus: null },
           { subscriptionStatus: "" },
           { subscriptionStatus: "trialing" },
         ],
         NOT: { trialEndsAt: "" },
-        paddleSubscriptionId: { not: null },
       },
       select: {
         id: true,
@@ -39,7 +41,6 @@ export async function GET(request: NextRequest) {
         businessName: true,
         trialEndsAt: true,
         subscriptionStatus: true,
-        paddleSubscriptionId: true,
       },
     });
 
@@ -58,29 +59,6 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      // NEVER send a trial-ending email to an actual paying subscriber. The
-      // query above already excludes status "active", but that local value
-      // can be stale if a Paddle webhook was missed — so for anyone with a
-      // Paddle subscription on file we confirm with Paddle (source of truth)
-      // and self-heal the local record before deciding. Paddle "active" =
-      // they've been charged (paying); "trialing" = genuine trial (send).
-      const liveStatus = await fetchPaddleSubscriptionStatus(u.paddleSubscriptionId);
-      if (liveStatus === "active") {
-        await prisma.user.update({
-          where: { id: u.id },
-          data: { subscriptionStatus: "active", trialEndsAt: "" },
-          select: { id: true },
-        });
-        skipped.push({ id: u.id, reason: "active_subscriber" });
-        continue;
-      }
-      // Fail closed: only Paddle-confirmed trials receive trial warnings.
-      // Unknown/canceled/paused/past_due must not receive trial messaging.
-      if (liveStatus !== "trialing") {
-        skipped.push({ id: u.id, reason: liveStatus ? `subscription_${liveStatus}` : "paddle_status_unknown" });
-        continue;
-      }
-
       const result = await sendEmail({
         to: u.email,
         subject: "Your DetailBook trial ends tomorrow",
@@ -90,24 +68,24 @@ export async function GET(request: NextRequest) {
             <p style="color:#374151;line-height:1.55">Hi ${u.name || u.businessName},</p>
             <p style="color:#374151;line-height:1.55">
               Your 7-day DetailBook trial for <strong>${u.businessName}</strong> ends tomorrow.
-              If you don't cancel, your card will be charged for the first month and your subscription will start automatically.
+              To keep your booking page live and accepting bookings, subscribe from $24/mo.
             </p>
             <p style="color:#374151;line-height:1.55">
-              Happy with DetailBook? Do nothing — your subscription kicks in seamlessly.
-              Not ready? You can cancel in one click from your billing settings.
+              If you don't subscribe, your booking page will be paused — but nothing is deleted.
+              Your packages, bookings, and settings stay saved, and you can reactivate anytime.
             </p>
             <p style="margin:24px 0">
               <a href="${baseUrl}/dashboard/billing" style="display:inline-block;background:#1d4ed8;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:700">
-                Manage subscription →
+                Choose a plan →
               </a>
             </p>
             <p style="color:#6b7280;font-size:13px;line-height:1.55">
-              Plans start at $24/mo. Your data is preserved either way.
+              Plans start at $24/mo · Cancel anytime.
             </p>
             <p style="color:#9ca3af;font-size:12px;margin-top:32px">— The DetailBook team</p>
           </div>
         `,
-        text: `Your 7-day DetailBook trial for ${u.businessName} ends tomorrow.\n\nIf you don't cancel, your card will be charged for the first month and your subscription will start automatically.\n\nManage subscription: ${baseUrl}/dashboard/billing\n\nPlans start at $24/mo. Your data is preserved either way.\n\n— The DetailBook team`,
+        text: `Your 7-day DetailBook trial for ${u.businessName} ends tomorrow.\n\nTo keep your booking page live and accepting bookings, subscribe from $24/mo: ${baseUrl}/dashboard/billing\n\nIf you don't subscribe, your booking page will be paused — but nothing is deleted. Your packages, bookings, and settings stay saved, and you can reactivate anytime.\n\nPlans start at $24/mo · Cancel anytime.\n\n— The DetailBook team`,
       });
 
       if (result.success) {
