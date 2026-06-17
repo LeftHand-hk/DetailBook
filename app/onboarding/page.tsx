@@ -154,6 +154,15 @@ export default function OnboardingPage() {
   const selectedVehicleIds = new Set(vehiclePricing.map((entry) => entry.type));
   const currentStep = STEPS[step];
 
+  // Once the first package is saved, the package step is no longer about
+  // "your first" — reframe the header so "Add another" doesn't look like
+  // it dropped the user back to square one.
+  const addingAnotherPackage = step === 1 && createdPackageCount > 0 && !packageSaved;
+  const headerTitle = addingAnotherPackage ? "Add another package" : currentStep.title;
+  const headerNote = addingAnotherPackage
+    ? `${createdPackageCount} ${createdPackageCount === 1 ? "package" : "packages"} added so far — add as many as you offer.`
+    : currentStep.note;
+
   const bookingUrl = user
     ? `${typeof window !== "undefined" ? window.location.origin : "https://detailbookapp.com"}/book/${user.slug}`
     : "";
@@ -334,8 +343,8 @@ export default function OnboardingPage() {
                   <StepIcon step={step} />
                 </span>
                 <div className="min-w-0">
-                  <h1 className="text-xl font-black leading-tight sm:text-2xl">{currentStep.title}</h1>
-                  <p className="mt-0.5 text-sm text-gray-500">{currentStep.note}</p>
+                  <h1 className="text-xl font-black leading-tight sm:text-2xl">{headerTitle}</h1>
+                  <p className="mt-0.5 text-sm text-gray-500">{headerNote}</p>
                 </div>
               </div>
             </div>
