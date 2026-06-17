@@ -65,6 +65,7 @@ export default function OnboardingPage() {
   const [createdPackageCount, setCreatedPackageCount] = useState(0);
   const [packageForm, setPackageForm] = useState(emptyPackageForm);
   const [vehiclePricing, setVehiclePricing] = useState<PackageVehiclePricing[]>(defaultVehiclePricing);
+  const [showVehiclePricing, setShowVehiclePricing] = useState(false);
 
   const [bizForm, setBizForm] = useState({
     businessName: "",
@@ -278,6 +279,7 @@ export default function OnboardingPage() {
   const resetPackageBuilder = () => {
     setPackageForm(emptyPackageForm());
     setVehiclePricing(defaultVehiclePricing());
+    setShowVehiclePricing(false);
     setPackageError("");
     setPackageSaved(false);
   };
@@ -464,7 +466,7 @@ export default function OnboardingPage() {
             {step === 1 && (
               <div className="animate-fadeIn p-5 sm:p-7">
                 {!packageSaved ? (
-                  <form onSubmit={savePackage} className="space-y-6">
+                  <form onSubmit={savePackage} className="space-y-5">
                     {packageError && (
                       <div className="flex items-start gap-2.5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                         <svg className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -474,80 +476,111 @@ export default function OnboardingPage() {
                       </div>
                     )}
 
-                    <div>
-                      <SectionLabel hint="Tap to autofill">Quick starters</SectionLabel>
-                      <div className="grid gap-2.5 sm:grid-cols-3">
-                        {PACKAGE_STARTERS.map((starter) => {
-                          const active = packageForm.name === starter.name && packageForm.price === starter.price;
-                          return (
-                            <button
-                              key={starter.name}
-                              type="button"
-                              onClick={() => setPackageForm(starter)}
-                              className={`rounded-2xl border-2 px-3.5 py-3 text-left transition-all active:scale-[0.98] ${
-                                active
-                                  ? "border-blue-600 bg-blue-50 shadow-md shadow-blue-100"
-                                  : "border-gray-200 bg-gray-50 hover:border-blue-200 hover:bg-white"
-                              }`}
-                            >
-                              <p className="text-sm font-black">{starter.name}</p>
-                              <p className="text-xs text-gray-500">from ${starter.price}</p>
-                            </button>
-                          );
-                        })}
+                    {/* Section 1 — the package itself */}
+                    <fieldset className="space-y-4">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                        <span className="text-xs font-bold text-gray-400">Quick fill</span>
+                        {PACKAGE_STARTERS.map((starter) => (
+                          <button
+                            key={starter.name}
+                            type="button"
+                            onClick={() => setPackageForm(starter)}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-bold text-gray-600 transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 active:scale-95"
+                          >
+                            <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                            {starter.name} · ${starter.price}
+                          </button>
+                        ))}
                       </div>
-                    </div>
 
-                    <div className="grid gap-4 sm:grid-cols-[1fr_140px]">
-                      <Field label="Package name" required>
-                        <input
-                          type="text"
+                      <div className="grid gap-4 sm:grid-cols-[1fr_140px]">
+                        <Field label="Package name" required>
+                          <input
+                            type="text"
+                            required
+                            value={packageForm.name}
+                            onChange={(e) => setPackageForm({ ...packageForm, name: e.target.value })}
+                            placeholder="Full Detail"
+                            className={INPUT_CLASS}
+                          />
+                        </Field>
+                        <Field label="Price" required>
+                          <CurrencyInput
+                            value={packageForm.price}
+                            onChange={(price) => setPackageForm({ ...packageForm, price })}
+                            placeholder="149"
+                          />
+                        </Field>
+                      </div>
+
+                      <Field label="Description" required>
+                        <textarea
                           required
-                          value={packageForm.name}
-                          onChange={(e) => setPackageForm({ ...packageForm, name: e.target.value })}
-                          placeholder="Full Detail"
-                          className={INPUT_CLASS}
+                          rows={2}
+                          value={packageForm.description}
+                          onChange={(e) => setPackageForm({ ...packageForm, description: e.target.value })}
+                          placeholder="What is included?"
+                          className={`${INPUT_CLASS} h-auto min-h-[76px] resize-none py-3 leading-relaxed`}
                         />
                       </Field>
-                      <Field label="Price" required>
-                        <CurrencyInput
-                          value={packageForm.price}
-                          onChange={(price) => setPackageForm({ ...packageForm, price })}
-                          placeholder="149"
-                        />
-                      </Field>
-                    </div>
+                    </fieldset>
 
-                    <Field label="Description" required>
-                      <textarea
-                        required
-                        rows={3}
-                        value={packageForm.description}
-                        onChange={(e) => setPackageForm({ ...packageForm, description: e.target.value })}
-                        placeholder="What is included?"
-                        className={`${INPUT_CLASS} h-auto min-h-[92px] resize-none py-3 leading-relaxed`}
-                      />
-                    </Field>
-
-                    <div>
-                      <SectionLabel hint="Optional">Vehicle pricing</SectionLabel>
-                      <p className="-mt-1 mb-2.5 text-xs text-gray-500">Pick the vehicle types you serve and add extra price for bigger ones.</p>
-                      <div className="grid gap-2.5 sm:grid-cols-2">
-                        {VEHICLE_TYPES.map((vehicle) => {
-                          const selected = selectedVehicleIds.has(vehicle.id);
-                          const entry = vehiclePricing.find((item) => item.type === vehicle.id);
-                          return (
-                            <VehiclePriceTile
-                              key={vehicle.id}
-                              vehicle={vehicle}
-                              selected={selected}
-                              surcharge={entry?.surcharge ?? 0}
-                              onToggle={() => toggleVehicle(vehicle.id)}
-                              onSurcharge={(value) => updateVehicleSurcharge(vehicle.id, value)}
-                            />
-                          );
-                        })}
-                      </div>
+                    {/* Section 2 — optional vehicle pricing, collapsed by default */}
+                    <div className="border-t border-gray-100 pt-5">
+                      {!showVehiclePricing ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowVehiclePricing(true)}
+                          className="flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-3.5 text-left transition-colors hover:border-blue-200 hover:bg-white"
+                        >
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-lg">🚙</span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-black">
+                              Vehicle pricing <span className="font-bold text-gray-400">· Optional</span>
+                            </span>
+                            <span className="block text-xs text-gray-500">
+                              Bookable for all vehicle types. Tap to charge extra for bigger ones.
+                            </span>
+                          </span>
+                          <svg className="h-5 w-5 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                          </svg>
+                        </button>
+                      ) : (
+                        <>
+                          <div className="mb-2.5 flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-black">Vehicle pricing <span className="font-bold text-gray-400">· Optional</span></p>
+                              <p className="text-xs text-gray-500">Pick the types you serve and add extra for bigger ones.</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowVehiclePricing(false)}
+                              className="shrink-0 text-xs font-black text-blue-600 hover:text-blue-700"
+                            >
+                              Hide
+                            </button>
+                          </div>
+                          <div className="grid gap-2.5 sm:grid-cols-2">
+                            {VEHICLE_TYPES.map((vehicle) => {
+                              const selected = selectedVehicleIds.has(vehicle.id);
+                              const entry = vehiclePricing.find((item) => item.type === vehicle.id);
+                              return (
+                                <VehiclePriceTile
+                                  key={vehicle.id}
+                                  vehicle={vehicle}
+                                  selected={selected}
+                                  surcharge={entry?.surcharge ?? 0}
+                                  onToggle={() => toggleVehicle(vehicle.id)}
+                                  onSurcharge={(value) => updateVehicleSurcharge(vehicle.id, value)}
+                                />
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     <PrimaryButton disabled={savingPackage}>
