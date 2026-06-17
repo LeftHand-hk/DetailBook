@@ -5,7 +5,7 @@ import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import { VEHICLE_TYPES, type VehicleTypeId } from "@/lib/vehicle-pricing";
-import { getUser, isLoggedIn, setUser, syncFromServer } from "@/lib/storage";
+import { getPackages, getUser, isLoggedIn, setUser, syncFromServer } from "@/lib/storage";
 import type { PackageVehiclePricing, User } from "@/types";
 
 const STEPS = [
@@ -128,6 +128,10 @@ export default function OnboardingPage() {
 
       if (!stepResolved.current) {
         stepResolved.current = true;
+        if (getPackages().length > 0) {
+          setStep(2);
+          return;
+        }
         const phone = (u.phone || "").trim();
         const address = (u.address || "").trim();
         const firstServiceArea = Array.isArray(u.serviceAreas) && u.serviceAreas[0] ? String(u.serviceAreas[0]).trim() : "";

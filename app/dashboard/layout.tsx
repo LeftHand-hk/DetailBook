@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { isLoggedIn, logout, getUser, syncFromServer } from "@/lib/storage";
+import { isLoggedIn, logout, getUser, getPackages, syncFromServer } from "@/lib/storage";
 import type { User } from "@/types";
 import { LogoIcon, LogoWordmark } from "@/components/Logo";
 import SetupExperience from "@/components/SetupExperience";
@@ -185,16 +185,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             router.replace("/dashboard/billing");
             return;
           }
-          // New signups (card-on-signup flow) must complete onboarding
-          // before reaching the dashboard. Cutoff prevents grandfathered
-          // legacy accounts from being re-routed. Heuristic for "done":
-          // user has both serviceType (step 0 saved) and paddleCustomerId
-          // (step 1 / Paddle Checkout completed).
+          // New signups must complete onboarding before reaching the
+          // dashboard. The current onboarding can create the first package
+          // without Paddle, so packages are now a valid completion signal.
           const NEW_FLOW_SHIP_DATE = new Date("2026-05-13T00:00:00Z");
           const createdAt = (freshUser as any).createdAt;
           const isNewSignup = createdAt && new Date(createdAt) >= NEW_FLOW_SHIP_DATE;
           const hasPaddle = Boolean((freshUser as any).paddleCustomerId);
-          if (isNewSignup && !hasPaddle) {
+          const hasPackages = getPackages().length > 0;
+          if (isNewSignup && !hasPaddle && !hasPackages) {
             router.replace("/onboarding");
             return;
           }
