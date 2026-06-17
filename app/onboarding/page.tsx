@@ -266,6 +266,16 @@ export default function OnboardingPage() {
         throw new Error(body?.error || "Could not save package.");
       }
 
+      await fetch("/api/onboarding/status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ markStep: "services" }),
+      }).catch(() => {});
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("detailbook:setup-changed"));
+      }
+
       setCreatedPackageCount((count) => count + 1);
       await syncFromServer().catch(() => {});
       setPackageSaved(true);
@@ -285,7 +295,7 @@ export default function OnboardingPage() {
   };
 
   const finishOnboarding = () => {
-    try { sessionStorage.setItem("dB_showTour", "1"); } catch { /* private mode */ }
+    try { sessionStorage.removeItem("dB_showTour"); } catch { /* private mode */ }
     setStep(2);
   };
 

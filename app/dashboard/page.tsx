@@ -33,7 +33,10 @@ export default function DashboardPage() {
     if (typeof window === "undefined") return [];
     try { return getBookings() || []; } catch { return []; }
   });
-  const [, setPackages] = useState<Package[]>([]);
+  const [packages, setPackages] = useState<Package[]>(() => {
+    if (typeof window === "undefined") return [];
+    try { return getPackages() || []; } catch { return []; }
+  });
   const [setupSteps, setSetupSteps] = useState<SetupStep[] | null>(null);
   const [copied, setCopied] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -244,6 +247,7 @@ export default function DashboardPage() {
         <SetupProgressCard
           steps={setupSteps}
           user={user}
+          packageCount={packages.length}
           onCopyLink={handleCopyLink}
           copied={copied}
           router={router}
@@ -480,12 +484,14 @@ const CARD_STEP_DEFS: { id: SetupStepId; label: string; href: string; emoji: str
 function SetupProgressCard({
   steps,
   user,
+  packageCount,
   onCopyLink,
   copied,
   router,
 }: {
   steps: SetupStep[] | null;
   user: User | null;
+  packageCount: number;
   onCopyLink: () => void;
   copied: boolean;
   router: ReturnType<typeof useRouter>;
@@ -511,6 +517,7 @@ function SetupProgressCard({
   }
 
   const doneById = new Map(steps.map((s) => [s.id, s.done]));
+  if (packageCount > 0) doneById.set("services", true);
   const rows = CARD_STEP_DEFS.map((def) => ({ ...def, done: Boolean(doneById.get(def.id)) }));
   const completed = rows.filter((r) => r.done).length;
   const percent = Math.round((completed / rows.length) * 100);
