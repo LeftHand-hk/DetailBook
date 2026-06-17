@@ -617,6 +617,9 @@ export default function OnboardingPage() {
                         Continue <ArrowIcon />
                       </button>
                     </div>
+                    <p className="mx-auto mt-4 max-w-sm text-xs text-gray-400">
+                      You can add, edit, or remove packages anytime from your dashboard.
+                    </p>
                   </div>
                 )}
               </div>
