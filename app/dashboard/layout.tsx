@@ -566,22 +566,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {trialStatusLabel ? (
               <Link
                 href="/dashboard/billing"
-                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${
+                aria-label={trialDays === 0 ? "Trial ended. Open billing." : `${trialDays} trial days left. Open billing.`}
+                className={`inline-flex h-9 items-center overflow-hidden rounded-lg border shadow-sm transition-colors ${
                   trialDays === 0
-                    ? "border-red-200 bg-red-50 text-red-700"
+                    ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
                     : trialDays <= 2
-                      ? "border-amber-200 bg-amber-50 text-amber-700"
-                      : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      ? "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                      : "border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100"
                 }`}
               >
-                <span className={`h-1.5 w-1.5 rounded-full ${
+                <span className="flex h-full items-center gap-1.5 px-2.5">
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-[10px] font-black uppercase tracking-wider">Trial</span>
+                </span>
+                <span className={`flex h-full items-center border-l px-2.5 text-xs font-black ${
                   trialDays === 0
-                    ? "bg-red-500"
+                    ? "border-red-200 bg-red-100/70"
                     : trialDays <= 2
-                      ? "bg-amber-500"
-                      : "bg-emerald-500"
-                }`} />
-                {trialDays === 0 ? "Trial ended" : `${trialDays}d trial`}
+                      ? "border-amber-200 bg-amber-100/70"
+                      : "border-blue-200 bg-blue-100/70"
+                }`}>
+                  {trialDays === 0 ? "Ended" : `${trialDays} day${trialDays === 1 ? "" : "s"}`}
+                </span>
               </Link>
             ) : isPro ? (
               <span className="text-[10px] font-bold bg-gray-700 text-white px-2.5 py-1 rounded-full uppercase tracking-wider">Pro</span>
