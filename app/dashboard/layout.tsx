@@ -562,10 +562,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <LogoWordmark darkText size="text-base" />
             </div>
           </div>
-          <div className="flex items-center gap-1">
-            {isPro && (
+          <div className="flex items-center gap-2">
+            {trialStatusLabel ? (
+              <Link
+                href="/dashboard/billing"
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${
+                  trialDays === 0
+                    ? "border-red-200 bg-red-50 text-red-700"
+                    : trialDays <= 2
+                      ? "border-amber-200 bg-amber-50 text-amber-700"
+                      : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${
+                  trialDays === 0
+                    ? "bg-red-500"
+                    : trialDays <= 2
+                      ? "bg-amber-500"
+                      : "bg-emerald-500"
+                }`} />
+                {trialDays === 0 ? "Trial ended" : `${trialDays}d trial`}
+              </Link>
+            ) : isPro ? (
               <span className="text-[10px] font-bold bg-gray-700 text-white px-2.5 py-1 rounded-full uppercase tracking-wider">Pro</span>
-            )}
+            ) : null}
           </div>
         </div>
 
