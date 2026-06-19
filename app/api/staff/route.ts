@@ -17,30 +17,19 @@ export async function GET() {
     },
   });
 
-  const result = staff.map(({ password: _, ...s }) => ({
+  const month = new Date().toISOString().slice(0, 7);
+  const result = staff.map(({ password, bookings, ...s }) => ({
     ...s,
-    hasPassword: !!s.bookings, // just to confirm password is hidden
-    totalBookings: s.bookings.length,
-    completedBookings: s.bookings.filter((b) => b.status === "completed").length,
-    totalRevenue: s.bookings
+    totalBookings: bookings.length,
+    completedBookings: bookings.filter((b) => b.status === "completed").length,
+    totalRevenue: bookings
       .filter((b) => b.status === "completed")
       .reduce((sum, b) => sum + b.servicePrice, 0),
-    bookingsThisMonth: s.bookings.filter((b) => {
-      const month = new Date().toISOString().slice(0, 7);
-      return b.date.startsWith(month);
-    }).length,
-    passwordSet: !!(s as any).password, // flag for UI
+    bookingsThisMonth: bookings.filter((b) => b.date.startsWith(month)).length,
+    passwordSet: Boolean(password),
   }));
 
-  // Re-add passwordSet from DB since we stripped it
-  const staffWithPasswordFlag = await Promise.all(
-    result.map(async (s) => {
-      const raw = await prisma.staff.findUnique({ where: { id: s.id }, select: { password: true } });
-      return { ...s, passwordSet: !!(raw?.password) };
-    })
-  );
-
-  return NextResponse.json(staffWithPasswordFlag);
+  return NextResponse.json(result);
 }
 
 // POST /api/staff — create a new staff member

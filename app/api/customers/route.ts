@@ -27,6 +27,11 @@ export async function GET(request: NextRequest) {
     ];
   }
 
+  if (sp.get("count") === "1") {
+    const count = await prisma.customer.count({ where });
+    return NextResponse.json({ count });
+  }
+
   const rows = await prisma.customer.findMany({ where });
 
   // Pull all this business's bookings ONCE and group in JS, so totalBookings

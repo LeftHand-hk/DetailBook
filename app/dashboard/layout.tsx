@@ -106,9 +106,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     if (typeof window === "undefined") return;
     const refresh = () => {
-      fetch("/api/customers", { cache: "no-store" })
-        .then((r) => (r.ok ? r.json() : []))
-        .then((list: any[]) => setCustomerCount(Array.isArray(list) ? list.length : 0))
+      fetch("/api/customers?count=1", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : { count: 0 }))
+        .then((data: { count?: number }) => setCustomerCount(Number(data.count) || 0))
         .catch(() => {});
     };
     // The customer-count badge is cosmetic — defer it so it doesn't compete

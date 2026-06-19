@@ -6,6 +6,7 @@ import { getBookings, getUser } from "@/lib/storage";
 import type { Booking } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
 import EmptyState, { EmptyIcons } from "@/components/EmptyState";
+import { localDateKey } from "@/lib/date-key";
 
 const DAYS_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
 const DAYS_FULL = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -88,12 +89,12 @@ export default function CalendarPage() {
         setBookings(mapped);
       })
       .catch(() => setBookings(getBookings()));
-    setSelectedDay(new Date().toISOString().split("T")[0]);
+    setSelectedDay(localDateKey());
   }, []);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateKey();
 
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -106,7 +107,7 @@ export default function CalendarPage() {
   const goToToday = () => {
     const now = new Date();
     setCurrentDate(new Date(now.getFullYear(), now.getMonth(), 1));
-    setSelectedDay(now.toISOString().split("T")[0]);
+    setSelectedDay(localDateKey(now));
   };
 
   const selectDay = (date: string | null) => {
@@ -133,14 +134,14 @@ export default function CalendarPage() {
   const calendarDays: { date: string | null; day: number; isCurrentMonth: boolean }[] = [];
   for (let i = firstDay - 1; i >= 0; i--) {
     const d = daysInPrevMonth - i;
-    calendarDays.push({ date: new Date(year, month - 1, d).toISOString().split("T")[0], day: d, isCurrentMonth: false });
+    calendarDays.push({ date: localDateKey(new Date(year, month - 1, d)), day: d, isCurrentMonth: false });
   }
   for (let d = 1; d <= daysInMonth; d++) {
-    calendarDays.push({ date: new Date(year, month, d).toISOString().split("T")[0], day: d, isCurrentMonth: true });
+    calendarDays.push({ date: localDateKey(new Date(year, month, d)), day: d, isCurrentMonth: true });
   }
   const remaining = 42 - calendarDays.length;
   for (let d = 1; d <= remaining; d++) {
-    calendarDays.push({ date: new Date(year, month + 1, d).toISOString().split("T")[0], day: d, isCurrentMonth: false });
+    calendarDays.push({ date: localDateKey(new Date(year, month + 1, d)), day: d, isCurrentMonth: false });
   }
 
   // Stats

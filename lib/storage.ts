@@ -412,6 +412,11 @@ export function getBookings(): Booking[] {
   }
 }
 
+export function setBookingsLocal(bookings: Booking[]): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(KEYS.BOOKINGS, JSON.stringify(bookings));
+}
+
 export function setBookings(bookings: Booking[]): void {
   if (typeof window === "undefined") return;
 
@@ -617,12 +622,17 @@ async function syncFromServerOnce(): Promise<void> {
  * Sends PUT /api/user, then creates/updates every package and booking.
  */
 let syncFromServerInFlight: Promise<void> | null = null;
+let syncFromServerCompletedAt = 0;
 
-export function syncFromServer(): Promise<void> {
+export function syncFromServer(maxAgeMs = 0): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
   if (syncFromServerInFlight) return syncFromServerInFlight;
+  if (maxAgeMs > 0 && Date.now() - syncFromServerCompletedAt < maxAgeMs) {
+    return Promise.resolve();
+  }
 
   syncFromServerInFlight = syncFromServerOnce().finally(() => {
+    syncFromServerCompletedAt = Date.now();
     syncFromServerInFlight = null;
   });
   return syncFromServerInFlight;

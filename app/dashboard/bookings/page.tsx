@@ -1,10 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getBookings, setBookings as saveBookings, getUser } from "@/lib/storage";
+import {
+  getBookings,
+  getPackages,
+  getUser,
+  setBookingsLocal,
+  syncFromServer,
+} from "@/lib/storage";
 import type { Booking, Staff, Package } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
 import EmptyState, { EmptyIcons } from "@/components/EmptyState";
+import { localDateKey } from "@/lib/date-key";
 
 const statusColors: Record<string, string> = {
   confirmed: "bg-green-100 text-green-700 border border-green-200",
@@ -97,13 +104,6 @@ export default function BookingsPage() {
     window.history.replaceState({}, "", url.pathname + (url.search ? `?${url.searchParams.toString()}` : ""));
   }, []);
 
-  useEffect(() => {
-    fetch("/api/packages", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((p) => { if (Array.isArray(p)) setPackages(p.filter((x: any) => x.active)); })
-      .catch(() => {});
-  }, []);
-
   const handleAddBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     setAdding(true);
@@ -166,7 +166,7 @@ export default function BookingsPage() {
             },
           };
       setBookings((prev) => [created, ...prev]);
-      try { saveBookings([created, ...getBookings()]); } catch { /* cache best-effort */ }
+      try { setBookingsLocal([created, ...getBookings()]); } catch { /* cache best-effort */ }
       setShowAddModal(false);
       setAddForm(emptyAddForm);
     } catch {
@@ -208,28 +208,32 @@ export default function BookingsPage() {
         new Date((b as any).createdAt).getTime() - new Date((a as any).createdAt).getTime()
       );
       setBookings(sorted);
-      saveBookings(sorted);
+      setBookingsLocal(sorted);
     } catch {
       setBookings(getBookings());
     }
   };
 
   useEffect(() => {
-    loadBookings();
+    let cancelled = false;
+    syncFromServer(10_000).finally(() => {
+      if (cancelled) return;
+      const freshBookings = getBookings();
+      setBookings(freshBookings);
+      setPackages(getPackages().filter((pkg) => pkg.active));
 
-    fetch("/api/user")
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        if (data?.user?.plan === "pro") setIsPro(true);
-        if (data?.user?.slug) setUserSlug(data.user.slug);
-      })
-      .catch(() => {
-        const u = getUser();
-        if (u?.plan === "pro") setIsPro(true);
-        if (u?.slug) setUserSlug(u.slug);
-      });
-
-    fetch("/api/staff").then((r) => r.ok ? r.json() : []).then(setStaffList).catch(() => {});
+      const u = getUser();
+      const pro = u?.plan === "pro";
+      setIsPro(pro);
+      if (u?.slug) setUserSlug(u.slug);
+      if (pro) {
+        fetch("/api/staff")
+          .then((r) => (r.ok ? r.json() : []))
+          .then((data) => { if (!cancelled) setStaffList(data); })
+          .catch(() => {});
+      }
+    });
+    return () => { cancelled = true; };
   }, []);
 
   const openBooking = async (booking: Booking) => {
@@ -250,7 +254,7 @@ export default function BookingsPage() {
     setActionError(null);
     const updated = bookings.map((b) => b.id === id ? { ...b, status: newStatus } : b);
     setBookings(updated);
-    saveBookings(updated);
+    setBookingsLocal(updated);
     if (selected?.id === id) setSelected({ ...selected, status: newStatus });
     try {
       const response = await fetch(`/api/bookings/${id}`, {
@@ -264,7 +268,7 @@ export default function BookingsPage() {
       }
     } catch (error) {
       setBookings(previousBookings);
-      saveBookings(previousBookings);
+      setBookingsLocal(previousBookings);
       setSelected(previousSelected);
       setActionError(error instanceof Error ? error.message : "Could not update booking");
     }
@@ -289,7 +293,7 @@ export default function BookingsPage() {
     }
     const updated = bookings.map((b) => b.id === bookingId ? { ...b, staffId, staffName: member?.name } : b);
     setBookings(updated);
-    saveBookings(updated);
+    setBookingsLocal(updated);
     if (selected?.id === bookingId) setSelected({ ...selected, staffId, staffName: member?.name });
   };
 
@@ -308,7 +312,7 @@ export default function BookingsPage() {
     }
     const updated = bookings.filter((b) => b.id !== id);
     setBookings(updated);
-    saveBookings(updated);
+    setBookingsLocal(updated);
     setSelected(null);
     // Re-sync with DB to be safe
     loadBookings();
@@ -326,7 +330,7 @@ export default function BookingsPage() {
       b.id === id ? { ...b, depositPaid: newDepositPaid } : b
     );
     setBookings(updated);
-    saveBookings(updated);
+    setBookingsLocal(updated);
     if (selected && selected.id === id) {
       setSelected({ ...selected, depositPaid: newDepositPaid });
     }
@@ -348,7 +352,7 @@ export default function BookingsPage() {
     const apply = (b: any) => ({ ...b, selectedAddons: newAddons, addonsTotal });
     const updated = bookings.map((b) => (b.id === booking.id ? apply(b) : b));
     setBookings(updated);
-    saveBookings(updated);
+    setBookingsLocal(updated);
     setSelected((cur) => (cur && cur.id === booking.id ? apply(cur) : cur));
     try {
       await fetch(`/api/bookings/${booking.id}`, {
@@ -373,7 +377,7 @@ export default function BookingsPage() {
     persistAddons(booking, existing.filter((a: any) => a.id !== chargeId));
   };
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateKey();
 
   // Compute date-range cutoffs for the day/week/month filter.
   const rangeStart = (() => {
@@ -381,11 +385,11 @@ export default function BookingsPage() {
     if (range === "day") return today;
     if (range === "week") {
       d.setDate(d.getDate() - 6);
-      return d.toISOString().split("T")[0];
+      return localDateKey(d);
     }
     if (range === "month") {
       d.setDate(d.getDate() - 29);
-      return d.toISOString().split("T")[0];
+      return localDateKey(d);
     }
     return null;
   })();
@@ -416,7 +420,7 @@ export default function BookingsPage() {
   const isToday = (date: string) => date === today;
   const isTomorrow = (date: string) => {
     const t = new Date(); t.setDate(t.getDate() + 1);
-    return date === t.toISOString().split("T")[0];
+    return date === localDateKey(t);
   };
   const isPast = (date: string) => date < today;
 

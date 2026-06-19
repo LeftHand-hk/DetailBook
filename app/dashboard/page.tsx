@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { getUser, getBookings, getPackages } from "@/lib/storage";
+import { getUser, getBookings, getPackages, syncFromServer } from "@/lib/storage";
 import type { User, Booking, Package } from "@/types";
 import EmptyState, { EmptyIcons } from "@/components/EmptyState";
+import { localDateKey, localMonthKey } from "@/lib/date-key";
 
 const statusColors: Record<string, string> = {
   confirmed: "bg-green-100 text-green-700 border border-green-200",
@@ -64,27 +65,10 @@ export default function DashboardPage() {
     setUser(getUser());
     setMounted(true);
 
-    Promise.all([
-      fetch("/api/packages").then((r) => (r.ok ? r.json() : [])).catch(() => null),
-      fetch("/api/bookings").then((r) => (r.ok ? r.json() : [])).catch(() => null),
-    ]).then(([pkgData, bkData]) => {
-      if (pkgData) setPackages(pkgData as Package[]);
-      else setPackages(getPackages());
-
-      if (bkData) {
-        const mapped: Booking[] = (bkData as any[]).map((b: any) => ({
-          ...b,
-          vehicle: b.vehicle || {
-            make: b.vehicleMake || "",
-            model: b.vehicleModel || "",
-            year: b.vehicleYear || "",
-            color: b.vehicleColor || "",
-          },
-        }));
-        setBookings(mapped);
-      } else {
-        setBookings(getBookings());
-      }
+    syncFromServer(10_000).finally(() => {
+      setUser(getUser());
+      setPackages(getPackages());
+      setBookings(getBookings());
     });
 
     refreshSetup();
@@ -102,14 +86,14 @@ export default function DashboardPage() {
   }, [refreshSetup]);
 
   const isPro = user?.plan === "pro";
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateKey();
   const todayBookings = bookings.filter((b) => b.date === today);
   const upcomingBookings = bookings
     .filter((b) => b.date >= today && b.status !== "cancelled")
     .sort((a, b) => a.date.localeCompare(b.date));
   const pendingBookings = bookings.filter((b) => b.status === "pending");
 
-  const thisMonth = new Date().toISOString().slice(0, 7);
+  const thisMonth = localMonthKey();
   const monthRevenue = bookings
     .filter((b) => b.date.startsWith(thisMonth) && b.status === "completed")
     .reduce((sum, b) => sum + b.servicePrice, 0);
@@ -186,7 +170,7 @@ export default function DashboardPage() {
   // Revenue chart (last 7 days)
   const last7 = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (6 - i));
-    const key = d.toISOString().split("T")[0];
+    const key = localDateKey(d);
     const rev = bookings
       .filter((b) => b.date === key && b.status === "completed")
       .reduce((s, b) => s + b.servicePrice, 0);

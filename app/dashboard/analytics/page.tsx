@@ -6,6 +6,7 @@ import { getUser, getBookings } from "@/lib/storage";
 import type { User, Booking } from "@/types";
 import DashboardHelp from "@/components/DashboardHelp";
 import EmptyState, { EmptyIcons } from "@/components/EmptyState";
+import { localDateKey, localMonthKey } from "@/lib/date-key";
 
 export default function AnalyticsPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -128,7 +129,7 @@ export default function AnalyticsPage() {
   // Analytics data
   const completedBookings = bookings.filter(b => b.status === "completed");
   const thisMonthRevenue = completedBookings
-    .filter(b => b.date.startsWith(new Date().toISOString().slice(0, 7)))
+    .filter(b => b.date.startsWith(localMonthKey()))
     .reduce((s, b) => s + b.servicePrice, 0);
   const avgPerBooking = completedBookings.length > 0 ? Math.round(completedBookings.reduce((s, b) => s + b.servicePrice, 0) / completedBookings.length) : 0;
   const completionRate = bookings.length > 0 ? Math.round((completedBookings.length / bookings.length) * 100) : 0;
@@ -162,8 +163,8 @@ export default function AnalyticsPage() {
     end.setDate(end.getDate() - i * 7);
     const start = new Date(end);
     start.setDate(start.getDate() - 6);
-    const startStr = start.toISOString().slice(0, 10);
-    const endStr = end.toISOString().slice(0, 10);
+    const startStr = localDateKey(start);
+    const endStr = localDateKey(end);
     weekLabels.push(`${start.getMonth() + 1}/${start.getDate()}`);
     weekCounts.push(bookings.filter((b) => b.date >= startStr && b.date <= endStr).length);
   }
@@ -276,7 +277,7 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {[
               { label: "This Month", value: `$${thisMonthRevenue.toLocaleString()}`, sub: "Revenue", color: "from-blue-500 to-blue-700" },
-              { label: "This Month", value: String(bookings.filter(b => b.date.startsWith(new Date().toISOString().slice(0,7))).length), sub: "Bookings", color: "from-emerald-500 to-emerald-700" },
+              { label: "This Month", value: String(bookings.filter(b => b.date.startsWith(localMonthKey())).length), sub: "Bookings", color: "from-emerald-500 to-emerald-700" },
               { label: "Average", value: `$${avgPerBooking}`, sub: "Per Booking", color: "from-purple-500 to-purple-700" },
               { label: "Completion", value: `${completionRate}%`, sub: "Rate", color: "from-amber-500 to-orange-600" },
             ].map((stat, i) => (
@@ -349,7 +350,7 @@ export default function AnalyticsPage() {
               { label: "Total Customers", value: customers.length === 0 ? "—" : String(customers.length), sub: "All-time" },
               { label: "Repeat Customers", value: customers.length === 0 ? "—" : String(repeatCustomers), sub: "Booked more than once" },
               { label: "Avg. Lifetime Value", value: customers.length === 0 ? "—" : `$${avgLifetimeValue}`, sub: "Per customer" },
-              { label: "New This Month", value: customers.length === 0 ? "—" : String(customers.filter(c => c.lastVisit.startsWith(new Date().toISOString().slice(0, 7))).length), sub: "First-time bookers" },
+              { label: "New This Month", value: customers.length === 0 ? "—" : String(customers.filter(c => c.lastVisit.startsWith(localMonthKey())).length), sub: "First-time bookers" },
             ].map((stat) => (
               <div key={stat.label} className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{stat.label}</p>
