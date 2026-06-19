@@ -127,7 +127,6 @@ export default function AdminUsersPage() {
   const [search, setSearch] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [editingEmail, setEditingEmail] = useState<{ id: string; email: string } | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<AdminUser | null>(null);
   const [trialUser, setTrialUser] = useState<AdminUser | null>(null);
   const [trialDateInput, setTrialDateInput] = useState("");
@@ -162,10 +161,10 @@ export default function AdminUsersPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to update");
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, ...data } : u)));
-      return true;
+      return data as Partial<AdminUser>;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to update user");
-      return false;
+      return null;
     } finally {
       setSaving(null);
     }
@@ -199,15 +198,12 @@ export default function AdminUsersPage() {
   };
 
   const adjustTrial = async (user: AdminUser, days: number) => {
-    const base = user.trialEndsAt && new Date(user.trialEndsAt) > new Date()
-      ? new Date(user.trialEndsAt)
-      : new Date();
-    base.setDate(base.getDate() + days);
-    await updateUser(user.id, {
-      subscriptionStatus: "trial",
-      trialEndsAt: base.toISOString(),
-      suspended: false,
-    });
+    const updated = await updateUser(user.id, { trialDaysDelta: days });
+    if (updated) {
+      setTrialUser((current) =>
+        current?.id === user.id ? { ...current, ...updated } : current
+      );
+    }
   };
 
   const endTrial = async (user: AdminUser) => {
@@ -220,11 +216,16 @@ export default function AdminUsersPage() {
   const setTrialCustomDate = async (user: AdminUser, isoDate: string) => {
     const date = new Date(isoDate);
     if (isNaN(date.getTime())) return;
-    await updateUser(user.id, {
+    const updated = await updateUser(user.id, {
       subscriptionStatus: "trial",
       trialEndsAt: date.toISOString(),
       suspended: false,
     });
+    if (updated) {
+      setTrialUser((current) =>
+        current?.id === user.id ? { ...current, ...updated } : current
+      );
+    }
   };
 
   const openTrialModal = (user: AdminUser) => {
@@ -241,12 +242,6 @@ export default function AdminUsersPage() {
     future.setDate(future.getDate() + 15);
     const tzOffset = future.getTimezoneOffset() * 60000;
     setTrialDateInput(new Date(future.getTime() - tzOffset).toISOString().slice(0, 16));
-  };
-
-  const handleSaveEmail = async () => {
-    if (!editingEmail) return;
-    const ok = await updateUser(editingEmail.id, { email: editingEmail.email });
-    if (ok) setEditingEmail(null);
   };
 
   const handleImpersonate = async (userId: string) => {
@@ -520,13 +515,6 @@ export default function AdminUsersPage() {
                               Trial
                             </button>
                             <button
-                              onClick={() => setEditingEmail({ id: user.id, email: user.email })}
-                              disabled={isSaving}
-                              className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded-md disabled:opacity-50"
-                            >
-                              Edit Email
-                            </button>
-                            <button
                               onClick={() => setDeleteConfirm(user)}
                               disabled={isSaving}
                               className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded-md disabled:opacity-50"
@@ -544,41 +532,6 @@ export default function AdminUsersPage() {
           )}
         </div>
       </div>
-
-      {/* Edit Email Modal */}
-      {editingEmail && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Edit Email</h3>
-            <p className="text-sm text-gray-500 mb-4">
-              Update the email address for this account. The user will need to use the new email to log in.
-            </p>
-            <input
-              type="email"
-              value={editingEmail.email}
-              onChange={(e) => setEditingEmail({ ...editingEmail, email: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 mb-4"
-              placeholder="new@example.com"
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setEditingEmail(null)}
-                disabled={saving === editingEmail.id}
-                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveEmail}
-                disabled={saving === editingEmail.id}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {saving === editingEmail.id ? "Saving..." : "Save"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Manage Trial Modal */}
       {trialUser && (
@@ -601,32 +554,24 @@ export default function AdminUsersPage() {
             <div className="mb-4">
               <div className="text-xs font-medium text-gray-700 mb-2">Quick adjustments</div>
               <div className="flex flex-wrap gap-2">
-                {[1, 7, 14, 30].map((d) => (
+                {[1, 2].map((d) => (
                   <button
                     key={d}
-                    onClick={async () => {
-                      await adjustTrial(trialUser, d);
-                      const updated = users.find((u) => u.id === trialUser.id);
-                      if (updated) setTrialUser(updated);
-                    }}
+                    onClick={() => adjustTrial(trialUser, d)}
                     disabled={saving === trialUser.id}
-                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-700 disabled:opacity-50"
+                    className="px-3 py-1.5 text-sm border border-green-200 rounded-lg bg-white hover:bg-green-50 text-green-700 disabled:opacity-50"
                   >
-                    +{d}d
+                    +{d} day{d === 1 ? "" : "s"}
                   </button>
                 ))}
-                {[7, 30].map((d) => (
+                {[1, 2].map((d) => (
                   <button
                     key={`minus-${d}`}
-                    onClick={async () => {
-                      await adjustTrial(trialUser, -d);
-                      const updated = users.find((u) => u.id === trialUser.id);
-                      if (updated) setTrialUser(updated);
-                    }}
+                    onClick={() => adjustTrial(trialUser, -d)}
                     disabled={saving === trialUser.id}
-                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-700 disabled:opacity-50"
+                    className="px-3 py-1.5 text-sm border border-red-200 rounded-lg bg-white hover:bg-red-50 text-red-600 disabled:opacity-50"
                   >
-                    −{d}d
+                    -{d} day{d === 1 ? "" : "s"}
                   </button>
                 ))}
                 <button
@@ -654,8 +599,6 @@ export default function AdminUsersPage() {
                 onClick={async () => {
                   if (!trialDateInput) return;
                   await setTrialCustomDate(trialUser, trialDateInput);
-                  const updated = users.find((u) => u.id === trialUser.id);
-                  if (updated) setTrialUser(updated);
                 }}
                 disabled={saving === trialUser.id || !trialDateInput}
                 className="mt-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"

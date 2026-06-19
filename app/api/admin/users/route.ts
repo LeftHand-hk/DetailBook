@@ -77,7 +77,15 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { userId, plan, suspended, email, trialEndsAt, subscriptionStatus } = body;
+    const {
+      userId,
+      plan,
+      suspended,
+      email,
+      trialEndsAt,
+      trialDaysDelta,
+      subscriptionStatus,
+    } = body;
 
     if (!userId) {
       return NextResponse.json(
@@ -120,6 +128,27 @@ export async function PUT(request: NextRequest) {
 
     if (trialEndsAt !== undefined) {
       data.trialEndsAt = trialEndsAt;
+    }
+
+    if (trialDaysDelta !== undefined) {
+      if (!Number.isInteger(trialDaysDelta) || ![-2, -1, 1, 2].includes(trialDaysDelta)) {
+        return NextResponse.json(
+          { error: "Trial adjustment must be -2, -1, 1, or 2 days" },
+          { status: 400 }
+        );
+      }
+
+      const storedTrialEnd = existing.trialEndsAt ? new Date(existing.trialEndsAt) : null;
+      const now = new Date();
+      const base =
+        storedTrialEnd && !isNaN(storedTrialEnd.getTime()) && storedTrialEnd > now
+          ? storedTrialEnd
+          : now;
+      base.setUTCDate(base.getUTCDate() + trialDaysDelta);
+
+      data.trialEndsAt = base.toISOString();
+      data.subscriptionStatus = "trial";
+      data.suspended = false;
     }
 
     if (subscriptionStatus !== undefined) {
