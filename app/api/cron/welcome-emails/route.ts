@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runWelcomeSequenceTick } from "@/lib/welcome-emails";
-import { runActivationRecoveryTick } from "@/lib/activation-recovery-email";
 
-// Hourly cron — called by cron-job.org. For every user signed up in the
-// last 30 days, dispatches the next welcome email if one is due.
-// Cadence: Day 0 (welcome), Day 2 (engagement, only if no packages),
-// Day 5 (share link), Day 13 (trial ending). Skips users who paused,
-// are suspended/cancelled, or (for Day 13) have upgraded to a paid plan.
+// Hourly cron called by cron-job.org. Day 1 is sent after signup, Day 3
+// selects the first incomplete setup action, and the final two messages
+// are tied to the app-owned trial end (48h and 24h remaining).
 export async function GET(request: NextRequest) {
   const secret =
     request.headers.get("x-cron-secret") ||
@@ -16,11 +13,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [welcomeSequence, activationRecovery] = await Promise.all([
-      runWelcomeSequenceTick(),
-      runActivationRecoveryTick(),
-    ]);
-    return NextResponse.json({ welcomeSequence, activationRecovery });
+    const welcomeSequence = await runWelcomeSequenceTick();
+    return NextResponse.json({ welcomeSequence });
   } catch (err) {
     console.error("[cron/welcome-emails] error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

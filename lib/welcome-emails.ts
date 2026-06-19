@@ -30,7 +30,7 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://detailbookapp.com";
 // also retries Day 0 sends an hour later if all three of these fail.
 const RETRY_DELAYS_MS = [1000, 4000];
 
-type Recipient = {
+export type WelcomeRecipient = {
   id: string;
   email: string;
   businessName: string;
@@ -42,6 +42,17 @@ type Recipient = {
   // the user knows the exact date their trial runs out.
   trialEndsAt: string;
   packageCount: number;
+  hasWorkingHours: boolean;
+  hasCustomizedPage: boolean;
+  hasSharedLink: boolean;
+};
+type Recipient = WelcomeRecipient;
+
+type NextAction = {
+  title: string;
+  description: string;
+  cta: string;
+  url: string;
 };
 
 function unsubLink(token: string): string {
@@ -82,84 +93,130 @@ function bookingUrlFor(r: Recipient): string {
   return r.slug ? `${APP_URL}/book/${r.slug}` : `${APP_URL}/dashboard`;
 }
 
-// ─── Day 1 — Welcome + setup guide ─────────────────────────────────
+function nextActionFor(r: Recipient): NextAction {
+  if (r.packageCount === 0) {
+    return {
+      title: "Add your first service package",
+      description: "Customers need at least one service to book. Add its name, price, duration, and the vehicle types you accept.",
+      cta: "Add a service package",
+      url: `${APP_URL}/dashboard/packages?setup=services`,
+    };
+  }
+  if (!r.hasWorkingHours) {
+    return {
+      title: "Set your working hours",
+      description: "Choose when customers can book. DetailBook automatically blocks times outside your availability.",
+      cta: "Set working hours",
+      url: `${APP_URL}/dashboard/settings`,
+    };
+  }
+  if (!r.hasCustomizedPage) {
+    return {
+      title: "Make the booking page yours",
+      description: "Add your logo, business introduction, photos, and branding so customers immediately recognize your business.",
+      cta: "Customize booking page",
+      url: `${APP_URL}/dashboard/booking-page`,
+    };
+  }
+  if (!r.hasSharedLink) {
+    return {
+      title: "Share your booking link",
+      description: "Your page is ready. Send the link to a customer or add it to Instagram, Facebook, or your Google Business profile.",
+      cta: "View booking page",
+      url: bookingUrlFor(r),
+    };
+  }
+  return {
+    title: "Your booking page is ready",
+    description: "Your core setup is complete. Keep sharing your booking link and manage new appointments from the dashboard.",
+    cta: "Open dashboard",
+    url: `${APP_URL}/dashboard`,
+  };
+}
+
+function progressRows(r: Recipient): Array<{ label: string; status: string }> {
+  return [
+    { label: "Service packages", status: r.packageCount > 0 ? "Completed" : "Not completed" },
+    { label: "Working hours", status: r.hasWorkingHours ? "Completed" : "Not completed" },
+    { label: "Booking page", status: r.hasCustomizedPage ? "Customized" : "Not customized" },
+    { label: "Booking link", status: r.hasSharedLink ? "Shared" : "Not shared" },
+  ];
+}
+
+// ─── Day 1 — Welcome ────────────────────────────────────────────────
 function emailDay1(r: Recipient, unsubUrl: string) {
   const firstName = (r.name || "").trim().split(/\s+/)[0] || "there";
   const bookingLink = bookingUrlFor(r);
   const e = escapeHtml;
-  const subject = `Welcome to DetailBook — let's get you set up`;
-  const packageStepText = r.packageCount > 0
-    ? `1. Services added — you already have ${r.packageCount} package${r.packageCount === 1 ? "" : "s"} ready for customers`
-    : "1. Add your services — go to Packages in the sidebar and create your first service with a price and duration";
-  const packageStepHtml = r.packageCount > 0
-    ? `<li style="margin-bottom:6px;"><strong>Services added</strong> — you already have ${r.packageCount} package${r.packageCount === 1 ? "" : "s"} ready for customers</li>`
-    : `<li style="margin-bottom:6px;"><strong>Add your services</strong> — go to Packages in the sidebar and create your first service with a price and duration</li>`;
+  const subject = `Welcome to DetailBook, ${firstName}`;
 
   const text = `Hi ${firstName},
 
-Welcome to DetailBook! I'm Ardit, the founder — and I personally want to make sure you get the most out of your 7-day trial.
+Thank you for trying DetailBook.
 
-Here's how to get set up in 10 minutes:
+DetailBook gives your detailing business one place to manage your services, bookings, customers, calendar, deposits, and reminders.
 
-${packageStepText}
-2. Set your working hours — so customers know when you're available
-3. Customize your booking page — add your logo, photos of your work, and business details under Booking Page in the sidebar
-4. Share your booking link — send it to your next customer and watch the booking come in
+During your 7-day trial, you can:
 
-Your booking link: ${bookingLink}
+- Create service packages with prices and durations
+- Build a professional booking page
+- Let customers choose a service and available time
+- Collect deposits to reduce no-shows
+- Manage bookings and customers from your dashboard
+- Share one booking link anywhere you promote your business
 
-If you want, just reply with your 3 main services and prices and I'll set them up for you personally. Takes me 10 minutes and you'll be live today.${tplSignatureText(unsubUrl)}`;
+Your booking page:
+${bookingLink}
+
+Start by adding your services and making the booking page match your business. If you need help at any point, reply to this email. I personally read every response.${tplSignatureText(unsubUrl)}`;
 
   const html = tplShell(`
     <p style="margin:0 0 14px 0;">Hi ${e(firstName)},</p>
-    <p style="margin:0 0 14px 0;">Welcome to DetailBook! I&rsquo;m Ardit, the founder — and I personally want to make sure you get the most out of your 7-day trial.</p>
-    <p style="margin:0 0 10px 0;">Here&rsquo;s how to get set up in 10 minutes:</p>
-    <ol style="margin:0 0 14px 0;padding-left:22px;">
-      ${packageStepHtml}
-      <li style="margin-bottom:6px;"><strong>Set your working hours</strong> — so customers know when you&rsquo;re available</li>
-      <li style="margin-bottom:6px;"><strong>Customize your booking page</strong> — add your logo, photos of your work, and business details under Booking Page in the sidebar</li>
-      <li style="margin-bottom:6px;"><strong>Share your booking link</strong> — send it to your next customer and watch the booking come in</li>
-    </ol>
-    <p style="margin:0 0 14px 0;">Your booking link: <a href="${bookingLink}" style="color:#2563eb;text-decoration:underline;">${e(bookingLink)}</a></p>
-    <p style="margin:0 0 14px 0;">If you want, just reply with your 3 main services and prices and I&rsquo;ll set them up for you personally. Takes me 10 minutes and you&rsquo;ll be live today.</p>`,
+    <p style="margin:0 0 14px 0;">Thank you for trying DetailBook.</p>
+    <p style="margin:0 0 14px 0;">DetailBook gives your detailing business one place to manage your services, bookings, customers, calendar, deposits, and reminders.</p>
+    <p style="margin:0 0 10px 0;">During your 7-day trial, you can:</p>
+    <ul style="margin:0 0 14px 0;padding-left:22px;">
+      <li>Create service packages with prices and durations</li>
+      <li>Build a professional booking page</li>
+      <li>Let customers choose a service and available time</li>
+      <li>Collect deposits to reduce no-shows</li>
+      <li>Manage bookings and customers from your dashboard</li>
+      <li>Share one booking link anywhere you promote your business</li>
+    </ul>
+    <p style="margin:0 0 8px 0;"><strong>Your booking page:</strong></p>
+    <p style="margin:0 0 14px 0;"><a href="${bookingLink}" style="color:#2563eb;text-decoration:underline;">${e(bookingLink)}</a></p>
+    <p style="margin:0 0 14px 0;">Start by adding your services and making the booking page match your business. If you need help at any point, reply to this email. I personally read every response.</p>`,
     unsubUrl);
 
   return { subject, text, html };
 }
 
-// ─── Day 3 — Need a hand setting up? ───────────────────────────────
+// ─── Day 3 — Account-specific next action ───────────────────────────
 function emailDay3(r: Recipient, unsubUrl: string) {
   const firstName = (r.name || "").trim().split(/\s+/)[0] || "there";
   const e = escapeHtml;
-  const subject = `Need a hand setting up?`;
-  const setupHelpText = r.packageCount > 0
-    ? `I can see you already added ${r.packageCount} service package${r.packageCount === 1 ? "" : "s"}. The best next step is to set your working hours, customize your booking page, and share your link with a customer.`
-    : `If you haven't set up your services yet, I'll do it for you. Just reply with:
-- Your service names
-- Prices
-- How long each one takes`;
-  const setupHelpHtml = r.packageCount > 0
-    ? `<p style="margin:0 0 14px 0;">I can see you already added ${r.packageCount} service package${r.packageCount === 1 ? "" : "s"}. The best next step is to set your working hours, customize your booking page, and share your link with a customer.</p>`
-    : `<p style="margin:0 0 10px 0;">If you haven&rsquo;t set up your services yet, I&rsquo;ll do it for you. Just reply with:</p>
-    <ul style="margin:0 0 14px 0;padding-left:22px;">
-      <li>Your service names</li>
-      <li>Prices</li>
-      <li>How long each one takes</li>
-    </ul>`;
+  const subject = `Let's finish your DetailBook booking page`;
+  const action = nextActionFor(r);
 
   const text = `Hi ${firstName},
 
-You're on day 3 of your trial — wanted to check in personally.
+Your DetailBook trial is underway. Here's the most useful next step for your account:
 
-${setupHelpText}
+${action.title}
 
-I'll build your booking page and send you back a live link. No extra cost, no catch — I just want to make sure you actually get to see DetailBook working for your business before the trial ends.${tplSignatureText(unsubUrl)}`;
+${action.description}
+
+${action.cta}: ${action.url}
+
+Need help finishing it? Reply with your services, prices, or any questions and I'll help you personally.${tplSignatureText(unsubUrl)}`;
 
   const html = tplShell(`
     <p style="margin:0 0 14px 0;">Hi ${e(firstName)},</p>
-    <p style="margin:0 0 14px 0;">You&rsquo;re on day 3 of your trial — wanted to check in personally.</p>
-    ${setupHelpHtml}
-    <p style="margin:0 0 14px 0;">I&rsquo;ll build your booking page and send you back a live link. No extra cost, no catch — I just want to make sure you actually get to see DetailBook working for your business before the trial ends.</p>`,
+    <p style="margin:0 0 14px 0;">Your DetailBook trial is underway. Here&rsquo;s the most useful next step for your account:</p>
+    <h2 style="margin:0 0 8px 0;font-size:18px;line-height:1.35;">${e(action.title)}</h2>
+    <p style="margin:0 0 18px 0;">${e(action.description)}</p>
+    <p style="margin:0 0 20px 0;"><a href="${action.url}" style="display:inline-block;background:#2563eb;color:#fff;padding:11px 18px;border-radius:8px;text-decoration:none;font-weight:700;">${e(action.cta)}</a></p>
+    <p style="margin:0 0 14px 0;">Need help finishing it? Reply with your services, prices, or any questions and I&rsquo;ll help you personally.</p>`,
     unsubUrl);
 
   return { subject, text, html };
@@ -170,34 +227,42 @@ function emailDay5(r: Recipient, unsubUrl: string) {
   const firstName = (r.name || "").trim().split(/\s+/)[0] || "there";
   const bookingLink = bookingUrlFor(r);
   const e = escapeHtml;
-  const subject = `2 days left — your booking page is ready`;
-  const setupStatusText = r.packageCount > 0
-    ? `Your ${r.packageCount} service package${r.packageCount === 1 ? " is" : "s are"} live and ready for customers.`
-    : "You have not added a service package yet. Reply now and I'll help you get one live.";
-  const setupStatusHtml = r.packageCount > 0
-    ? `Your ${r.packageCount} service package${r.packageCount === 1 ? " is" : "s are"} live and ready for customers.`
-    : "You have not added a service package yet. Reply now and I&rsquo;ll help you get one live.";
+  const subject = `Your DetailBook trial ends in 2 days`;
+  const rows = progressRows(r);
+  const progressText = rows
+    .map((row) => `- ${row.label}: ${row.status}`)
+    .join("\n");
+  const progressHtml = rows
+    .map((row) => `<li style="margin-bottom:5px;"><strong>${e(row.label)}:</strong> ${e(row.status)}</li>`)
+    .join("");
 
   const text = `Hi ${firstName},
 
-You've got 2 days left on your trial.
+You have two days remaining in your DetailBook trial.
 
-${setupStatusText}
-Your booking link:
+Your services, bookings, customers, and settings will remain saved, but your public booking page will pause when the trial ends unless you subscribe.
+
+Your current progress:
+${progressText}
+
+Your booking page:
 ${bookingLink}
 
-Send it to your next customer instead of texting back and forth — they pick the service, pick a time, and you get notified instantly.
+To keep it live after the trial, choose a plan from Billing:
+${APP_URL}/dashboard/billing
 
-${tplSignatureText(unsubUrl)}`;
+If you need help getting everything ready before the trial ends, reply to this email. I'll be happy to help.${tplSignatureText(unsubUrl)}`;
 
   const html = tplShell(`
     <p style="margin:0 0 14px 0;">Hi ${e(firstName)},</p>
-    <p style="margin:0 0 14px 0;">You&rsquo;ve got 2 days left on your trial.</p>
-    <p style="margin:0 0 10px 0;">${setupStatusHtml}</p>
-    <p style="margin:0 0 10px 0;">Your booking link:</p>
+    <p style="margin:0 0 14px 0;">You have two days remaining in your DetailBook trial.</p>
+    <p style="margin:0 0 14px 0;">Your services, bookings, customers, and settings will remain saved, but your public booking page will pause when the trial ends unless you subscribe.</p>
+    <p style="margin:0 0 8px 0;"><strong>Your current progress:</strong></p>
+    <ul style="margin:0 0 14px 0;padding-left:22px;">${progressHtml}</ul>
+    <p style="margin:0 0 8px 0;"><strong>Your booking page:</strong></p>
     <p style="margin:0 0 14px 0;"><a href="${bookingLink}" style="color:#2563eb;text-decoration:underline;">${e(bookingLink)}</a></p>
-    <p style="margin:0 0 14px 0;">Send it to your next customer instead of texting back and forth — they pick the service, pick a time, and you get notified instantly.</p>
-    `,
+    <p style="margin:0 0 20px 0;"><a href="${APP_URL}/dashboard/billing" style="display:inline-block;background:#2563eb;color:#fff;padding:11px 18px;border-radius:8px;text-decoration:none;font-weight:700;">View plans</a></p>
+    <p style="margin:0 0 14px 0;">If you need help getting everything ready before the trial ends, reply to this email. I&rsquo;ll be happy to help.</p>`,
     unsubUrl);
 
   return { subject, text, html };
@@ -213,18 +278,23 @@ function emailDay7(r: Recipient, unsubUrl: string) {
 
 Your 7-day trial ends today.
 
-If you want to keep your booking page live and keep taking bookings through DetailBook, just subscribe from Settings → Billing before midnight — it only takes a minute.
+To keep your booking page live and continue accepting customer bookings, choose a plan before the trial expires:
+${APP_URL}/dashboard/billing
 
-If now's not the right time, no problem — your account will pause and you can come back anytime.
+Plans start at $24 per month and can be canceled anytime.
 
-Either way, it's been great having you. If you have any feedback on what we could do better, just reply — I read every email personally.${tplSignatureText(unsubUrl)}`;
+If you do not subscribe today, your account will pause. Nothing will be deleted: your packages, bookings, customers, and settings will remain saved so you can reactivate later.
+
+Need help deciding or setting something up? Reply to this email and I'll help you personally.${tplSignatureText(unsubUrl)}`;
 
   const html = tplShell(`
     <p style="margin:0 0 14px 0;">Hi ${e(firstName)},</p>
     <p style="margin:0 0 14px 0;">Your 7-day trial ends today.</p>
-    <p style="margin:0 0 14px 0;">If you want to keep your booking page live and keep taking bookings through DetailBook, just subscribe from <a href="${APP_URL}/dashboard/billing" style="color:#2563eb;text-decoration:underline;">Settings → Billing</a> before midnight — it only takes a minute.</p>
-    <p style="margin:0 0 14px 0;">If now&rsquo;s not the right time, no problem — your account will pause and you can come back anytime.</p>
-    <p style="margin:0 0 14px 0;">Either way, it&rsquo;s been great having you. If you have any feedback on what we could do better, just reply — I read every email personally.</p>`,
+    <p style="margin:0 0 14px 0;">To keep your booking page live and continue accepting customer bookings, choose a plan before the trial expires.</p>
+    <p style="margin:0 0 20px 0;"><a href="${APP_URL}/dashboard/billing" style="display:inline-block;background:#2563eb;color:#fff;padding:11px 18px;border-radius:8px;text-decoration:none;font-weight:700;">Keep my booking page live</a></p>
+    <p style="margin:0 0 14px 0;">Plans start at $24 per month and can be canceled anytime.</p>
+    <p style="margin:0 0 14px 0;">If you do not subscribe today, your account will pause. Nothing will be deleted: your packages, bookings, customers, and settings will remain saved so you can reactivate later.</p>
+    <p style="margin:0 0 14px 0;">Need help deciding or setting something up? Reply to this email and I&rsquo;ll help you personally.</p>`,
     unsubUrl);
 
   return { subject, text, html };
@@ -321,6 +391,13 @@ function buildEmail(key: WelcomeEmailKey, r: Recipient, unsubUrl: string) {
     case "day5": return emailDay5(r, unsubUrl);
     case "day7": return emailDay7(r, unsubUrl);
   }
+}
+
+export function previewWelcomeEmail(
+  key: WelcomeEmailKey,
+  recipient: WelcomeRecipient,
+): { subject: string; text: string; html: string } {
+  return buildEmail(key, recipient, `${APP_URL}/api/welcome-unsubscribe?t=preview`);
 }
 
 async function ensureUnsubToken(userId: string, current: string | null): Promise<string> {
@@ -435,6 +512,11 @@ export async function sendWelcomeEmail(
       slug: true,
       name: true,
       trialEndsAt: true,
+      businessHours: true,
+      bookingPageTitle: true,
+      pageContent: true,
+      bio: true,
+      onboardingProgress: true,
       welcomeUnsubToken: true,
       welcomeEmailsPaused: true,
       suspended: true,
@@ -448,6 +530,38 @@ export async function sendWelcomeEmail(
     },
   });
   if (!user) return { success: false, error: "user_not_found" };
+
+  const progress =
+    user.onboardingProgress && typeof user.onboardingProgress === "object"
+      ? user.onboardingProgress as Record<string, unknown>
+      : {};
+  const imageFlags = await prisma.$queryRaw<Array<{ hasLogo: boolean; hasBanner: boolean }>>`
+    SELECT (logo IS NOT NULL AND logo <> '' AND logo NOT LIKE '/api/%') AS "hasLogo",
+           ("bannerImage" IS NOT NULL AND "bannerImage" <> '' AND "bannerImage" NOT LIKE '/api/%') AS "hasBanner"
+    FROM "User" WHERE id = ${user.id}`;
+  const flags = imageFlags[0] ?? { hasLogo: false, hasBanner: false };
+  const hasPageContent =
+    user.pageContent &&
+    typeof user.pageContent === "object" &&
+    Object.keys(user.pageContent as Record<string, unknown>).length > 0;
+  const recipientSnapshot = (): Recipient => ({
+    id: user.id,
+    email: user.email,
+    businessName: user.businessName,
+    slug: user.slug,
+    name: user.name || "",
+    trialEndsAt: user.trialEndsAt || "",
+    packageCount: user._count.packages,
+    hasWorkingHours: Boolean(progress.working_hours) || user.businessHours != null,
+    hasCustomizedPage:
+      Boolean(progress.customize_page) ||
+      flags.hasLogo ||
+      flags.hasBanner ||
+      Boolean(user.bookingPageTitle?.trim()) ||
+      Boolean(user.bio?.trim()) ||
+      Boolean(hasPageContent),
+    hasSharedLink: Boolean(progress.share_link),
+  });
 
   const isTest = Boolean(options.overrideTo);
 
@@ -497,15 +611,7 @@ export async function sendWelcomeEmail(
 
       const token = await ensureUnsubToken(user.id, user.welcomeUnsubToken);
       const unsubUrl = unsubLink(token);
-      const recipient: Recipient = {
-        id: user.id,
-        email: user.email,
-        businessName: user.businessName,
-        slug: user.slug,
-        name: user.name || "",
-        trialEndsAt: user.trialEndsAt || "",
-        packageCount: user._count.packages,
-      };
+      const recipient = recipientSnapshot();
       const payload = buildEmail(key, recipient, unsubUrl);
       const result = await sendWithRetry(user.id, key, user.email, payload);
 
@@ -533,15 +639,7 @@ export async function sendWelcomeEmail(
 
   const token = await ensureUnsubToken(user.id, user.welcomeUnsubToken);
   const unsubUrl = unsubLink(token);
-  const recipient: Recipient = {
-    id: user.id,
-    email: user.email,
-    businessName: user.businessName,
-    slug: user.slug,
-    name: user.name || "",
-    trialEndsAt: user.trialEndsAt || "",
-    packageCount: user._count.packages,
-  };
+  const recipient = recipientSnapshot();
 
   const payload = buildEmail(key, recipient, unsubUrl);
 
@@ -584,6 +682,7 @@ export type DueDecision =
 export async function decideNextAction(user: {
   id: string;
   createdAt: Date;
+  trialEndsAt: string;
   welcomeEmailDay0At: Date | null;
   welcomeEmailDay2At: Date | null;
   welcomeEmailDay5At: Date | null;
@@ -607,15 +706,26 @@ export async function decideNextAction(user: {
     return { action: "none", reason: `subscription_${status}` };
   }
 
-  if (!user.welcomeEmailDay0At) return { action: "send", key: "day1" };
-  const sequenceAgeDays =
-    (now.getTime() - user.welcomeEmailDay0At.getTime()) / (24 * 60 * 60 * 1000);
+  const trialEnds = Date.parse(user.trialEndsAt);
+  if (Number.isNaN(trialEnds)) return { action: "none", reason: "invalid_trial_end" };
 
-  if (!user.welcomeEmailDay2At  && sequenceAgeDays >= 2) return { action: "send", key: "day3" };
-  if (!user.welcomeEmailDay5At  && sequenceAgeDays >= 4) return { action: "send", key: "day5" };
-  if (!user.welcomeEmailDay13At && sequenceAgeDays >= 6) {
-    return { action: "send", key: "day7" };
-  }
+  const dayMs = 24 * 60 * 60 * 1000;
+  const remainingMs = trialEnds - now.getTime();
+  if (remainingMs <= 0) return { action: "none", reason: "trial_ended" };
+
+  // Countdown messages are tied to the app-owned trial end. This also
+  // handles extended promo trials correctly: they get the reminders two
+  // days and one day before their real expiration, not on fixed signup days.
+  if (user.welcomeEmailDay13At) return { action: "none", reason: "sequence_complete" };
+  if (remainingMs <= dayMs) return { action: "send", key: "day7" };
+  if (user.welcomeEmailDay5At) return { action: "none", reason: "not_due" };
+  if (remainingMs <= 2 * dayMs) return { action: "send", key: "day5" };
+
+  if (user.welcomeEmailDay2At) return { action: "none", reason: "not_due" };
+  if (!user.welcomeEmailDay0At) return { action: "send", key: "day1" };
+
+  const accountAgeMs = now.getTime() - user.createdAt.getTime();
+  if (accountAgeMs >= 2 * dayMs) return { action: "send", key: "day3" };
 
   return { action: "none", reason: "not_due" };
 }
@@ -626,10 +736,10 @@ export async function runWelcomeSequenceTick(): Promise<{
   sent: { email: string; key: WelcomeEmailKey }[];
   skipped: { email: string; reason: string }[];
 }> {
-  // Cap to last 21 days so we don't scan the whole table forever. Day 7
-  // is the last touchpoint, so anyone older has either finished the
-  // sequence or already paused/converted.
-  const sinceCutoff = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000);
+  // Promo codes can extend the app-owned trial up to three months. Keep a
+  // bounded scan while covering those extended trials and their final
+  // countdown messages.
+  const sinceCutoff = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000);
 
   const candidates = await prisma.user.findMany({
     where: {
@@ -660,6 +770,7 @@ export async function runWelcomeSequenceTick(): Promise<{
       id: true,
       email: true,
       createdAt: true,
+      trialEndsAt: true,
       welcomeEmailDay0At: true,
       welcomeEmailDay2At: true,
       welcomeEmailDay5At: true,
@@ -745,6 +856,9 @@ export async function sendPaymentFailedEmail(userId: string): Promise<{ success:
     name: user.name || "",
     trialEndsAt: user.trialEndsAt || "",
     packageCount: user._count.packages,
+    hasWorkingHours: false,
+    hasCustomizedPage: false,
+    hasSharedLink: false,
   };
 
   const payload = emailPaymentIssue(recipient);
