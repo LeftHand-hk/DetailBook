@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { LogoIcon, LogoWordmark } from "@/components/Logo";
+import Logo, { LogoIcon } from "@/components/Logo";
 
 interface StaffUser {
   id: string;
@@ -163,10 +163,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <div className="flex items-center gap-2">
-            <LogoIcon size={22} />
-            <LogoWordmark darkText size="text-sm" />
-          </div>
+          <Logo size="xs" darkText />
           <div
             className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold"
             style={{ backgroundColor: staff?.color || "#3B82F6" }}

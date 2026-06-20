@@ -178,65 +178,19 @@ export default function LandingPage() {
         </div>
       )}
 
-      {/* ═══════════════════════════════════════════════
-          HERO — FUTURISTIC MESH BACKGROUND
-      ═══════════════════════════════════════════════ */}
-      <section className="relative min-h-screen flex flex-col justify-center text-white overflow-hidden">
-
-        {/* Base dark background */}
-        <div className="absolute inset-0 bg-[#080c18]" />
-
-        {/* Animated gradient orbs — desktop only. The 100-120px blur radii
-            multiplied by huge surface areas tank mobile GPUs (the user
-            reported blank sections for ~10s on phones). The flat dark
-            base + grid lines below still look polished without them. */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none hidden md:block">
-          <div className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-blue-600/25 rounded-full blur-[120px] animate-blobFloat" />
-          <div className="absolute top-[10%] right-[-15%] w-[60%] h-[60%] bg-indigo-700/20 rounded-full blur-[100px] animate-blobFloat delay-400" />
-          <div className="absolute bottom-[-10%] left-[20%] w-[50%] h-[50%] bg-cyan-600/15 rounded-full blur-[100px] animate-blobFloat delay-700" />
-        </div>
-        {/* Mobile fallback: a static, much cheaper radial gradient that
-            keeps the section from looking too flat. */}
+      {/* Product-first hero background */}
+      <section className="relative min-h-screen flex flex-col justify-center bg-[#080c12] text-white overflow-hidden">
         <div
-          className="absolute inset-0 pointer-events-none md:hidden"
+          className="hero-workspace-bg absolute inset-x-0 top-0 h-[105svh] pointer-events-none"
+        />
+        <div className="absolute inset-0 bg-black/10 pointer-events-none" />
+        <div
+          className="absolute inset-0 pointer-events-none"
           style={{
             background:
-              "radial-gradient(ellipse at top left, rgba(37,99,235,0.18), transparent 55%), radial-gradient(ellipse at bottom right, rgba(67,56,202,0.12), transparent 55%)",
+              "linear-gradient(to bottom, rgba(3,7,18,0.22) 0%, rgba(3,7,18,0.08) 42%, rgba(3,7,18,0.58) 100%)",
           }}
         />
-
-        {/* SVG Grid lines */}
-        <div className="absolute inset-0 overflow-hidden opacity-[0.07] pointer-events-none">
-          <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
-                <path d="M 60 0 L 0 0 0 60" fill="none" stroke="white" strokeWidth="0.8"/>
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#grid)" />
-          </svg>
-        </div>
-
-        {/* Glowing horizontal lines */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-20">
-          <div className="absolute top-1/3 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500 to-transparent" />
-          <div className="absolute top-2/3 left-0 right-0 h-px bg-gradient-to-r from-transparent via-indigo-500/60 to-transparent" />
-        </div>
-
-        {/* Scattered dot particles — hidden on mobile to keep above-the-fold light */}
-        <div className="absolute inset-0 pointer-events-none hidden sm:block">
-          {[
-            { top:"15%", left:"8%",  delay:"0s",   size:"w-1 h-1" },
-            { top:"25%", left:"92%", delay:"0.5s", size:"w-1.5 h-1.5" },
-            { top:"70%", left:"5%",  delay:"1s",   size:"w-1 h-1" },
-            { top:"80%", left:"88%", delay:"1.5s", size:"w-2 h-2" },
-            { top:"40%", left:"96%", delay:"2s",   size:"w-1 h-1" },
-            { top:"55%", left:"3%",  delay:"2.5s", size:"w-1.5 h-1.5" },
-          ].map((p, i) => (
-            <div key={i} className={`absolute ${p.size} bg-blue-400 rounded-full opacity-50 animate-pulse`}
-              style={{ top: p.top, left: p.left, animationDelay: p.delay }} />
-          ))}
-        </div>
 
         <div className="relative z-10 max-w-5xl mx-auto px-4 text-center pt-24 sm:pt-32 pb-12 sm:pb-16">
           {/* Badge */}

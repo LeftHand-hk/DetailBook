@@ -2,6 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+.hero-workspace-bg {
+  background-color: #080c12;
+  background-image: url("/detailbook-hero-workspace.png");
+  background-repeat: no-repeat;
+  background-position: center top;
+  background-size: 100% auto;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 78%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 78%, transparent 100%);
+}
+
+@media (max-width: 640px) {
+  .hero-workspace-bg {
+    background-image: url("/detailbook-hero-mobile.png");
+    background-position: center top;
+    background-size: cover;
+  }
+}
+
 /* Inter is now loaded via next/font/google in app/layout.tsx — that
    self-hosts the WOFF2 file, eliminating the render-blocking external
    request that was blanking out below-the-fold sections on mobile. */

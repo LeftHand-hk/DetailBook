@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { isLoggedIn, logout, getUser, getPackages, syncFromServer } from "@/lib/storage";
 import type { User } from "@/types";
-import { LogoIcon, LogoWordmark } from "@/components/Logo";
+import Logo from "@/components/Logo";
 import TrialEndedModal from "@/components/TrialEndedModal";
 import { getTrialPhase } from "@/lib/trial";
 
@@ -344,9 +344,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="flex flex-col h-full bg-[#0B1120]">
       {/* Logo */}
       <div className="px-5 py-5 flex-shrink-0">
-        <Link href="/dashboard" className="flex items-center gap-2.5" onClick={() => setSidebarOpen(false)}>
-          <LogoIcon size={32} />
-          <LogoWordmark size="text-lg" />
+        <Link href="/dashboard" className="flex items-center" onClick={() => setSidebarOpen(false)}>
+          <Logo size="sm" />
         </Link>
       </div>
 
@@ -557,10 +556,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <div className="flex items-center gap-2">
-              <LogoIcon size={28} />
-              <LogoWordmark darkText size="text-base" />
-            </div>
+            <Logo size="xs" darkText />
           </div>
           <div className="flex items-center gap-2">
             {trialStatusLabel ? (

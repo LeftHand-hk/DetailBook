@@ -179,7 +179,7 @@ export default function LoginPage() {
       {/* Right panel — form */}
       <div className="flex-1 flex flex-col bg-white">
         {/* Top bar */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 lg:border-none">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 lg:px-6 lg:py-5 lg:border-none">
           <div className="lg:hidden">
             <Logo size="sm" href="/" darkText />
           </div>
