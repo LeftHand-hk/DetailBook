@@ -131,7 +131,7 @@ export default function HowToUsePage() {
           id="first-five"
           kicker="Part 1"
           title="Your first 5 minutes"
-          intro="Everything between hitting 'Start free trial' and seeing your live booking link. The 7-day trial starts the moment you save your card, and you won't be charged a cent during it."
+          intro="Everything between hitting 'Start free trial' and seeing your live booking link. Your 7-day trial starts when you create your account, with no card required."
         />
 
         <Step n="1" title="Create your account" badge="Starter" screenshot="The Sign up page filled in (email, business name, password) and the Create account button.">
@@ -150,21 +150,20 @@ export default function HowToUsePage() {
           <p className="text-sm text-gray-500">Don&rsquo;t worry about getting them perfect — you can edit any field later from Settings.</p>
         </Step>
 
-        <Step n="3" title="Save your card to start the 7-day trial" badge="Starter" screenshot="The Add card step — Paddle checkout overlay with the card form open.">
+        <Step n="3" title="Add your first service package" badge="Starter" screenshot="Step 2 of onboarding — the package builder with quick-fill service templates.">
           <p>
-            We ask for a card up front so your subscription kicks in seamlessly on day 8. <strong>No charge happens during the trial.</strong>
-            You can cancel any time from Settings → Billing before then.
+            Choose a quick-fill template or enter your own service name, price, and description.
+            <strong> No card is required</strong>, and you can edit your packages at any time.
           </p>
-          <p className="text-sm text-gray-500">Only cards are accepted — Apple Pay and Google Pay can&rsquo;t save a payment method for a delayed first charge.</p>
+          <p className="text-sm text-gray-500">Save at least one package so customers have a service they can book.</p>
         </Step>
 
-        <Step n="4" title="Add your first service package" badge="Starter" screenshot="The 'One last step' screen with the Create Your First Package button.">
+        <Step n="4" title="Review your live booking page" badge="Starter" screenshot="The final onboarding screen showing the new business booking link.">
           <p>
-            On the final onboarding screen, hit <strong>Create Your First Package</strong>. The form opens
-            pre-filled with 3 typical detailing packages — Exterior Wash & Wax, Interior Detail, Full Detail.
-            Edit the names and prices to match what you actually sell.
+            After saving your package, DetailBook shows your live booking link. Open the preview to check
+            your business details and service before sharing it.
           </p>
-          <p className="text-sm text-gray-500">Save at least one — your booking link only goes live after that.</p>
+          <p className="text-sm text-gray-500">You can customize the logo, photos, text, and colors later from the dashboard.</p>
         </Step>
 
         <Step n="5" title="Share your booking link" badge="Starter" screenshot="The dashboard home with the booking-link card highlighted.">

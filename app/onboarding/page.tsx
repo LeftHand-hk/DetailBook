@@ -53,6 +53,13 @@ const defaultVehiclePricing = (): PackageVehiclePricing[] => (
 
 const INPUT_CLASS = "w-full h-12 px-4 bg-white border border-gray-200 rounded-2xl text-gray-950 text-[15px] placeholder-gray-400 outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
 
+function queueRegistrationConversion(userId?: string) {
+  if (!userId || typeof window === "undefined") return;
+  try {
+    localStorage.setItem(`db_meta_registration_pending:${userId}`, "1");
+  } catch { /* private mode */ }
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -130,6 +137,7 @@ export default function OnboardingPage() {
       if (authoritative || !stepResolved.current) {
         stepResolved.current = true;
         if (getPackages().length > 0) {
+          queueRegistrationConversion(u.id);
           setStep(2);
           return;
         }
@@ -292,6 +300,7 @@ export default function OnboardingPage() {
 
       setCreatedPackageCount((count) => count + 1);
       await syncFromServer().catch(() => {});
+      queueRegistrationConversion(user?.id);
       setPackageSaved(true);
     } catch (err) {
       setPackageError(err instanceof Error ? err.message : "Could not save package.");
@@ -310,13 +319,7 @@ export default function OnboardingPage() {
 
   const finishOnboarding = () => {
     try { sessionStorage.removeItem("dB_showTour"); } catch { /* private mode */ }
-    // Queue Meta's registration conversion for the first dashboard arrival.
-    // The user-scoped marker survives the route change and a slow pixel load.
-    if (user?.id) {
-      try {
-        localStorage.setItem(`db_meta_registration_pending:${user.id}`, "1");
-      } catch { /* private mode */ }
-    }
+    queueRegistrationConversion(user?.id);
     setStep(2);
   };
 

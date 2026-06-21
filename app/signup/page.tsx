@@ -49,8 +49,8 @@ export default function SignupPage() {
       setError("All fields are required.");
       return;
     }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
       return;
     }
 
@@ -268,7 +268,7 @@ export default function SignupPage() {
                     required
                     value={form.password}
                     onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    placeholder="Minimum 6 characters"
+                    placeholder="Minimum 8 characters"
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white placeholder-gray-400 text-sm transition-all pr-11"
                   />
                   <button
