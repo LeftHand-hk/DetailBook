@@ -53,7 +53,7 @@ export default function LandingPage() {
   ];
 
   const faqs = [
-    { q: "Do I need a credit card to start?", a: "Yes — we ask for a card up front so your trial activates without interruption. You won't be charged during the 7-day trial, and you can cancel anytime from your Settings page before day 8." },
+    { q: "Do I need a credit card to start?", a: "No. You can create your account and start your 7-day free trial without entering any card details." },
     { q: "Do you take a cut of my bookings or deposits?", a: "Never. The monthly subscription is the only thing you pay us — no per-booking fees, no commission, no hidden cuts. When a customer pays a deposit by card, the money goes straight to your own Stripe/Square account. The only fees are the standard processor fees Stripe or Square charge directly." },
     { q: "Can my customers pay the deposit online?", a: "Yes. On both Starter and Pro, customers can pay the deposit straight from your booking page. We support card payments via Stripe, plus PayPal, Cash App, Square, bank transfer, and pay-cash-on-arrival — turn on whichever methods fit your business." },
     { q: "What happens if I exceed 5 packages on Starter?", a: "You'll be prompted to upgrade to Pro. All your existing packages stay active — you just can't add more until you upgrade." },
@@ -105,7 +105,7 @@ export default function LandingPage() {
                 Log In
               </Link>
               <Link href="/signup" onClick={() => trackEvent("Lead")}
-                className="relative group flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-all duration-200 shadow-lg shadow-blue-600/30 hover:shadow-blue-500/40 hover:-translate-y-0.5">
+                className="relative group flex items-center gap-1.5 bg-gradient-to-r from-[#2563EB] to-[#4F46E5] hover:from-[#1D4ED8] hover:to-[#4338CA] text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-all duration-200 shadow-lg shadow-indigo-600/30 hover:shadow-indigo-500/40 hover:-translate-y-0.5">
                 Start Free Trial
                 <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
@@ -116,7 +116,7 @@ export default function LandingPage() {
             {/* Mobile: Start Free Trial + burger */}
             <div className="md:hidden flex items-center gap-2">
               <Link href="/signup" onClick={() => trackEvent("Lead")}
-                className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all shadow-lg shadow-blue-600/30">
+                className="bg-gradient-to-r from-[#2563EB] to-[#4F46E5] hover:from-[#1D4ED8] hover:to-[#4338CA] text-white text-xs font-bold px-3 py-2 rounded-xl transition-all shadow-lg shadow-indigo-600/30">
                 Start Free Trial
               </Link>
               <button onClick={() => setMenuOpen(true)}
@@ -170,7 +170,7 @@ export default function LandingPage() {
                 Log In
               </Link>
               <Link href="/signup" onClick={() => { trackEvent("Lead"); setMenuOpen(false); }}
-                className="block text-center bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-3 px-4 rounded-xl hover:from-blue-500 hover:to-indigo-500 transition-all shadow-lg shadow-blue-600/20 text-sm">
+                className="block text-center bg-gradient-to-r from-[#2563EB] to-[#4F46E5] text-white font-bold py-3 px-4 rounded-xl hover:from-[#1D4ED8] hover:to-[#4338CA] transition-all shadow-lg shadow-indigo-600/20 text-sm">
                 Start Free Trial
               </Link>
             </div>
@@ -182,7 +182,21 @@ export default function LandingPage() {
       <section className="relative min-h-screen flex flex-col justify-center bg-[#080c12] text-white overflow-hidden">
         <div
           className="hero-workspace-bg absolute inset-x-0 top-0 h-[105svh] pointer-events-none"
-        />
+          aria-hidden="true"
+        >
+          <picture>
+            <source media="(max-width: 640px)" srcSet="/detailbook-hero-mobile.webp" type="image/webp" />
+            <img
+              src="/detailbook-hero-workspace.webp"
+              alt=""
+              width={1717}
+              height={916}
+              fetchPriority="high"
+              decoding="async"
+              className="hero-workspace-image"
+            />
+          </picture>
+        </div>
         <div className="absolute inset-0 bg-black/10 pointer-events-none" />
         <div
           className="absolute inset-0 pointer-events-none"
@@ -210,12 +224,12 @@ export default function LandingPage() {
 
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-10 sm:mb-14 animate-fadeInUp delay-300">
             <Link href="/signup" onClick={() => trackEvent("Lead")}
-              className="group relative inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-black text-lg px-10 py-4 rounded-2xl transition-all duration-300 shadow-2xl shadow-blue-600/40 hover:shadow-blue-500/50 hover:-translate-y-1">
+              className="group relative inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#2563EB] to-[#4F46E5] hover:from-[#1D4ED8] hover:to-[#4338CA] text-white font-black text-lg px-10 py-4 rounded-2xl transition-all duration-300 shadow-2xl shadow-indigo-600/40 hover:shadow-indigo-500/50 hover:-translate-y-1">
               <span>Start My Free Trial</span>
               <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-500 opacity-0 group-hover:opacity-100 transition-opacity -z-10 blur-xl" />
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#2563EB] to-[#4F46E5] opacity-0 group-hover:opacity-100 transition-opacity -z-10 blur-xl" />
             </Link>
             <Link href="/book/mikes-mobile-detailing"
               className="glass border border-white/20 text-white font-bold text-lg px-10 py-4 rounded-2xl hover:bg-white/10 transition-all duration-300 hover:-translate-y-0.5">
@@ -224,7 +238,7 @@ export default function LandingPage() {
           </div>
 
           <p className="text-white/35 text-sm animate-fadeInUp delay-400">
-            7-day free trial · Cancel anytime
+            7-day free trial · No card required · Cancel anytime
           </p>
         </div>
 
@@ -459,7 +473,7 @@ export default function LandingPage() {
             <div className="hidden md:block absolute top-8 left-[16%] right-[16%] h-px bg-gradient-to-r from-transparent via-blue-500/30 to-transparent pointer-events-none" />
 
             {[
-              { num: "1", title: "Create your account", desc: "Enter your business name, add your card to start the 7-day trial. No charge until day 8." },
+              { num: "1", title: "Create your account", desc: "Enter your business name and start your 7-day trial. No card required." },
               { num: "2", title: "Add your service packages", desc: "List the details you offer — basic wash, full detail, ceramic coating. Set price, duration, and deposit." },
               { num: "3", title: "Share your booking link", desc: "Send your DetailBook link via SMS, IG bio, or your website. Customers book and pay deposits 24/7." },
             ].map((step) => (
@@ -618,7 +632,7 @@ export default function LandingPage() {
           </div>
 
           <p className="text-center text-gray-500 mt-8 text-sm">
-            Both plans include a 7-day free trial. Cancel anytime. No setup fees.
+            Both plans include a 7-day free trial. No card required. Cancel anytime. No setup fees.
           </p>
         </div>
       </section>
@@ -711,7 +725,7 @@ export default function LandingPage() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
             <Link href="/signup" onClick={() => trackEvent("Lead")}
-              className="group inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-black text-lg px-10 py-4 rounded-2xl transition-all duration-300 shadow-2xl shadow-blue-600/40 hover:-translate-y-1">
+              className="group inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#2563EB] to-[#4F46E5] hover:from-[#1D4ED8] hover:to-[#4338CA] text-white font-black text-lg px-10 py-4 rounded-2xl transition-all duration-300 shadow-2xl shadow-indigo-600/40 hover:shadow-indigo-500/50 hover:-translate-y-1">
               Try DetailBook Free
               <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
@@ -723,7 +737,7 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          <p className="text-white/25 text-sm">7-day free trial · Setup in 5 minutes · Cancel anytime</p>
+          <p className="text-white/25 text-sm">7-day free trial · No card required · Setup in 5 minutes · Cancel anytime</p>
         </div>
       </section>
 
