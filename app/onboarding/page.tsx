@@ -310,6 +310,13 @@ export default function OnboardingPage() {
 
   const finishOnboarding = () => {
     try { sessionStorage.removeItem("dB_showTour"); } catch { /* private mode */ }
+    // Queue Meta's registration conversion for the first dashboard arrival.
+    // The user-scoped marker survives the route change and a slow pixel load.
+    if (user?.id) {
+      try {
+        localStorage.setItem(`db_meta_registration_pending:${user.id}`, "1");
+      } catch { /* private mode */ }
+    }
     setStep(2);
   };
 

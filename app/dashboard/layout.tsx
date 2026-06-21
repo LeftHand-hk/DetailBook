@@ -121,6 +121,52 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [checked, setChecked] = useState(false);
   const [upgradeDismissed, setUpgradeDismissed] = useState(false);
   const [impersonating, setImpersonating] = useState(false);
+
+  // Onboarding queues this conversion. Consume it only after the dashboard
+  // loads and Meta Pixel is ready, then persist completion so refreshes and
+  // later dashboard visits cannot duplicate the event.
+  useEffect(() => {
+    if (!user?.id || typeof window === "undefined") return;
+
+    const pendingKey = `db_meta_registration_pending:${user.id}`;
+    const completedKey = `db_meta_registration_completed:${user.id}`;
+    try {
+      if (localStorage.getItem(pendingKey) !== "1") return;
+      if (localStorage.getItem(completedKey) === "1") {
+        localStorage.removeItem(pendingKey);
+        return;
+      }
+    } catch {
+      return;
+    }
+
+    let attempts = 0;
+    let retryTimer: number | undefined;
+    const fireWhenReady = () => {
+      attempts += 1;
+      if (typeof window.fbq === "function") {
+        window.fbq("track", "CompleteRegistration", {
+          content_name: "DetailBook Onboarding",
+          status: true,
+          value: 0,
+          currency: "USD",
+        });
+        try {
+          localStorage.setItem(completedKey, "1");
+          localStorage.removeItem(pendingKey);
+        } catch { /* private mode */ }
+        return;
+      }
+      if (attempts < 20) {
+        retryTimer = window.setTimeout(fireWhenReady, 250);
+      }
+    };
+
+    fireWhenReady();
+    return () => {
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+    };
+  }, [user?.id]);
   // Dashboard dark mode. Persisted in localStorage; applied as a
   // `db-dark` class on the dashboard root, which a scoped block in
   // globals.css restyles (so we don't need dark: variants on every

@@ -84,11 +84,9 @@ export default function SignupPage() {
       // Navigate immediately; warm the cache in the background instead
       // of blocking on a full sync.
       syncFromServer().catch(() => {});
-      // Pixel events are deliberately NOT fired here — the conversion
-      // event (CompleteRegistration) lives in /onboarding's Paddle
-      // checkout.completed callback, and the top-of-funnel Lead fires
-      // after Business Details. Firing at signup-form submission was
-      // making Meta optimise for users who never reached the card step.
+      // CompleteRegistration is deliberately not fired at form submission.
+      // It is queued after required onboarding and emitted on the user's
+      // first dashboard arrival, avoiding abandoned-form conversions.
       router.push("/onboarding");
     } catch {
       setError("Something went wrong. Please try again.");
@@ -204,7 +202,7 @@ export default function SignupPage() {
           <div className="w-full max-w-[400px]">
             <div className="mb-8">
               <h1 className="text-2xl font-black text-gray-900 mb-1.5">Start your free trial</h1>
-              <p className="text-gray-400 text-sm">7 days free · Card required · Cancel anytime</p>
+              <p className="text-gray-400 text-sm">7 days free · No card required · Cancel anytime</p>
             </div>
 
             {error && (
