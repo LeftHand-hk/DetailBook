@@ -20,22 +20,22 @@ const SITE_URL = "https://detailbookapp.com";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "DetailBook — Booking & Scheduling Built for Auto Detailers",
+  title: "DetailBook — Let your detailing clients book themselves, for $24/mo",
   description:
-    "Booking tool built for auto detailers. Stop no-shows with required deposits, send SMS reminders, and run shop or mobile jobs from one calendar.",
+    "Simple booking page for solo auto detailers. Clients book themselves, pay a deposit, and stop no-shows. Cheaper and simpler than Urable or Jobber.",
   openGraph: {
     type: "website",
     url: SITE_URL,
     siteName: "DetailBook",
-    title: "DetailBook — Booking & Scheduling Built for Auto Detailers",
+    title: "DetailBook — Let your detailing clients book themselves, for $24/mo",
     description:
-      "Stop no-shows. Collect deposits, automate SMS reminders, and manage shop + mobile jobs from one calendar.",
+      "Simple booking page for solo auto detailers. Clients book themselves, pay a deposit, and stop no-shows. Cheaper and simpler than Urable or Jobber.",
   },
   twitter: {
     card: "summary",
-    title: "DetailBook — Booking & Scheduling Built for Auto Detailers",
+    title: "DetailBook — Let your detailing clients book themselves, for $24/mo",
     description:
-      "Stop no-shows. Collect deposits, automate SMS reminders, and manage shop + mobile jobs from one calendar.",
+      "Simple booking page for solo auto detailers. Clients book themselves, pay a deposit, and stop no-shows. Cheaper and simpler than Urable or Jobber.",
   },
   verification: {
     other: {

@@ -53,12 +53,12 @@ export default function LandingPage() {
   ];
 
   const faqs = [
-    { q: "Do I need a credit card to start?", a: "No. You can create your account and start your 7-day free trial without entering any card details." },
-    { q: "Do you take a cut of my bookings or deposits?", a: "Never. The monthly subscription is the only thing you pay us — no per-booking fees, no commission, no hidden cuts. When a customer pays a deposit by card, the money goes straight to your own Stripe/Square account. The only fees are the standard processor fees Stripe or Square charge directly." },
-    { q: "Can my customers pay the deposit online?", a: "Yes. On both Starter and Pro, customers can pay the deposit straight from your booking page. We support card payments via Stripe, plus PayPal, Cash App, Square, bank transfer, and pay-cash-on-arrival — turn on whichever methods fit your business." },
-    { q: "What happens if I exceed 5 packages on Starter?", a: "You'll be prompted to upgrade to Pro. All your existing packages stay active — you just can't add more until you upgrade." },
-    { q: "Can I cancel anytime?", a: "Absolutely. No long-term contracts. Cancel any time from the Billing page in your dashboard. Your packages, bookings, and settings are always saved, so you can reactivate whenever you're ready." },
-    { q: "Does DetailBook work on mobile?", a: "Yes! Both your dashboard and your customer-facing booking page are fully optimized for mobile devices." },
+    { q: "Do I need a credit card to start?", a: "No. Start your 7-day trial with no card. We only ask for payment if you decide to stay." },
+    { q: "Do you take a cut of my bookings or deposits?", a: "Never. You keep 100%. You pay a flat monthly price and nothing per booking." },
+    { q: "Can my customers pay the deposit online?", a: "Yes. Clients pay the deposit when they book, so they're committed before they take a slot." },
+    { q: "What happens if I exceed 5 packages on Starter?", a: "Starter includes up to 5 service packages. For unlimited packages, upgrade to Pro any time." },
+    { q: "Can I cancel anytime?", a: "Yes. One click, no contract, no cancellation fee." },
+    { q: "Does DetailBook work on mobile?", a: "Yes. The dashboard and your booking page work fully on phone, tablet, and desktop." },
   ];
 
   const navLinks = ["Features","Pricing","FAQ"];
@@ -210,16 +210,16 @@ export default function LandingPage() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 glass border border-blue-500/30 text-blue-300 text-xs sm:text-sm font-semibold px-3 sm:px-4 py-1.5 sm:py-2 rounded-full mb-5 sm:mb-8 animate-fadeInUp">
             <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
-            Purpose-built for auto detailers
+            For detailers who already have clients
           </div>
 
           <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black leading-[1.05] mb-4 sm:mb-6 animate-fadeInUp delay-100">
-            Booking Software<br />
-            <span className="bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent animate-gradientShift">Built for Auto Detailers</span>
+            Stop running your detailing business out of{" "}
+            <span className="bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent animate-gradientShift">text messages.</span>
           </h1>
 
           <p className="text-base sm:text-xl text-white/60 max-w-2xl mx-auto mb-7 sm:mb-10 leading-relaxed animate-fadeInUp delay-200">
-            Stop losing money to no-shows. Collect deposits, send SMS reminders, and manage your entire schedule — for shops and mobile detailers alike.
+            Give your clients one link to book themselves, pay a deposit, and show up. Built for solo detailers who think Urable and Jobber are overkill — for $24, not $70.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-10 sm:mb-14 animate-fadeInUp delay-300">
@@ -244,8 +244,9 @@ export default function LandingPage() {
 
         {/* Dashboard mockup */}
         <div className="relative z-10 max-w-4xl mx-auto px-4 pb-20 animate-fadeInUp delay-500">
+          {/* TODO: replace with a real product screenshot of the actual dashboard */}
           <div className="text-xs text-gray-500 text-center mb-2">
-            Sample Dashboard Preview
+            Your dashboard
           </div>
           <div className="relative">
             {/* Glow beneath card */}
@@ -369,8 +370,8 @@ export default function LandingPage() {
             ))}
           </div>
           <div className="mt-14 p-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl text-white text-center shadow-xl shadow-blue-600/20">
-            <p className="text-2xl font-black mb-2">{platformName} fixes all of this.</p>
-            <p className="text-blue-200">Professional tools built specifically for auto detailing businesses — shop-based or mobile.</p>
+            <p className="text-2xl font-black mb-2">You&apos;ve outgrown phone tag.</p>
+            <p className="text-blue-200">You don&apos;t need enterprise software to fix it.</p>
           </div>
         </div>
       </section>
@@ -394,7 +395,12 @@ export default function LandingPage() {
                 <div className="w-12 h-12 bg-blue-600/20 border border-blue-500/20 rounded-xl flex items-center justify-center text-2xl mb-4 group-hover:bg-blue-600/30 transition-colors">
                   {feature.icon}
                 </div>
-                <h3 className="text-lg font-bold text-white mb-2">{feature.title}</h3>
+                <h3 className="text-lg font-bold text-white mb-2">
+                  {feature.title}
+                  {feature.title.includes("SMS") && (
+                    <span className="ml-2 align-middle text-[10px] font-bold bg-blue-600 text-white px-1.5 py-0.5 rounded uppercase tracking-wider">Pro</span>
+                  )}
+                </h3>
                 <p className="text-gray-400 text-sm leading-relaxed">{feature.desc}</p>
               </div>
             ))}
@@ -446,7 +452,12 @@ export default function LandingPage() {
             ].map((pillar, i) => (
               <div key={i} className="bg-gray-50 border border-gray-100 rounded-2xl p-6 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
                 <div className="text-4xl mb-3">{pillar.icon}</div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">{pillar.title}</h3>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">
+                  {pillar.title}
+                  {pillar.title.includes("SMS") && (
+                    <span className="ml-2 align-middle text-[10px] font-bold bg-blue-600 text-white px-1.5 py-0.5 rounded uppercase tracking-wider">Pro</span>
+                  )}
+                </h3>
                 <p className="text-gray-500 text-sm leading-relaxed">{pillar.desc}</p>
               </div>
             ))}
@@ -491,53 +502,52 @@ export default function LandingPage() {
       </section>
 
       {/* ═══════════════════════════════════════════════
-          COMPARISON — DETAILBOOK VS GENERIC TOOLS
+          COMPARISON — DETAILBOOK IN THE MIDDLE
       ═══════════════════════════════════════════════ */}
       <section className="bg-gray-50 py-24 px-4">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">
-              Why Not Just Use Square or Vagaro?
+              More than texting. Less than Urable.
             </h2>
             <p className="text-gray-500 text-lg max-w-2xl mx-auto">
-              Generic booking tools weren&apos;t built with auto detailing in mind. {platformName} is.
+              You don&apos;t need a $70 platform with payroll and route optimization. You need your clients to book themselves.
             </p>
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="grid grid-cols-3 bg-gray-50 border-b border-gray-200">
-              <div className="px-4 sm:px-6 py-4 text-xs sm:text-sm font-bold text-gray-500 uppercase tracking-wide">Feature</div>
-              <div className="px-4 sm:px-6 py-4 text-xs sm:text-sm font-black text-blue-700 uppercase tracking-wide text-center">{platformName}</div>
-              <div className="px-4 sm:px-6 py-4 text-xs sm:text-sm font-bold text-gray-500 uppercase tracking-wide text-center">Generic Tools</div>
+            {/* Header row */}
+            <div className="grid grid-cols-4 border-b border-gray-200">
+              <div className="px-3 sm:px-6 py-4 text-[11px] sm:text-sm font-bold text-gray-500 uppercase tracking-wide">Feature</div>
+              <div className="px-2 sm:px-4 py-4 text-[11px] sm:text-sm font-bold text-gray-500 uppercase tracking-wide text-center">Phone &amp; Text</div>
+              <div className="px-2 sm:px-4 py-4 text-[11px] sm:text-sm font-black text-white uppercase tracking-wide text-center bg-blue-600">DetailBook</div>
+              <div className="px-2 sm:px-4 py-4 text-[11px] sm:text-sm font-bold text-gray-500 uppercase tracking-wide text-center">Urable / Jobber</div>
             </div>
+
+            {/* Boolean rows */}
             {[
-              { feature: "Vehicle-type pricing (sedan / SUV / truck)", us: true, them: false },
-              { feature: "Built-in mandatory deposits", us: true, them: false },
-              { feature: "Shop + mobile scheduling in one calendar", us: true, them: false },
-              { feature: "Detailing service-package builder", us: true, them: false },
-              { feature: "No per-booking commission", us: true, them: "Some take a cut" },
-              { feature: "Starts at $24/month", us: true, them: "$30+ and up" },
+              { feature: "Clients book themselves 24/7", phone: false, db: true, them: true },
+              { feature: "Deposits to stop no-shows", phone: false, db: true, them: true },
+              { feature: "Set up in 5 minutes", phone: true, db: true, them: false },
+              { feature: "Simple — no training needed", phone: true, db: true, them: false },
             ].map((row, i) => (
-              <div key={i} className={`grid grid-cols-3 ${i % 2 === 0 ? "bg-white" : "bg-gray-50/50"} border-b border-gray-100 last:border-0`}>
-                <div className="px-4 sm:px-6 py-4 text-sm text-gray-700">{row.feature}</div>
-                <div className="px-4 sm:px-6 py-4 text-center">
-                  {row.us === true ? (
-                    <CheckIcon />
-                  ) : (
-                    <span className="text-sm font-semibold text-gray-700">{row.us}</span>
-                  )}
-                </div>
-                <div className="px-4 sm:px-6 py-4 text-center">
-                  {row.them === false ? (
-                    <XIcon />
-                  ) : row.them === true ? (
-                    <CheckIcon />
-                  ) : (
-                    <span className="text-xs sm:text-sm text-gray-500">{row.them}</span>
-                  )}
-                </div>
+              <div key={i} className={`grid grid-cols-4 ${i % 2 === 0 ? "bg-white" : "bg-gray-50/50"} border-b border-gray-100`}>
+                <div className="px-3 sm:px-6 py-4 text-xs sm:text-sm text-gray-700 flex items-center">{row.feature}</div>
+                <div className="px-2 sm:px-4 py-4 flex justify-center items-center">{row.phone ? <CheckIcon /> : <XIcon />}</div>
+                <div className="px-2 sm:px-4 py-4 flex justify-center items-center bg-blue-50 border-x border-blue-200">{row.db ? <CheckIcon /> : <XIcon />}</div>
+                <div className="px-2 sm:px-4 py-4 flex justify-center items-center">{row.them ? <CheckIcon /> : <XIcon />}</div>
               </div>
             ))}
+
+            {/* Price row */}
+            <div className="grid grid-cols-4 bg-white">
+              <div className="px-3 sm:px-6 py-4 text-xs sm:text-sm font-bold text-gray-900 flex items-center">Monthly price</div>
+              <div className="px-2 sm:px-4 py-4 text-center text-sm font-bold text-gray-700">Free</div>
+              <div className="px-2 sm:px-4 py-4 text-center bg-blue-50 border-x border-b border-blue-200">
+                <span className="text-base sm:text-lg font-black text-blue-700">$24</span>
+              </div>
+              <div className="px-2 sm:px-4 py-4 text-center text-sm font-bold text-gray-700">$70+</div>
+            </div>
           </div>
         </div>
       </section>
@@ -701,12 +711,12 @@ export default function LandingPage() {
           </div>
 
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-tight mb-6">
-            Ready to Grow Your<br />
-            <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">Detailing Business?</span>
+            Ready to let your{" "}
+            <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">clients book themselves?</span>
           </h2>
 
           <p className="text-white/50 text-lg max-w-xl mx-auto mb-10 leading-relaxed">
-            Start your free trial today. Set up in minutes, start collecting deposits and bookings right away.
+            Set up in minutes. Send your link. Start collecting deposits right away.
           </p>
 
           {/* Value props */}
