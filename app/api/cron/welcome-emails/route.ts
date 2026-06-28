@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runWelcomeSequenceTick } from "@/lib/welcome-emails";
+import { runWelcomeSequenceTick, runWinBackTick } from "@/lib/welcome-emails";
 
 // Hourly cron called by cron-job.org. Day 1 is sent after signup, Day 3
 // selects the first incomplete setup action, and the final two messages
@@ -14,7 +14,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const welcomeSequence = await runWelcomeSequenceTick();
-    return NextResponse.json({ welcomeSequence });
+    const winBack = await runWinBackTick();
+    return NextResponse.json({ welcomeSequence, winBack });
   } catch (err) {
     console.error("[cron/welcome-emails] error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

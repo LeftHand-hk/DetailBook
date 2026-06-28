@@ -279,9 +279,11 @@ export default function BillingPage() {
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setCancelDone(true);
-        // Reload billing page — layout will keep them confined here
-        // because user.suspended is now true. They can reactivate from
-        // the same page without logging out.
+        // Reload so the page reflects the new state. A paid cancel keeps the
+        // user active until period end (no suspend), so they land back on a
+        // fully-usable dashboard with the "cancellation scheduled" notice.
+        // An immediate/edge cancel sets suspended=true and the layout
+        // confines them here to reactivate.
         setTimeout(() => window.location.reload(), 2000);
       } else {
         alert(data.error || "Could not cancel subscription. Please contact support.");
@@ -422,6 +424,9 @@ export default function BillingPage() {
   const isPro = user?.plan === "pro";
   const isSubscribed = user?.subscriptionStatus === "active";
   const isTrialing = user?.subscriptionStatus === "trialing";
+  // Canceled but not yet suspended = cancellation is scheduled for the end
+  // of the current period; the user keeps full access until then.
+  const isCancelScheduled = user?.subscriptionStatus === "canceled" && !user?.suspended;
   // A trialing user has a live Paddle subscription with a card already
   // on file (captured at onboarding). For card display and current-plan
   // marking they should be treated exactly like an active subscriber —
@@ -547,6 +552,24 @@ export default function BillingPage() {
         </div>
       )}
 
+      {/* Banner: cancellation scheduled — user keeps access until the
+          current period ends, then the webhook suspends them. */}
+      {isCancelScheduled && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-5 flex items-start gap-4">
+          <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+            <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <p className="font-bold text-amber-900">Your plan is canceled.</p>
+            <p className="text-sm text-amber-800 mt-1">
+              You keep full access — your dashboard and booking page stay live — until the end of your current period. After that your account pauses and your data is saved. Changed your mind? Pick a plan below to stay.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* === Current plan summary === */}
       <div className="rounded-3xl bg-white border border-gray-200 shadow-sm p-5 sm:p-6 mb-5">
         <p className="text-[11px] font-black uppercase tracking-wider text-gray-400 mb-2">Current plan</p>
@@ -554,16 +577,18 @@ export default function BillingPage() {
           <span className="text-2xl font-black text-gray-900 capitalize">{user?.plan || "Starter"}</span>
           <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full ${
             isSubscribed ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+            isCancelScheduled ? "bg-amber-50 text-amber-700 border border-amber-200" :
             trialDaysLeft !== null && trialDaysLeft <= 2 ? "bg-red-50 text-red-700 border border-red-200" :
             trialDaysLeft !== null ? "bg-amber-50 text-amber-700 border border-amber-200" :
             "bg-gray-100 text-gray-600 border border-gray-200"
           }`}>
             <span className={`w-1.5 h-1.5 rounded-full ${
               isSubscribed ? "bg-emerald-500" :
+              isCancelScheduled ? "bg-amber-500" :
               trialDaysLeft !== null && trialDaysLeft <= 2 ? "bg-red-500" :
               trialDaysLeft !== null ? "bg-amber-500" : "bg-gray-400"
             }`} />
-            {isSubscribed ? "Active" : trialDaysLeft !== null ? `Trial · ${trialDaysLeft}d left` : "Inactive"}
+            {isSubscribed ? "Active" : isCancelScheduled ? "Canceling" : trialDaysLeft !== null ? `Trial · ${trialDaysLeft}d left` : "Inactive"}
           </span>
           <span className="ml-auto whitespace-nowrap">
             <span className="text-2xl font-black text-gray-900">${isPro ? 50 : 24}</span>
@@ -758,7 +783,7 @@ export default function BillingPage() {
             <p className="text-xs text-gray-500 mt-0.5">
               {isTrialing
                 ? `You won't be charged${trialDaysLeft ? ` — trial runs ${trialDaysLeft} more day${trialDaysLeft === 1 ? "" : "s"}` : ""}. Your data stays put.`
-                : "Account pauses immediately. Data is preserved — resubscribe to restore access."}
+                : "Cancels at the end of your current billing period — you keep access until then. Your data is always saved."}
             </p>
           </div>
           <button
@@ -786,7 +811,7 @@ export default function BillingPage() {
               </svg>
             </div>
             <h3 className="text-lg font-bold text-gray-900 mb-2">Subscription Canceled</h3>
-            <p className="text-sm text-gray-500">Your account is paused. You can reactivate any time from this page.</p>
+            <p className="text-sm text-gray-500">You&apos;ll keep access until your current period ends, then your account pauses. Your data stays saved — reactivate any time from this page.</p>
           </div>
         </div>
       )}
@@ -807,7 +832,7 @@ export default function BillingPage() {
               {user?.subscriptionStatus === "trialing" ? (
                 <>You won&apos;t be charged. Your trial keeps running{trialDaysLeft ? ` for ${trialDaysLeft} more day${trialDaysLeft === 1 ? "" : "s"}` : ""} and your data stays safe.</>
               ) : (
-                <>Your account will be <strong>paused</strong> immediately and you&apos;ll lose access to bookings, calendar, and dashboard. Your data stays safe — you can reactivate any time.</>
+                <>You&apos;ll keep full access until the end of your current billing period. After that your account <strong>pauses</strong> — your data stays safe and you can reactivate any time.</>
               )}
             </p>
             <div className="flex gap-3">

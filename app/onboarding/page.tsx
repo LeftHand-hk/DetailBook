@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
+import ShareToolkit from "@/components/ShareToolkit";
 import { VEHICLE_TYPES, type VehicleTypeId } from "@/lib/vehicle-pricing";
 import { getPackages, getUser, isLoggedIn, syncFromServer } from "@/lib/storage";
 import type { PackageVehiclePricing, User } from "@/types";
@@ -321,6 +322,20 @@ export default function OnboardingPage() {
     try { sessionStorage.removeItem("dB_showTour"); } catch { /* private mode */ }
     queueRegistrationConversion(user?.id);
     setStep(2);
+  };
+
+  // Mark the "share_link" setup step complete when the owner shares or
+  // copies their link from the go-live screen, so the dashboard checklist
+  // and trial emails reflect it.
+  const markShareLink = () => {
+    fetch("/api/onboarding/status", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ markStep: "share_link" }),
+    }).catch(() => {});
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("detailbook:setup-changed"));
+    }
   };
 
   return (
@@ -693,6 +708,15 @@ export default function OnboardingPage() {
                     </button>
                   </div>
                 </div>
+
+                {bookingUrl && (
+                  <ShareToolkit
+                    url={bookingUrl}
+                    businessName={user?.businessName}
+                    onShared={markShareLink}
+                    className="mt-4"
+                  />
+                )}
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <Link

@@ -215,21 +215,21 @@ export default function BlogPage() {
         </div>
       </section>
 
-      {/* ── Newsletter CTA ── */}
+      {/* ── CTA ── */}
       <section className="py-16 bg-slate-900/50 border-t border-white/10">
         <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-2xl sm:text-3xl font-black text-white mb-3">Get New Articles in Your Inbox</h2>
-          <p className="text-gray-400 mb-6">No spam. Practical content for detailers, once a week.</p>
-          <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-            <input
-              type="email"
-              placeholder="your@email.com"
-              className="flex-1 bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
-            />
-            <button className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-3 rounded-xl transition-colors">
-              Subscribe
-            </button>
-          </div>
+          <h2 className="text-2xl sm:text-3xl font-black text-white mb-3">Put These Tips to Work</h2>
+          <p className="text-gray-400 mb-6">Set up online booking, deposits, and reminders for your detailing business in minutes.</p>
+          <Link
+            href="/signup"
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold px-7 py-3.5 rounded-xl transition-all duration-200 shadow-lg shadow-blue-600/25 hover:-translate-y-0.5"
+          >
+            Start Your 7-Day Free Trial
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </Link>
+          <p className="text-gray-500 text-xs mt-4">No card required · Cancel anytime</p>
         </div>
       </section>
     </SiteLayout>

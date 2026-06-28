@@ -59,11 +59,11 @@ const categories = [
 const faqs = [
   {
     q: "How do I set up my booking page for the first time?",
-    a: "After signing up, go to your Dashboard and click 'Set Up Booking Page'. You'll be guided through adding your business name, services, pricing, availability hours, and deposit settings. The whole process takes about 15 minutes. Once published, you'll get a shareable link at detailbook.app/book/your-handle.",
+    a: "After signing up, go to your Dashboard and click 'Set Up Booking Page'. You'll be guided through adding your business name, services, pricing, availability hours, and deposit settings. The whole process takes about 15 minutes. Once published, you'll get a shareable link at detailbookapp.com/book/your-handle.",
   },
   {
     q: "How does deposit collection work?",
-    a: "On the Pro plan, customers pay a deposit via Stripe when they book through your page. The deposit is automatically deducted from their total at the appointment. If they cancel within your policy window (typically 24 hours), the deposit is forfeited and transferred to you. You need to connect a Stripe account in Settings > Payments to enable this.",
+    a: "Deposit collection is available on both Starter and Pro. When you enable deposits, customers pay a deposit via Stripe (and other methods you turn on) when they book through your page. The deposit is automatically deducted from their total at the appointment. If they cancel within your policy window (typically 24 hours), the deposit is forfeited and transferred to you. Connect your Stripe account on the Deposit Payments page to enable this.",
   },
   {
     q: "Can I sync DetailBook with my Google Calendar?",
@@ -79,7 +79,7 @@ const faqs = [
   },
   {
     q: "Can I have multiple service providers on one account?",
-    a: "Currently, each DetailBook account supports one primary service provider. If you have employees or subcontractors, each would need their own account. Multi-provider accounts with shared calendars and routing are on our roadmap for 2026. Join the waitlist at detailbook.app/pro-teams.",
+    a: "Yes. The Pro plan includes multiple staff and calendars, so you can add your team members and manage their schedules from one account. Add them under Staff in your dashboard after upgrading to Pro.",
   },
   {
     q: "How do SMS reminders work?",

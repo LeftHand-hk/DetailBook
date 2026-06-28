@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { getUser, getBookings, getPackages, syncFromServer } from "@/lib/storage";
 import type { User, Booking, Package } from "@/types";
 import EmptyState, { EmptyIcons } from "@/components/EmptyState";
+import ShareToolkit from "@/components/ShareToolkit";
 import { localDateKey, localMonthKey } from "@/lib/date-key";
 
 const statusColors: Record<string, string> = {
@@ -180,6 +181,9 @@ export default function DashboardPage() {
   const weekTotal = last7.reduce((s, d) => s + d.rev, 0);
 
   const hasNoBookings = bookings.length === 0;
+  const bookingUrl = user?.slug
+    ? `${typeof window !== "undefined" ? window.location.origin : "https://detailbookapp.com"}/book/${user.slug}`
+    : "";
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
@@ -251,6 +255,18 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Share Toolkit — the #1 path to a first booking. Shown only while
+          the user has no bookings yet AND has at least one package, so we
+          never push them to share an empty, unbookable page. */}
+      {hasNoBookings && bookingUrl && packages.length > 0 && (
+        <ShareToolkit
+          url={bookingUrl}
+          businessName={user?.businessName}
+          onShared={markShareLinkDone}
+          className="mb-6"
+        />
       )}
 
       {/* Pro-tip nudge — only after the user has felt a real booking,

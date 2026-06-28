@@ -749,6 +749,7 @@ export default function BookingPage({ params }: { params: { slug: string } }) {
     if (!user?.businessHours) return null;
     const dayName = DAY_NAMES[new Date().getDay()];
     const hours = user.businessHours[dayName];
+    if (!hours) return null;
     if (hours.closed) return "Closed today";
     return `Open today: ${hours.open} – ${hours.close}`;
   };

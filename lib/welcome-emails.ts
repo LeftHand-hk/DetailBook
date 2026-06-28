@@ -272,28 +272,27 @@ If you need help getting everything ready before the trial ends, reply to this e
 function emailDay7(r: Recipient, unsubUrl: string) {
   const firstName = (r.name || "").trim().split(/\s+/)[0] || "there";
   const e = escapeHtml;
-  const subject = `Your trial ends today`;
+  const subject = `Your trial ends today — your booking page goes offline tonight`;
 
   const text = `Hi ${firstName},
 
-Your 7-day trial ends today.
+Your 7-day trial ends today — and when it does, your booking page goes offline. Anyone who opens your link won't be able to book you or pay a deposit.
 
-To keep your booking page live and continue accepting customer bookings, choose a plan before the trial expires:
+Keep your page live and keep taking bookings — choose a plan before today ends:
 ${APP_URL}/dashboard/billing
 
 Plans start at $24 per month and can be canceled anytime.
 
-If you do not subscribe today, your account will pause. Nothing will be deleted: your packages, bookings, customers, and settings will remain saved so you can reactivate later.
+Nothing gets deleted — your packages, bookings, customers, and settings stay saved if you reactivate later. But your page stays offline until you do.
 
 Need help deciding or setting something up? Reply to this email and I'll help you personally.${tplSignatureText(unsubUrl)}`;
 
   const html = tplShell(`
     <p style="margin:0 0 14px 0;">Hi ${e(firstName)},</p>
-    <p style="margin:0 0 14px 0;">Your 7-day trial ends today.</p>
-    <p style="margin:0 0 14px 0;">To keep your booking page live and continue accepting customer bookings, choose a plan before the trial expires.</p>
+    <p style="margin:0 0 14px 0;">Your 7-day trial ends today — and when it does, <strong>your booking page goes offline</strong>. Anyone who opens your link won&rsquo;t be able to book you or pay a deposit.</p>
     <p style="margin:0 0 20px 0;"><a href="${APP_URL}/dashboard/billing" style="display:inline-block;background:#2563eb;color:#fff;padding:11px 18px;border-radius:8px;text-decoration:none;font-weight:700;">Keep my booking page live</a></p>
     <p style="margin:0 0 14px 0;">Plans start at $24 per month and can be canceled anytime.</p>
-    <p style="margin:0 0 14px 0;">If you do not subscribe today, your account will pause. Nothing will be deleted: your packages, bookings, customers, and settings will remain saved so you can reactivate later.</p>
+    <p style="margin:0 0 14px 0;">Nothing gets deleted — your packages, bookings, customers, and settings stay saved if you reactivate later. But your page stays offline until you do.</p>
     <p style="margin:0 0 14px 0;">Need help deciding or setting something up? Reply to this email and I&rsquo;ll help you personally.</p>`,
     unsubUrl);
 
@@ -896,6 +895,255 @@ export async function sendPaymentFailedEmail(userId: string): Promise<{ success:
   }
 
   return { success: false, error: lastError };
+}
+
+// ─── Win-back (post-trial) ──────────────────────────────────────────
+// After the trial lapses unpaid the booking page goes offline. These two
+// emails pull the owner back to reactivate. They are NOT part of the
+// day1-7 sequence — they fire AFTER the trial end and use EmailLog
+// (emailType "welcome_winbackN") for idempotency, so no schema migration
+// is needed. No discounts, per product direction. Timing is relative to
+// the real trial end: winback1 ~2 days after, winback2 ~7 days after.
+export type WinBackKey = "winback1" | "winback2";
+
+function emailWinback1(r: Recipient, unsubUrl: string) {
+  const firstName = (r.name || "").trim().split(/\s+/)[0] || "there";
+  const business = r.businessName || "your business";
+  const e = escapeHtml;
+  const billing = `${APP_URL}/dashboard/billing`;
+  const subject = `Your DetailBook booking page is paused`;
+
+  const text = `Hi ${firstName},
+
+Your free trial ended, so the booking page for ${business} is now paused — anyone who opens your link right now can't book you or pay a deposit.
+
+Everything you set up is still saved: your packages, settings, and bookings. You can turn your page back on in under a minute:
+${billing}
+
+Plans start at $24 per month and can be canceled anytime.
+
+If something held you back or you have questions, just reply — I read every email.${tplSignatureText(unsubUrl)}`;
+
+  const html = tplShell(`
+    <p style="margin:0 0 14px 0;">Hi ${e(firstName)},</p>
+    <p style="margin:0 0 14px 0;">Your free trial ended, so the booking page for <strong>${e(business)}</strong> is now paused — anyone who opens your link right now can&rsquo;t book you or pay a deposit.</p>
+    <p style="margin:0 0 14px 0;">Everything you set up is still saved: your packages, settings, and bookings. You can turn your page back on in under a minute.</p>
+    <p style="margin:0 0 20px 0;"><a href="${billing}" style="display:inline-block;background:#2563eb;color:#fff;padding:11px 18px;border-radius:8px;text-decoration:none;font-weight:700;">Reactivate my booking page</a></p>
+    <p style="margin:0 0 14px 0;">Plans start at $24 per month and can be canceled anytime.</p>
+    <p style="margin:0 0 14px 0;">If something held you back or you have questions, just reply — I read every email.</p>`,
+    unsubUrl);
+
+  return { subject, text, html };
+}
+
+function emailWinback2(r: Recipient, unsubUrl: string) {
+  const firstName = (r.name || "").trim().split(/\s+/)[0] || "there";
+  const e = escapeHtml;
+  const billing = `${APP_URL}/dashboard/billing`;
+  const subject = `Still want your booking page back?`;
+
+  const text = `Hi ${firstName},
+
+A week ago your DetailBook trial ended and your booking page went offline. I wanted to check in once more before I stop sending these.
+
+Your packages and settings are still saved — nothing has been lost. Whenever you're ready to take online bookings and deposits again, you can switch your page back on here:
+${billing}
+
+No pressure — your account stays right here for whenever the timing's better. And if there's anything I can help with, just reply.${tplSignatureText(unsubUrl)}`;
+
+  const html = tplShell(`
+    <p style="margin:0 0 14px 0;">Hi ${e(firstName)},</p>
+    <p style="margin:0 0 14px 0;">A week ago your DetailBook trial ended and your booking page went offline. I wanted to check in once more before I stop sending these.</p>
+    <p style="margin:0 0 14px 0;">Your packages and settings are still saved — nothing has been lost. Whenever you&rsquo;re ready to take online bookings and deposits again, you can switch your page back on:</p>
+    <p style="margin:0 0 20px 0;"><a href="${billing}" style="display:inline-block;background:#2563eb;color:#fff;padding:11px 18px;border-radius:8px;text-decoration:none;font-weight:700;">Turn my booking page back on</a></p>
+    <p style="margin:0 0 14px 0;">No pressure — your account stays right here for whenever the timing&rsquo;s better. And if there&rsquo;s anything I can help with, just reply.</p>`,
+    unsubUrl);
+
+  return { subject, text, html };
+}
+
+function buildWinBack(key: WinBackKey, r: Recipient, unsubUrl: string) {
+  return key === "winback1" ? emailWinback1(r, unsubUrl) : emailWinback2(r, unsubUrl);
+}
+
+function winBackEmailType(key: WinBackKey): string {
+  return `welcome_${key}`;
+}
+
+async function hasSentEmailType(userId: string, emailType: string): Promise<boolean> {
+  const row = await prisma.emailLog.findFirst({
+    where: { userId, emailType, success: true },
+    select: { id: true },
+  });
+  return Boolean(row);
+}
+
+export function previewWinBackEmail(
+  key: WinBackKey,
+  recipient: WelcomeRecipient,
+): { subject: string; text: string; html: string } {
+  return buildWinBack(key, recipient, `${APP_URL}/api/welcome-unsubscribe?t=preview`);
+}
+
+// Send one win-back email. Idempotent via EmailLog: a successful prior send
+// of the same type short-circuits. Skips paid/canceled/paused/past-due and
+// self-heals legacy card trials that already converted at Paddle.
+export async function sendWinBackEmail(
+  userId: string,
+  key: WinBackKey,
+): Promise<{ success: boolean; error?: string }> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      businessName: true,
+      slug: true,
+      trialEndsAt: true,
+      welcomeUnsubToken: true,
+      welcomeEmailsPaused: true,
+      suspended: true,
+      subscriptionStatus: true,
+      paddleSubscriptionId: true,
+      _count: { select: { packages: true } },
+    },
+  });
+  if (!user) return { success: false, error: "user_not_found" };
+  if (user.welcomeEmailsPaused) return { success: false, error: "paused" };
+  if (user.suspended) return { success: false, error: "suspended" };
+
+  const status = (user.subscriptionStatus || "").toLowerCase();
+  if (["active", "canceled", "paused", "past_due"].includes(status)) {
+    return { success: false, error: status === "active" ? "already_subscribed" : `subscription_${status}` };
+  }
+  // Legacy card-on-file trials: confirm with Paddle (source of truth) and
+  // self-heal if they've already converted.
+  if (user.paddleSubscriptionId) {
+    const liveStatus = await fetchPaddleSubscriptionStatus(user.paddleSubscriptionId);
+    if (liveStatus === "active") {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { subscriptionStatus: "active", trialEndsAt: "" },
+        select: { id: true },
+      });
+      return { success: false, error: "already_subscribed" };
+    }
+  }
+
+  const emailTypeStr = winBackEmailType(key);
+  if (await hasSentEmailType(user.id, emailTypeStr)) {
+    return { success: false, error: "already_sent" };
+  }
+
+  const token = await ensureUnsubToken(user.id, user.welcomeUnsubToken);
+  const unsubUrl = unsubLink(token);
+  const recipient: Recipient = {
+    id: user.id,
+    email: user.email,
+    businessName: user.businessName,
+    slug: user.slug,
+    name: user.name || "",
+    trialEndsAt: user.trialEndsAt || "",
+    packageCount: user._count.packages,
+    hasWorkingHours: false,
+    hasCustomizedPage: false,
+    hasSharedLink: false,
+  };
+  const payload = buildWinBack(key, recipient, unsubUrl);
+
+  let lastError: string | undefined;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const result = await sendEmail({
+      to: user.email,
+      subject: payload.subject,
+      text: payload.text,
+      html: payload.html,
+      from: `"${FROM_NAME}" <${FROM_ADDRESS}>`,
+      replyTo: REPLY_TO,
+    });
+    try {
+      await prisma.emailLog.create({
+        data: {
+          userId: user.id,
+          emailType: emailTypeStr,
+          recipient: user.email,
+          success: result.success,
+          errorMessage: result.error || null,
+          attempt,
+        },
+      });
+    } catch (err) {
+      console.error("[win-back] EmailLog write failed:", err);
+    }
+    if (result.success) {
+      console.log(`[win-back] sent ${key} to ${user.email} (attempt ${attempt})`);
+      return { success: true };
+    }
+    lastError = result.error || "send_failed";
+    const delay = RETRY_DELAYS_MS[attempt - 1];
+    if (delay) await new Promise((res) => setTimeout(res, delay));
+  }
+  return { success: false, error: lastError };
+}
+
+// Cron walker for win-back. Scans accounts whose trial lapsed unpaid in
+// the last 60 days and sends winback1 (>=2 days after end) then winback2
+// (>=7 days after end). EmailLog guarantees each is sent at most once.
+export async function runWinBackTick(): Promise<{
+  checked: number;
+  sent: { email: string; key: WinBackKey }[];
+  skipped: { email: string; reason: string }[];
+}> {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const sinceCutoff = new Date(now - 60 * dayMs);
+
+  const candidates = await prisma.user.findMany({
+    where: {
+      createdAt: { gte: sinceCutoff },
+      welcomeEmailsPaused: false,
+      suspended: false,
+      OR: [
+        { subscriptionStatus: null },
+        { subscriptionStatus: "" },
+        { subscriptionStatus: "trialing" },
+      ],
+      NOT: { trialEndsAt: "" },
+    },
+    select: {
+      id: true,
+      email: true,
+      trialEndsAt: true,
+      subscriptionStatus: true,
+      paddleSubscriptionId: true,
+    },
+  });
+
+  const sent: { email: string; key: WinBackKey }[] = [];
+  const skipped: { email: string; reason: string }[] = [];
+
+  for (const u of candidates) {
+    const ends = Date.parse(u.trialEndsAt);
+    if (Number.isNaN(ends)) { skipped.push({ email: u.email, reason: "invalid_trial_end" }); continue; }
+    const sinceEndMs = now - ends;
+    if (sinceEndMs <= 0) { skipped.push({ email: u.email, reason: "trial_active" }); continue; }
+    const daysSinceEnd = sinceEndMs / dayMs;
+
+    let key: WinBackKey | null = null;
+    if (daysSinceEnd >= 7) {
+      if (!(await hasSentEmailType(u.id, winBackEmailType("winback2")))) key = "winback2";
+    } else if (daysSinceEnd >= 2) {
+      if (!(await hasSentEmailType(u.id, winBackEmailType("winback1")))) key = "winback1";
+    }
+    if (!key) { skipped.push({ email: u.email, reason: "not_due" }); continue; }
+
+    const result = await sendWinBackEmail(u.id, key);
+    if (result.success) sent.push({ email: u.email, key });
+    else skipped.push({ email: u.email, reason: result.error || "send_failed" });
+  }
+
+  return { checked: candidates.length, sent, skipped };
 }
 
 // Sends all four trial-sequence emails to an arbitrary address (the

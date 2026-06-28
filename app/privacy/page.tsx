@@ -54,7 +54,7 @@ We do not share your customers' data with any third party except as necessary to
 
 We use essential cookies (required for the service to function), analytics cookies (to understand how users interact with our product), and preference cookies (to remember your settings).
 
-You can control cookie settings through your browser settings or by reviewing our Cookie Policy at detailbook.app/cookies. Note that disabling certain cookies may affect the functionality of our services.`,
+You can control cookie settings through your browser settings or by reviewing our Cookie Policy at detailbookapp.com/cookies. Note that disabling certain cookies may affect the functionality of our services.`,
   },
   {
     id: "data-security",

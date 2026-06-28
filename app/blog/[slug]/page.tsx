@@ -63,7 +63,7 @@ We spent weeks testing every major option. Here's the honest breakdown.
 
 **DetailBook**
 
-Built specifically for mobile auto detailers. Includes online booking, deposit collection, SMS reminders, package builder, Google Calendar sync, and a clean mobile dashboard. Starts at $24/month with a 30-day free trial.
+Built specifically for mobile auto detailers. Includes online booking, deposit collection, SMS reminders, package builder, Google Calendar sync, and a clean mobile dashboard. Starts at $24/month with a 7-day free trial.
 
 *Best for:* Detailers who want something purpose-built and don't want to configure a generic tool. ★★★★★
 
@@ -361,7 +361,7 @@ Add your business name, logo, service area, hours, and a short bio. Upload a pro
 
 **Step 5: Share Your Booking Link**
 
-Your booking page is live at detailbook.app/book/[your-handle]. Share it everywhere:
+Your booking page is live at detailbookapp.com/book/[your-handle]. Share it everywhere:
 - Instagram bio link
 - Google Business Profile website field
 - Nextdoor and Facebook group posts
@@ -488,7 +488,7 @@ export default function BlogPostPage({ params }: { params: { slug: string } }) {
           <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center text-white font-black text-xs">
-                AR
+                DB
               </div>
               <span className="text-white font-semibold">{post.author}</span>
             </div>
@@ -527,7 +527,7 @@ export default function BlogPostPage({ params }: { params: { slug: string } }) {
                   href="/signup"
                   className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold px-7 py-3.5 rounded-xl transition-all duration-200 shadow-lg shadow-blue-600/25 hover:-translate-y-0.5"
                 >
-                  Start Your 30-Day Free Trial
+                  Start Your 7-Day Free Trial
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                   </svg>

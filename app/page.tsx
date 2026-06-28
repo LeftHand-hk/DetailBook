@@ -57,7 +57,7 @@ export default function LandingPage() {
     { q: "Do you take a cut of my bookings or deposits?", a: "Never. The monthly subscription is the only thing you pay us — no per-booking fees, no commission, no hidden cuts. When a customer pays a deposit by card, the money goes straight to your own Stripe/Square account. The only fees are the standard processor fees Stripe or Square charge directly." },
     { q: "Can my customers pay the deposit online?", a: "Yes. On both Starter and Pro, customers can pay the deposit straight from your booking page. We support card payments via Stripe, plus PayPal, Cash App, Square, bank transfer, and pay-cash-on-arrival — turn on whichever methods fit your business." },
     { q: "What happens if I exceed 5 packages on Starter?", a: "You'll be prompted to upgrade to Pro. All your existing packages stay active — you just can't add more until you upgrade." },
-    { q: "Can I cancel anytime?", a: "Absolutely. No long-term contracts. Cancel any time from your Settings page. You keep access until the end of your billing period." },
+    { q: "Can I cancel anytime?", a: "Absolutely. No long-term contracts. Cancel any time from the Billing page in your dashboard. Your packages, bookings, and settings are always saved, so you can reactivate whenever you're ready." },
     { q: "Does DetailBook work on mobile?", a: "Yes! Both your dashboard and your customer-facing booking page are fully optimized for mobile devices." },
   ];
 
@@ -584,7 +584,7 @@ export default function LandingPage() {
                 <span className="text-gray-400 ml-1">/month</span>
               </div>
               <ul className="space-y-3 mb-6 flex-1">
-                {["Custom booking page","Up to 5 service packages","Deposit collection","Email reminders","Calendar dashboard","Mobile-friendly dashboard","Google Calendar sync"].map((item) => (
+                {["Custom booking page","Up to 5 service packages","Deposit collection","Email reminders","Calendar dashboard","Mobile-friendly dashboard","Vehicle-type pricing"].map((item) => (
                   <li key={item} className="flex items-center gap-3 text-gray-300 text-sm">
                     <CheckIcon />{item}
                   </li>
@@ -697,7 +697,7 @@ export default function LandingPage() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 glass border border-white/10 text-white/60 text-xs font-bold px-4 py-2 rounded-full mb-8 uppercase tracking-widest">
             <svg className="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4"/></svg>
-            Now in Beta — Join Early Access
+            7-Day Free Trial · No Card Required
           </div>
 
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-tight mb-6">

@@ -34,7 +34,7 @@ export default function TrialEndedModal() {
           </div>
           <h2 className="text-2xl font-black text-gray-900">Your trial has ended</h2>
           <p className="mx-auto mt-1.5 max-w-xs text-sm text-gray-500">
-            Keep your booking page live and ready for your customers.
+            Your booking page is now offline — customers can&apos;t book you or pay deposits until you choose a plan.
           </p>
         </div>
 

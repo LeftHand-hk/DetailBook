@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runWelcomeSequenceTick } from "@/lib/welcome-emails";
+import { runWelcomeSequenceTick, runWinBackTick } from "@/lib/welcome-emails";
 
 // Backward-compatible daily cron endpoint. The hourly welcome cron is the
 // primary scheduler; this route runs the same atomic sequence as a backup.
@@ -15,7 +15,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const welcomeSequence = await runWelcomeSequenceTick();
-    return NextResponse.json({ welcomeSequence });
+    const winBack = await runWinBackTick();
+    return NextResponse.json({ welcomeSequence, winBack });
   } catch (error) {
     console.error("[cron/trial-warnings] error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

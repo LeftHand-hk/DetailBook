@@ -443,7 +443,7 @@ export default function BookingPageClassicEditor() {
             <label className="block text-sm font-semibold text-gray-700 mb-2">Booking Page URL</label>
             <div className="flex items-center gap-0">
               <span className="inline-flex items-center px-4 py-3 bg-gray-50 border border-r-0 border-gray-200 rounded-l-xl text-sm text-gray-500 font-medium whitespace-nowrap">
-                detailbook.app/book/
+                detailbookapp.com/book/
               </span>
               <input type="text" value={form.slug} onChange={(e) => update({ slug: e.target.value })} placeholder="your-business-name"
                 className="flex-1 px-4 py-3 border border-gray-200 rounded-r-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all placeholder-gray-300" />

@@ -266,7 +266,7 @@ export default function AnalyticsPage() {
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
           <EmptyState
             icon={EmptyIcons.TrendingUp}
-            title="Revenue insights coming soon"
+            title="Your revenue insights will appear here"
             description="Once you start receiving bookings, you'll see revenue trends, top services, and customer insights here."
           />
         </div>
