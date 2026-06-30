@@ -85,6 +85,43 @@ export async function GET(req: NextRequest) {
     out.paymentMethods = "NO paddleCustomerId stored on this user";
   }
 
+  // ALL subscriptions for this customer — the single stored
+  // paddleSubscriptionId can't reveal an orphan/duplicate that keeps
+  // billing. List every sub across every customer record sharing this email.
+  out.allSubscriptions = [];
+  const customerIds = new Set<string>();
+  if (user.paddleCustomerId) customerIds.add(user.paddleCustomerId);
+  try {
+    const cr = await fetch(`${base}/customers?email=${encodeURIComponent(user.email)}`, { headers, cache: "no-store" });
+    const cj = await cr.json().catch(() => ({} as any));
+    for (const c of cj?.data || []) if (c?.id) customerIds.add(c.id);
+  } catch { /* ignore */ }
+  for (const cid of Array.from(customerIds)) {
+    try {
+      const sr = await fetch(`${base}/subscriptions?customer_id=${cid}&per_page=50`, { headers, cache: "no-store" });
+      const sj = await sr.json().catch(() => ({} as any));
+      for (const s of sj?.data || []) {
+        out.allSubscriptions.push({
+          id: s.id,
+          customerId: cid,
+          status: s.status,
+          next_billed_at: s.next_billed_at,
+          scheduled_change: s.scheduled_change?.action || null,
+          priceIds: (s.items || []).map((i: any) => i.price?.id || i.price_id),
+          isTracked: s.id === user.paddleSubscriptionId,
+        });
+      }
+    } catch { /* ignore */ }
+  }
+  const billable = (out.allSubscriptions as any[]).filter((s) =>
+    ["active", "trialing", "past_due"].includes(s.status)
+  );
+  if (billable.length > 1) {
+    out.DUPLICATE_WARNING =
+      `This customer has ${billable.length} active/trialing/past_due subscriptions — likely duplicate billing. ` +
+      `Keep one (ideally the "isTracked" one), cancel the rest in Paddle, and refund the extra charges.`;
+  }
+
   // Diagnosis
   const problems: string[] = [];
   if (sub) {

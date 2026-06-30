@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendPaymentFailedEmail } from "@/lib/welcome-emails";
+import { cancelPaddleSubscription } from "@/lib/paddle";
 
 // Map Paddle price IDs → plan names
 const PRICE_TO_PLAN: Record<string, string> = {
@@ -201,6 +202,16 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // Capture any subscription we already had linked, so that if Paddle
+        // just created a DIFFERENT one we can cancel the old one. Otherwise
+        // the previous subscription becomes an orphan that keeps billing —
+        // the duplicate-charge bug. One DetailBook account = one sub.
+        const prior = await prisma.user.findUnique({
+          where: { id: resolvedUser.id },
+          select: { paddleSubscriptionId: true },
+        });
+        const previousSubId = prior?.paddleSubscriptionId || "";
+
         const updateData: Record<string, any> = {
           paddleSubscriptionId: data.id,
           paddleCustomerId: data.customer_id,
@@ -216,6 +227,16 @@ export async function POST(req: NextRequest) {
         }
 
         await prisma.user.update({ where: { id: resolvedUser.id }, data: updateData });
+
+        // Orphan guard: a genuinely new subscription id means the old one is
+        // a duplicate. Cancel it at Paddle so it stops billing. Never throws.
+        if (previousSubId && previousSubId !== data.id) {
+          const cancelResult = await cancelPaddleSubscription(previousSubId);
+          console.log(
+            "[Paddle webhook] canceled previous subscription to prevent duplicate billing",
+            JSON.stringify({ userId: resolvedUser.id, previousSubId, newSubId: data.id, cancelResult })
+          );
+        }
         console.log(
           "[Paddle webhook] linked subscription",
           JSON.stringify({

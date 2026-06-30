@@ -375,6 +375,36 @@ export default function BillingPage() {
         }
       }
 
+      // Duplicate-subscription guard. Before opening a brand-new checkout,
+      // ask the server whether this customer already has a subscription at
+      // Paddle. Creating a second one is what caused duplicate charges.
+      try {
+        const pre = await fetch("/api/subscription/checkout-precheck", { method: "POST" });
+        const preData = await pre.json().catch(() => ({} as any));
+        if (pre.ok) {
+          if (preData.action === "already_active") {
+            if (preData.user) setUser(preData.user);
+            setActivateSuccess(true);
+            if (typeof window !== "undefined") setTimeout(() => window.location.reload(), 600);
+            return;
+          }
+          if (preData.action === "pay_existing" && preData.transactionId) {
+            if (!paddle) {
+              setChangePlanError("Payment system is still loading. Please wait a moment and try again.");
+              return;
+            }
+            pendingPlanRef.current = plan;
+            checkoutIntentRef.current = "subscribe";
+            setWaitTimedOut(false);
+            setActivateSuccess(false);
+            paddle.Checkout.open({ transactionId: preData.transactionId });
+            return;
+          }
+        }
+      } catch {
+        // Fail open — never block a real purchase on a precheck hiccup.
+      }
+
       const priceId = plan === "pro"
         ? process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID
         : process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID;
@@ -417,6 +447,9 @@ export default function BillingPage() {
     if (param !== "starter" && param !== "pro") return;
     autoCheckoutFired.current = true;
     window.history.replaceState(null, "", "/dashboard/billing");
+    // Already paying? Don't auto-open a checkout — prevents creating a
+    // duplicate subscription if the user reopens the ?checkout= link.
+    if (user.subscriptionStatus === "active") return;
     handlePlanAction(param);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, paddle]);
