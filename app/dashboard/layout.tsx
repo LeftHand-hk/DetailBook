@@ -8,6 +8,7 @@ import type { User } from "@/types";
 import Logo from "@/components/Logo";
 import TrialEndedModal from "@/components/TrialEndedModal";
 import { getTrialPhase } from "@/lib/trial";
+import { trackTrialStartedConversion } from "@/lib/google-ads";
 
 interface NavItem {
   label: string;
@@ -122,17 +123,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [upgradeDismissed, setUpgradeDismissed] = useState(false);
   const [impersonating, setImpersonating] = useState(false);
 
-  // Onboarding queues this conversion. Consume it only after the dashboard
-  // loads and Meta Pixel is ready, then persist completion so refreshes and
-  // later dashboard visits cannot duplicate the event.
+  // Onboarding queues signup conversions. Consume them only after the
+  // dashboard loads, then persist completion per ad platform so refreshes and
+  // later dashboard visits cannot duplicate the events.
   useEffect(() => {
     if (!user?.id || typeof window === "undefined") return;
 
     const pendingKey = `db_meta_registration_pending:${user.id}`;
-    const completedKey = `db_meta_registration_completed:${user.id}`;
+    const metaCompletedKey = `db_meta_registration_completed:${user.id}`;
+    const googleCompletedKey = `db_google_trial_started_completed:${user.id}`;
     try {
       if (localStorage.getItem(pendingKey) !== "1") return;
-      if (localStorage.getItem(completedKey) === "1") {
+      if (
+        localStorage.getItem(metaCompletedKey) === "1" &&
+        localStorage.getItem(googleCompletedKey) === "1"
+      ) {
         localStorage.removeItem(pendingKey);
         return;
       }
@@ -144,7 +149,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     let retryTimer: number | undefined;
     const fireWhenReady = () => {
       attempts += 1;
-      if (typeof window.fbq === "function") {
+
+      let metaDone = false;
+      let googleDone = false;
+      try {
+        metaDone = localStorage.getItem(metaCompletedKey) === "1";
+        googleDone = localStorage.getItem(googleCompletedKey) === "1";
+      } catch {
+        return;
+      }
+
+      if (!metaDone && typeof window.fbq === "function") {
         window.fbq("track", "CompleteRegistration", {
           content_name: "DetailBook Onboarding",
           status: true,
@@ -152,11 +167,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           currency: "USD",
         });
         try {
-          localStorage.setItem(completedKey, "1");
-          localStorage.removeItem(pendingKey);
+          localStorage.setItem(metaCompletedKey, "1");
+          metaDone = true;
         } catch { /* private mode */ }
+      }
+
+      if (!googleDone && trackTrialStartedConversion()) {
+        try {
+          localStorage.setItem(googleCompletedKey, "1");
+          googleDone = true;
+        } catch { /* private mode */ }
+      }
+
+      if (metaDone && googleDone) {
+        try { localStorage.removeItem(pendingKey); } catch { /* private mode */ }
         return;
       }
+
       if (attempts < 20) {
         retryTimer = window.setTimeout(fireWhenReady, 250);
       }
