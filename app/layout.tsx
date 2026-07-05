@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import MetaPixel from "@/components/MetaPixel";
 
@@ -51,6 +52,21 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={inter.variable}>
+      <head>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=AW-18300678638"
+          strategy="beforeInteractive"
+        />
+        <Script id="google-ads-tag" strategy="beforeInteractive">
+          {`
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'AW-18300678638');
+`}
+        </Script>
+      </head>
       <body className="bg-white text-gray-900 antialiased font-sans">
         <MetaPixel />
         {children}
