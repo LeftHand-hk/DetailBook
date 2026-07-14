@@ -42,6 +42,7 @@ export default function DashboardPage() {
   const [setupSteps, setSetupSteps] = useState<SetupStep[] | null>(null);
   const [copied, setCopied] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [paidThrough, setPaidThrough] = useState<string | null>(null);
   // Persisted dismissal of the post-first-booking "consider deposits"
   // nudge. Once dismissed we never show it again on this device.
   const [depositTipDismissed, setDepositTipDismissed] = useState(false);
@@ -75,6 +76,30 @@ export default function DashboardPage() {
     refreshSetup();
   }, [refreshSetup]);
 
+  useEffect(() => {
+    const status = String((user as any)?.subscriptionStatus || "").toLowerCase();
+    const hasPaidPeriod = ["active", "canceled"].includes(status) && !(user as any)?.suspended;
+    if (!hasPaidPeriod) {
+      setPaidThrough(null);
+      return;
+    }
+
+    let cancelled = false;
+    fetch("/api/subscription/payment-method", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        setPaidThrough(data?.nextBilledAt || null);
+      })
+      .catch(() => {
+        if (!cancelled) setPaidThrough(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   // Other pages (e.g. /dashboard/packages) dispatch
   // "detailbook:setup-changed" after mutating setup state. Listen so
   // the Setup Progress Card here also refreshes without a hard reload
@@ -87,6 +112,12 @@ export default function DashboardPage() {
   }, [refreshSetup]);
 
   const isPro = user?.plan === "pro";
+  const subscriptionStatus = String((user as any)?.subscriptionStatus || "").toLowerCase();
+  const showPaidAccessNotice =
+    ["active", "canceled"].includes(subscriptionStatus) && !(user as any)?.suspended;
+  const paidThroughLabel = paidThrough
+    ? new Date(paidThrough).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+    : "the end of your paid billing period";
   const today = localDateKey();
   const todayBookings = bookings.filter((b) => b.date === today);
   const upcomingBookings = bookings
@@ -223,6 +254,30 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      {showPaidAccessNotice && (
+        <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 sm:px-5 sm:py-4 flex items-start gap-3">
+          <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.4} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-emerald-900">
+              DetailBook is active through {paidThroughLabel}.
+            </p>
+            <p className="mt-0.5 text-xs sm:text-sm text-emerald-800">
+              Your dashboard and booking page will stay functional for the month you have paid for.
+            </p>
+          </div>
+          <Link
+            href="/dashboard/billing"
+            className="hidden sm:inline-flex flex-shrink-0 text-xs font-bold text-emerald-800 hover:text-emerald-900 underline underline-offset-2"
+          >
+            Billing
+          </Link>
+        </div>
+      )}
 
       {/* ── Stats / Setup Progress (mutually exclusive) ──
           With 0 bookings the 4 stat cards all read "—" which gives the
